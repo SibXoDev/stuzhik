@@ -1,0 +1,17 @@
+// Quick compilation test
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_analyzer_creation() {
+        let analyzer = LogAnalyzer::new();
+        assert!(analyzer.patterns.len() > 0);
+    }
+
+    #[test]
+    fn test_class_analysis() {
+        let result = analyze_class_path("net.minecraft.client.Main");
+        assert_eq!(result, ClassAnalysisResult::Minecraft);
+    }
+}

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Stuzhik",
+  "version": "0.0.3",
+  "identifier": "ru.sibxodev.stuzhik",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Stuzhik",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": false,
+        "transparent": false,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: asset: http://asset.localhost https://cdn.modrinth.com https://cdn-raw.modrinth.com https://media.forgecdn.net https://www.gravatar.com https://i.imgur.com https://raw.githubusercontent.com; connect-src 'self' https://api.modrinth.com https://api.curseforge.com https://launchermeta.mojang.com https://piston-meta.mojang.com https://resources.download.minecraft.net https://libraries.minecraft.net https://files.minecraftforge.net https://maven.minecraftforge.net https://meta.fabricmc.net https://maven.fabricmc.net https://meta.quiltmc.org https://maven.quiltmc.org https://maven.neoforged.net; font-src 'self' data:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self';",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPDATA/**",
+          "$APPLOCALDATA/**",
+          "$APPCONFIG/**",
+          "$RESOURCE/**",
+          "$HOME/.local/share/**",
+          "$HOME/Library/Application Support/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "copyright": "© 2025 Stuzhik",
+    "publisher": "SibXoDev",
+    "homepage": "https://sibxodev.github.io/stuzhik/",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "allowDowngrades": false,
+      "wix": {
+        "language": "ru-RU"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "languages": ["Russian", "English"],
+        "displayLanguageSelector": true
+      }
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      },
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1"
+        ],
+        "section": "games",
+        "priority": "optional"
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "gtk3",
+          "libappindicator-gtk3"
+        ]
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 },
+        "windowSize": { "width": 660, "height": 400 }
+      },
+      "signingIdentity": null,
+      "hardenedRuntime": true
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/SibXoDev/stuzhik/releases/latest/download/latest.json",
+        "https://stuzhik.ru/releases/latest/download/latest.json",
+        "https://stuzhik.sibxodev.ru/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE4ODRBRDQzNzIzMTRDMjcKUldRblRERnlRNjJFcVBHTmszZURlN3pYL1dVUkRnTm9EMTFjdXBMTURLdFd0aEd5NlJWQ3NWeTcK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

@@ -1,0 +1,2010 @@
+{
+  "common": {
+    "create": "Create",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "close": "Close",
+    "back": "Back",
+    "yes": "Yes",
+    "no": "No",
+    "or": "or",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "install": "Install",
+    "copy": "Copy",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "tools": "Tools",
+    "play": "Play",
+    "stop": "Stop",
+    "more": "more",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "reset": "Reset",
+    "documentation": "Documentation"
+  },
+  "titleBar": {
+    "devConsole": "Developer Console",
+    "settings": "Settings",
+    "downloads": "Downloads",
+    "connect": "Friends",
+    "docs": "Documentation",
+    "changelog": "Changelog",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "versions": "versions",
+    "current": "Current",
+    "allReleases": "All releases",
+    "madeIn": "Made in Russia",
+    "types": {
+      "feature": "New",
+      "fix": "Fixes",
+      "improvement": "Improvements",
+      "breaking": "Breaking Changes"
+    }
+  },
+  "app": {
+    "subtitle": "Manage instances, mods and settings"
+  },
+  "loaders": {
+    "notRequired": "Not required",
+    "notSupported": "Not supported",
+    "notSupportedHint": "This loader does not support the selected Minecraft version. Choose a different version or loader.",
+    "autoLatest": "Automatic (latest)",
+    "fabric": "Fabric",
+    "forge": "Forge",
+    "neoforge": "NeoForge",
+    "quilt": "Quilt",
+    "vanilla": "Vanilla"
+  },
+  "quickPlay": {
+    "installing": "Installing...",
+    "steps": {
+      "java": "Java",
+      "minecraft": "Minecraft",
+      "loader": "Loader",
+      "complete": "Complete"
+    }
+  },
+  "instances": {
+    "title": "Instances",
+    "create": "Create Instance",
+    "creating": "Creating Instance",
+    "loading": "Loading instances...",
+    "start": "Start",
+    "stop": "Stop",
+    "quickLaunch": "Quick Launch",
+    "delete": "Delete",
+    "edit": "Edit",
+    "openFolder": "Open Folder",
+    "moreActions": "More Actions",
+    "gameSettings": "Game Settings",
+    "console": "Console",
+    "serverSettings": "Server Settings",
+    "analyzeLogs": "Analyze Logs",
+    "checkIntegrity": "Check Integrity",
+    "exportStzhk": "Export STZHK",
+    "repair": "Repair",
+    "unknownError": "Unknown error. Try reinstalling the instance.",
+    "confirmDelete": "Confirm Delete",
+    "modsFor": "Mods",
+    "stepBasic": "Basic",
+    "stepSettings": "Settings",
+    "stepConfirm": "Confirmation",
+    "name": "Name",
+    "minecraftVersion": "Minecraft Version",
+    "type": "Type",
+    "typeClient": "Client",
+    "typeServer": "Server",
+    "loader": "Loader",
+    "loaderVersion": "Loader Version",
+    "serverPort": "Server Port",
+    "memory": "Memory",
+    "minMemory": "Min Memory",
+    "maxMemory": "Max Memory",
+    "javaArgs": "Java Arguments",
+    "gameArgs": "Game Arguments",
+    "username": "Username",
+    "notes": "Notes",
+    "prev": "Previous",
+    "next": "Next",
+    "createButton": "Create",
+    "newInstance": "New Instance",
+    "namePlaceholder": "My Modpack",
+    "fromGlobalSettings": "From global settings",
+    "notesPlaceholder": "Instance description...",
+    "noInstances": "No instances",
+    "createFirst": "Create your first instance",
+    "emptyTitle": "Start Your Adventure",
+    "emptyDescription": "Create your first Minecraft instance or install a modpack",
+    "optionalFromSettings": "(optional, uses value from settings)",
+    "serverMemoryHint": "For servers: It's recommended to set min = max for stable operation. This prevents delays during heap expansion.",
+    "installInfoMessage": "After creation, necessary files will be automatically downloaded",
+    "confirmTitle": "Confirmation",
+    "confirmVersion": "Version",
+    "confirmPort": "Port",
+    "confirmPlayer": "Player",
+    "status": {
+      "stopped": "Stopped",
+      "starting": "Starting",
+      "running": "Running",
+      "stopping": "Stopping",
+      "installing": "Installing",
+      "error": "Error"
+    },
+    "installationFailed": "Installation failed",
+    "failedAtStep": "Step",
+    "retryInstallation": "Retry installation",
+    "retry": "Retry",
+    "downloads": "Downloads",
+    "noLoaderVersions": "No available loader versions",
+    "loaderNotSupported": "Loader doesn't support this Minecraft version",
+    "edit": {
+      "title": "Edit Instance",
+      "versions": "Versions",
+      "showVersions": "Change",
+      "hideVersions": "Hide",
+      "minecraftLabel": "Minecraft",
+      "loaderLabel": "Loader",
+      "versionWarning": "Warning: Changing versions requires downloading new files. After saving, you will be prompted to run instance repair.",
+      "minecraftVersion": "Minecraft Version",
+      "loaderVersion": "Loader Version",
+      "optional": "(optional)",
+      "name": "Name",
+      "namePlaceholder": "My Modpack",
+      "memory": "Memory (RAM)",
+      "available": "Available",
+      "allocateMemory": "Allocate Memory",
+      "memoryHint": "Recommended: 2048-4096 MB for modpacks, 2048 MB for vanilla",
+      "minMemory": "Minimum Memory",
+      "maxMemory": "Maximum Memory",
+      "serverPort": "Server Port",
+      "username": "Username",
+      "fromGlobalSettings": "From global settings",
+      "javaArgs": "JVM Arguments",
+      "javaArgsHint": "Additional parameters for Java VM",
+      "gameArgs": "Game Arguments",
+      "gameArgsPlaceholder": "--fullscreen --server mc.hypixel.net",
+      "notes": "Notes",
+      "notesPlaceholder": "Instance description...",
+      "saving": "Saving...",
+      "repairDialog": {
+        "title": "Run repair?",
+        "message": "Minecraft version or loader has been changed. It is recommended to run instance repair to download necessary files.",
+        "confirm": "Run",
+        "skip": "Skip"
+      },
+      "repairError": "Failed to run repair",
+      "java": "Java",
+      "javaPath": "Java Path",
+      "javaAuto": "Automatic",
+      "javaAutoHint": "Will use Java from launcher settings",
+      "javaCustom": "Custom path",
+      "javaSelect": "Select Java",
+      "javaCompatible": "Compatible",
+      "javaWarning": "Warning",
+      "javaIncompatible": "Incompatible"
+    }
+  },
+  "mods": {
+    "title": "Mods",
+    "installed": "Installed",
+    "browse": "Browse",
+    "search": "Search mods...",
+    "enable": "Enable",
+    "disable": "Disable",
+    "remove": "Remove",
+    "update": "Update",
+    "autoUpdate": "Auto-update",
+    "noMods": "No mods installed",
+    "page": "Page",
+    "next": "Next",
+    "installing": "Installing",
+    "downloads": "downloads",
+    "incompatible": "Incompatible",
+    "hideIncompatible": "Hide incompatible",
+    "recommendations": {
+      "title": "Recommended for you",
+      "basedOn": "Based on your installed mods",
+      "loading": "Finding recommendations...",
+      "empty": "No recommendations yet. Install more mods!",
+      "reasons": {
+        "sameCategory": "Category",
+        "popularWith": "Popular with",
+        "addonFor": "Addon for",
+        "trending": "Trending",
+        "optimization": "Optimization",
+        "commonDependency": "Common dependency"
+      }
+    }
+  },
+  "modpacks": {
+    "title": "Modpacks",
+    "editor": "Editor",
+    "import": "Import",
+    "export": "Export",
+    "search": "Search modpacks...",
+    "install": "Install Modpack"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Default settings for new instances",
+    "loading": "Loading...",
+    "saved": "Settings saved!",
+    "appearance": {
+      "title": "Appearance",
+      "background": "Application Background",
+      "backgroundTypes": {
+        "floatingLines": "Waves",
+        "aurora": "Aurora",
+        "dotGrid": "Dot Grid",
+        "rippleGrid": "Ripple Grid",
+        "edgePixels": "Pixels",
+        "static": "Dark",
+        "image": "Image"
+      },
+      "selectImage": "Select",
+      "copying": "Copying...",
+      "backgroundImage": "Background image",
+      "change": "Change",
+      "dimming": "Dimming",
+      "dimmingHint": "Dims the background for better readability"
+    },
+    "language": {
+      "title": "Language",
+      "select": "Select language",
+      "changesApply": "Changes apply immediately"
+    },
+    "user": {
+      "title": "User",
+      "defaultUsername": "Default player name",
+      "usernamePlaceholder": "Player",
+      "usernameHint": "Used for offline mode"
+    },
+    "memory": {
+      "title": "Memory",
+      "minMemory": "Minimum memory",
+      "maxMemory": "Maximum memory"
+    },
+    "java": {
+      "title": "Java & Launch",
+      "defaultJvmArgs": "Default JVM arguments",
+      "jvmArgsHint": "Optimization parameters for Java VM",
+      "defaultGameArgs": "Default game arguments",
+      "autoInstall": "Automatically install Java",
+      "management": {
+        "title": "Java Management",
+        "scan": "Find system Java",
+        "scanning": "Searching...",
+        "found": "Found versions",
+        "add": "Add",
+        "added": "Added",
+        "installed": "Installed",
+        "customPath": "Specify path manually",
+        "download": "Download",
+        "downloadHint": "Java is downloaded from Adoptium (Eclipse Temurin)"
+      }
+    },
+    "gpu": {
+      "title": "Graphics Card",
+      "select": "GPU Selection",
+      "auto": "Automatic",
+      "autoHint": "System will choose GPU automatically",
+      "discrete": "Discrete",
+      "integrated": "Integrated",
+      "unknown": "Unknown",
+      "recommended": "Recommended",
+      "detecting": "Detecting GPUs...",
+      "noGpus": "No GPUs detected",
+      "multipleGpus": "Multiple GPUs detected",
+      "multipleGpusHint": "On laptops with hybrid graphics, it's recommended to select the discrete GPU for better performance"
+    },
+    "launchBehavior": {
+      "title": "On Game Launch",
+      "description": "What to do with launcher when game is running",
+      "minimizeToTray": "Minimize to tray",
+      "minimizeToTrayHint": "Launcher will hide to system tray",
+      "keepOpen": "Keep open",
+      "keepOpenHint": "Launcher will stay visible",
+      "close": "Close",
+      "closeHint": "Launcher will close completely"
+    },
+    "mods": {
+      "title": "Mods",
+      "autoUpdate": "Automatically update mods"
+    },
+    "downloads": {
+      "title": "Downloads",
+      "threads": "Download threads",
+      "maxConcurrent": "Max concurrent downloads",
+      "bandwidthLimit": "Bandwidth Limit",
+      "unlimited": "Unlimited",
+      "bandwidthHint": "0 = unlimited"
+    },
+    "auth": {
+      "title": "Authorization",
+      "type": "Authorization type",
+      "offline": "Offline mode",
+      "elyBy": "Ely.by",
+      "microsoft": "Microsoft (coming soon)",
+      "elyByServer": "Ely.by Server"
+    },
+    "storage": {
+      "title": "Storage",
+      "calculate": "Calculate size",
+      "calculating": "Calculating...",
+      "totalUsed": "Total used",
+      "instances": "Instances",
+      "shared": "Shared files",
+      "libraries": "Libraries",
+      "assets": "Assets",
+      "versions": "MC Versions",
+      "javaTotal": "Java",
+      "java": {
+        "title": "Java Management",
+        "description": "Installed Java Runtime versions",
+        "analyze": "Analyze",
+        "versions": "versions",
+        "installedVersions": "Installed versions",
+        "usedBy": "Used by",
+        "notUsed": "Not used by any instance",
+        "allUsed": "All Java versions are in use",
+        "cleanupAll": "Delete unused",
+        "cleanupConfirm": {
+          "title": "Delete Java?",
+          "message": "Delete",
+          "confirm": "Delete"
+        },
+        "cleanupAllConfirm": {
+          "title": "Delete unused Java?",
+          "message": "Delete all unused Java versions",
+          "confirm": "Delete all"
+        }
+      },
+      "cache": "Cache",
+      "logs": "Logs",
+      "byInstances": "By instances:",
+      "openFolder": "Open folder",
+      "refresh": "Refresh",
+      "clearCache": "Clear cache",
+      "clearLogs": "Clear logs",
+      "orphaned": {
+        "title": "Orphaned folders",
+        "description": "Instance folders without database record",
+        "check": "Check",
+        "found": "Found",
+        "deleteAll": "Delete all"
+      }
+    },
+    "folders": {
+      "title": "Application Folders",
+      "base": "Base folder",
+      "instances": "Instances",
+      "shared": "Shared files",
+      "java": "Java",
+      "cache": "Cache",
+      "logs": "Logs",
+      "openFolder": "Open folder"
+    },
+    "actions": {
+      "reset": "Reset",
+      "save": "Save",
+      "saving": "Saving..."
+    },
+    "dialogs": {
+      "clearCache": {
+        "title": "Clear cache?",
+        "message": "This is safe, but some data will need to be re-downloaded.",
+        "confirm": "Clear"
+      },
+      "clearLogs": {
+        "title": "Clear logs?",
+        "message": "Clear application logs?",
+        "confirm": "Clear"
+      },
+      "deleteFolder": {
+        "title": "Delete folder?",
+        "message": "This action is irreversible.",
+        "confirm": "Delete"
+      },
+      "deleteAllOrphaned": {
+        "title": "Delete all orphaned folders?",
+        "message": "folders will be deleted",
+        "irreversible": "This action is irreversible.",
+        "confirm": "Delete all"
+      },
+      "resetSettings": {
+        "title": "Reset settings?",
+        "message": "All settings will be reset to default values.",
+        "confirm": "Reset"
+      },
+      "imageError": "Failed to set image"
+    },
+    "fileTypes": {
+      "images": "Images"
+    },
+    "units": {
+      "bytes": "B",
+      "kilobytes": "KB",
+      "megabytes": "MB",
+      "gigabytes": "GB",
+      "terabytes": "TB"
+    }
+  },
+  "errors": {
+    "unknown": "Unknown error",
+    "networkError": "Network error",
+    "notFound": "Not found"
+  },
+  "notifications": {
+    "peerDiscovered": "User discovered",
+    "incomingRequest": "Sync request",
+    "transferCompleted": "Transfer completed",
+    "transferFailed": "Transfer failed",
+    "friendRequest": "Friend request",
+    "friendAdded": "Added as friend"
+  },
+  "logAnalyzer": {
+    "title": "Log Analyzer",
+    "analyzeExternal": "Analyze Logs",
+    "analyzeExternalHint": "Open a log file from any location",
+    "analyze": "Analyze",
+    "openFile": "Open file",
+    "import": "Import",
+    "export": "Export",
+    "archive": "Archive",
+    "analyzing": "Analyzing logs...",
+    "noProblems": "No problems detected",
+    "detectedProblems": "Detected Problems",
+    "optimizations": "Optimization Recommendations",
+    "completedIn": "Completed in",
+    "ms": "ms",
+    "lines": "Lines",
+    "critical": "Critical",
+    "errors": "Errors",
+    "warnings": "Warnings",
+    "crashDetected": "Crash Detected",
+    "possibleCulprit": "Possible culprit",
+    "stackTrace": "Stack trace",
+    "relatedMods": "Related mods",
+    "solutions": "Solutions",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard",
+      "expert": "Expert"
+    },
+    "successRate": "Success rate",
+    "apply": "Apply",
+    "documentation": "Documentation",
+    "clickToAnalyze": "Click \"Analyze\" to check instance logs",
+    "fixAllProblems": "Fix All Problems",
+    "noFixableProblems": "No fixable problems found",
+    "logLine": "Log line",
+    "description": "Description",
+    "instanceNotSelected": "Instance not selected",
+    "exportArchiveOnlyInstances": "Archive export is only available for instances",
+    "exportArchiveUnavailable": "Archive export is temporarily unavailable. Use JSON export.",
+    "fixPreview": "Fix Preview",
+    "selectFixesToApply": "Select fixes to apply",
+    "selectedCount": "Selected",
+    "applySelected": "Apply Selected",
+    "viewMode": "View mode:",
+    "report": "Report"
+  },
+  "autoFix": {
+    "requiresRestart": "Requires instance restart",
+    "applying": "Applying...",
+    "success": "Fix applied",
+    "failed": "Failed to apply fix",
+    "backupCreated": "Backup created",
+    "types": {
+      "removeMod": "Remove mod",
+      "downloadMod": "Download mod",
+      "increaseRam": "Increase RAM",
+      "changeJvmArg": "Change JVM argument",
+      "reinstallMod": "Reinstall mod",
+      "deleteConfig": "Delete config",
+      "installJava": "Install Java",
+      "updateLoader": "Update loader",
+      "resetConfigs": "Reset configs",
+      "verifyFiles": "Verify files"
+    },
+    "status": {
+      "detected": "Detected",
+      "awaitingRestart": "Awaiting restart",
+      "resolved": "Resolved",
+      "failed": "Failed"
+    }
+  },
+  "conflictPredictor": {
+    "checking": "Checking compatibility...",
+    "warningTitle": "Potential Issues",
+    "dangerTitle": "Conflicts Detected!",
+    "installing": "Installing mod",
+    "foundIssues": "Found Issues",
+    "conflictsWith": "Conflicts with",
+    "moreInfo": "More info",
+    "installAnyway": "Install anyway",
+    "installAtRisk": "Install at your own risk",
+    "severity": {
+      "info": "Info",
+      "warning": "Warning",
+      "error": "Error",
+      "critical": "Critical"
+    },
+    "category": {
+      "incompatible": "Incompatible",
+      "duplicate": "Duplicate functionality",
+      "loaderMismatch": "Loader mismatch",
+      "versionConflict": "Version conflict",
+      "missingDependency": "Missing dependency",
+      "mixinConflict": "Mixin conflict",
+      "knownIssue": "Known issue"
+    },
+    "noConflicts": "No conflicts detected. Mod can be safely installed.",
+    "hasKnownIssues": "Has known issues"
+  },
+  "crashHistory": {
+    "title": "Crash History",
+    "tabStatistics": "Statistics",
+    "tabHistory": "History",
+    "tabTrends": "Trends",
+    "totalCrashes": "Total crashes",
+    "lastWeek": "Last week",
+    "last24h": "Last 24h",
+    "fixRate": "Fix rate",
+    "overallTrend": "Overall trend",
+    "avgTimeBetween": "Average time between crashes",
+    "problematicMods": "Problematic mods",
+    "crashes": "crashes",
+    "noCrashes": "No crashes recorded",
+    "noHistory": "History is empty",
+    "noTrends": "Not enough data for trend analysis",
+    "crashReport": "Crash report",
+    "logAnalysis": "Log analysis",
+    "problems": "problems",
+    "moreProblems": "more problems",
+    "markFixed": "Mark as fixed",
+    "fixedVia": "Fixed via",
+    "clearHistory": "Clear history",
+    "confirmClear": "Are you sure you want to clear crash history?",
+    "trendWorsening": "Worsening",
+    "trendImproving": "Improving",
+    "trendStable": "Stable",
+    "trendUnknown": "Not enough data"
+  },
+  "liveCrash": {
+    "title": "Live Monitoring",
+    "live": "Live",
+    "off": "Off",
+    "monitoring": "Monitoring active",
+    "notMonitoring": "Monitoring inactive",
+    "active": "Active",
+    "inactive": "Inactive",
+    "errors": "Errors",
+    "warnings": "Warnings",
+    "crashDetected": "Crash detected!",
+    "noIssues": "No issues detected",
+    "notMonitoringDesc": "Monitoring is inactive. Start the game and enable monitoring.",
+    "startMonitoring": "Enable monitoring",
+    "start": "Start",
+    "stop": "Stop",
+    "clear": "Clear",
+    "openAnalyzer": "Open log analyzer"
+  },
+  "errorReporter": {
+    "title": "Error Reports",
+    "selectAll": "Select All",
+    "deselect": "Deselect",
+    "selected": "selected",
+    "clearAll": "Clear All",
+    "noErrors": "No errors captured",
+    "beforeReporting": "Before reporting",
+    "checkDuplicates": "Please check if this error was already reported",
+    "searchIssues": "Search existing issues",
+    "selectToReport": "Select errors to include in your GitHub issue report",
+    "report": "Report"
+  },
+  "solutionFinder": {
+    "title": "Solution Finder",
+    "searching": "Searching for solutions...",
+    "noSolutions": "No solutions found",
+    "foundSolutions": "Solutions found",
+    "searchTime": "Search time",
+    "sourcesChecked": "Sources checked",
+    "confidence": "Confidence",
+    "helped": "Helped",
+    "people": "people",
+    "viewSource": "Source",
+    "applyFix": "Apply",
+    "didItHelp": "Did it help?",
+    "yes": "Yes",
+    "no": "No",
+    "thanksFeedback": "Thanks for the feedback!",
+    "sources": {
+      "builtIn": "Built-in",
+      "github": "GitHub",
+      "reddit": "Reddit",
+      "modPage": "Mod Page",
+      "community": "Community"
+    },
+    "confidenceLevels": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "knowledgeBase": {
+      "outofmemory": {
+        "title": "Increase allocated RAM",
+        "description": "Increase maximum memory in instance settings (6-8GB recommended for modpacks)"
+      },
+      "outofmemoryTextures": {
+        "title": "Remove HD texture packs",
+        "description": "High resolution texture packs (256x+) consume lots of VRAM and RAM"
+      },
+      "optifine": {
+        "title": "Remove OptiFine",
+        "description": "OptiFine is incompatible with Sodium/Iris/Rubidium. Use Sodium + Iris for shaders"
+      },
+      "missingDependency": {
+        "title": "Auto-install dependencies",
+        "description": "Use 'Resolve Dependencies' feature to automatically install missing mods"
+      },
+      "mixinUpdate": {
+        "title": "Update mods",
+        "description": "Mixin conflicts are often fixed in newer mod versions. Check for updates"
+      },
+      "mixinRemove": {
+        "title": "Remove conflicting mod",
+        "description": "If two mods modify the same method via Mixin, one of them needs to be removed"
+      },
+      "javaVersion": {
+        "title": "Install correct Java version",
+        "description": "MC 1.17+ requires Java 17+, MC 1.20.5+ requires Java 21. Install the correct version"
+      },
+      "corrupted": {
+        "title": "Reinstall mod",
+        "description": "Mod file is corrupted. Delete it and download again from Modrinth/CurseForge"
+      },
+      "config": {
+        "title": "Reset configs",
+        "description": "Delete the config folder to reset settings. Mod will create new configs on startup"
+      },
+      "kubejs": {
+        "title": "Check KubeJS scripts",
+        "description": "KubeJS errors usually indicate problems in scripts. Check kubejs/startup_scripts/ and kubejs/server_scripts/"
+      }
+    },
+    "problemTypes": {
+      "outOfMemory": "Out of memory",
+      "missingDependency": "Missing dependency",
+      "modConflict": "Mod conflict",
+      "mixinConflict": "Mixin conflict",
+      "javaIssue": "Java issue",
+      "configError": "Config error",
+      "corruptedFile": "Corrupted file",
+      "versionMismatch": "Version mismatch",
+      "crashDuringStartup": "Crash during startup",
+      "crashDuringGame": "Crash during gameplay",
+      "performanceIssue": "Performance issue",
+      "networkIssue": "Network issue",
+      "renderingIssue": "Rendering issue",
+      "worldCorruption": "World corruption",
+      "unknown": "Unknown problem"
+    }
+  },
+  "knowledgeBase": {
+    "feedbackTitle": "Did this solution help?",
+    "solution": "Solution",
+    "didItHelp": "Did this solution fix the problem?",
+    "notesOptional": "Notes (optional)",
+    "notesPlaceholder": "Describe what worked or didn't work...",
+    "yesHelped": "Yes, it helped",
+    "noDidntHelp": "No, it didn't help",
+    "skipFeedback": "Skip",
+    "personallyRecommended": "⭐ Recommended based on your experience",
+    "successRate": "Success rate",
+    "timesApplied": "Times applied",
+    "timesHelped": "Times helped",
+    "noPersonalHistory": "No personal history",
+    "stats": {
+      "title": "Knowledge Base Statistics",
+      "totalFeedback": "Total feedback",
+      "totalSolutions": "Solutions with rating",
+      "avgSuccessRate": "Average success"
+    }
+  },
+  "performance": {
+    "title": "Performance",
+    "monitoring": "Monitoring",
+    "startMonitoring": "Monitor",
+    "stopMonitoring": "Stop",
+    "memoryUsage": "Memory",
+    "cpuUsage": "CPU",
+    "tps": "TPS",
+    "mspt": "MSPT",
+    "modPerformance": "Mod Performance",
+    "tickTime": "Tick Time",
+    "impactScore": "Impact",
+    "recommendations": "Recommendations",
+    "bottlenecks": "Bottlenecks",
+    "sparkDetected": "Spark Detected",
+    "sparkNotInstalled": "Spark Not Installed",
+    "installSpark": "Install Spark for detailed mod performance analysis",
+    "installSparkHint": "Install Spark for detailed mod performance analysis",
+    "installSparkButton": "Install Spark",
+    "installingSpark": "Installing...",
+    "noData": "No Data",
+    "lastUpdate": "Last Update",
+    "realtime": "Real-time",
+    "memoryHistory": "Memory History",
+    "clickToStart": "Click \"Monitor\" to start collecting data",
+    "instanceNotRunning": "Instance not running",
+    "noSparkData": "No Spark data. Create a report with /spark profiler",
+    "noRecommendations": "No recommendations - everything is running well!",
+    "overallScore": "Overall Score",
+    "severity": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "impact": {
+      "minimal": "Minimal",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "critical": "Critical"
+    },
+    "bottleneckCategories": {
+      "memory": "Memory",
+      "tickTime": "Tick Time",
+      "networkLag": "Network Lag",
+      "renderLag": "Render Lag",
+      "chunkLoading": "Chunk Loading",
+      "garbageCollection": "Garbage Collection",
+      "diskIO": "Disk I/O"
+    }
+  },
+  "modpackCompare": {
+    "title": "Compare Modpacks",
+    "subtitle": "Find differences between two modpacks",
+    "source1": "First modpack",
+    "source2": "Second modpack",
+    "sourceType": {
+      "file": "File",
+      "instance": "Instance",
+      "modrinth": "Modrinth",
+      "curseforge": "CurseForge"
+    },
+    "selectFile": "Select file...",
+    "selectInstance": "Select instance...",
+    "searchModpack": "Search modpack...",
+    "latestVersion": "Latest version",
+    "compare": "Compare",
+    "comparing": "Comparing...",
+    "newComparison": "New comparison",
+    "selectBoth": "Select both modpacks to compare",
+    "tabs": {
+      "mods": "Mods",
+      "configs": "Configs",
+      "other": "Other files"
+    },
+    "stats": {
+      "modsFirst": "Mods (1st)",
+      "modsSecond": "Mods (2nd)",
+      "identical": "Identical",
+      "different": "Different versions"
+    },
+    "mods": {
+      "onlyInFirst": "Only in 1st",
+      "onlyInSecond": "Only in 2nd",
+      "differentVersions": "Different versions",
+      "identical": "Identical mods",
+      "allIdentical": "All mods are identical",
+      "diffFirst": "1st",
+      "diffSecond": "2nd"
+    },
+    "configs": {
+      "onlyInFirst": "Only in 1st",
+      "onlyInSecond": "Only in 2nd",
+      "differentContent": "Different content",
+      "allIdentical": "Configs are identical"
+    },
+    "other": {
+      "onlyInFirst": "Only in 1st",
+      "onlyInSecond": "Only in 2nd",
+      "allIdentical": "Other files are identical"
+    },
+    "download": {
+      "title": "Download mod",
+      "selectFolder": "Select folder...",
+      "selectFolderTitle": "Choose folder for download",
+      "selectFolderRequired": "Please select a folder for download",
+      "searching": "Searching...",
+      "noResults": "No mods found",
+      "download": "Download",
+      "downloadAll": "Download all missing",
+      "downloadAllHint": "Download all mods from second modpack",
+      "downloaded": "Downloaded",
+      "failed": "Failed"
+    },
+    "export": {
+      "title": "Export results",
+      "exportJson": "Export to JSON",
+      "exportText": "Export to text",
+      "copied": "Copied to clipboard"
+    },
+    "closeConfirm": {
+      "title": "Close comparison?",
+      "message": "Comparison results will be lost. Are you sure you want to close this window?"
+    },
+    "fileTypes": {
+      "modpacks": "Modpacks"
+    },
+    "patch": {
+      "title": "Patches",
+      "applyToInstance": "Apply a patch to this instance",
+      "instanceMustBeStopped": "Instance must be stopped to apply patches",
+      "browse": "Browse...",
+      "applyAnother": "Apply Another Patch",
+      "create": "Create Patch",
+      "createTitle": "Create Patch",
+      "createHint": "Create a patch file from these differences",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe what this patch changes...",
+      "author": "Author",
+      "authorPlaceholder": "Your name",
+      "save": "Save Patch",
+      "creating": "Creating...",
+      "apply": "Apply Patch",
+      "applying": "Applying...",
+      "selectFile": "Select patch file...",
+      "preview": "Preview",
+      "previewTitle": "Patch Preview",
+      "modsToAdd": "Mods to add",
+      "modsToRemove": "Mods to remove",
+      "configsToChange": "Configs to change",
+      "configsToRemove": "Configs to remove",
+      "filesToAdd": "Files to add",
+      "filesToRemove": "Files to remove",
+      "warnings": "Warnings",
+      "errors": "Errors",
+      "success": "Patch applied successfully",
+      "failed": "Failed to apply patch",
+      "compatibility": {
+        "title": "Compatibility",
+        "checking": "Checking compatibility...",
+        "compatible": "Compatible",
+        "compatibleWithWarnings": "Compatible with warnings",
+        "incompatible": "Incompatible",
+        "alreadyApplied": "Already applied",
+        "compatibleDesc": "Patch is fully compatible with this instance",
+        "compatibleWithWarningsDesc": "Patch can be applied, but there are warnings",
+        "incompatibleDesc": "Patch is incompatible with this instance",
+        "alreadyAppliedDesc": "This patch has already been applied to the instance",
+        "mcVersion": "Minecraft version",
+        "loader": "Loader",
+        "loaderVersion": "Loader version",
+        "match": "matches",
+        "mismatch": "does not match",
+        "recommendation": "Recommendation",
+        "selectInstance": "Select an instance to check compatibility"
+      }
+    }
+  },
+  "backup": {
+    "title": "Backups",
+    "enabled": "Automatic backups",
+    "enabledDescription": "Create backups before mod changes",
+    "disabled": "Disabled",
+    "disabledForInstance": "Disabled for this instance",
+    "useGlobal": "Use global setting",
+    "maxCount": "Maximum backups",
+    "maxCountDescription": "Old backups are automatically deleted",
+    "includeSaves": "Backup worlds",
+    "includeSavesDescription": "Include saves folder in backup",
+    "backupModDetected": "Backup mod detected",
+    "backupModMessage": "Worlds are backed up by '{mod}', we only backup mods and configs",
+    "noBackupMod": "No backup mod detected",
+    "noBackupModMessage": "Backing up mods, configs and worlds",
+    "createManual": "Create backup",
+    "creating": "Creating backup...",
+    "created": "Backup created",
+    "restore": "Restore",
+    "restoring": "Restoring...",
+    "restored": "Backup restored",
+    "delete": "Delete backup",
+    "confirmDelete": "Delete this backup?",
+    "noBackups": "No backups",
+    "noBackupsDescription": "Backups are created automatically before changes",
+    "files": "files",
+    "trigger": {
+      "beforeModInstall": "Before mod install",
+      "beforeModRemove": "Before mod removal",
+      "beforeModUpdate": "Before mod update",
+      "beforeAutoFix": "Before auto-fix",
+      "manual": "Manual backup"
+    }
+  },
+  "resources": {
+    "title": "Resources",
+    "shaders": "Shaders",
+    "resourcePacks": "Resource Packs",
+    "shader": "Shader",
+    "resourcePack": "Resource Pack",
+    "installed": "Installed",
+    "browse": "Browse",
+    "searchInstalled": "Search installed...",
+    "addLocal": "Add Local",
+    "scanTooltip": "Scan folder for untracked files",
+    "noInstalled": "None installed",
+    "searchModrinth": "Search on Modrinth...",
+    "installGlobal": "Install globally (available for all instances)",
+    "searchHint": "Find shaders or resource packs on Modrinth",
+    "downloads": "downloads",
+    "global": "Global",
+    "disable": "Disable",
+    "enable": "Enable",
+    "version": "Version",
+    "source": "Source",
+    "fileSize": "File size",
+    "installing": "Installing...",
+    "removing": "Removing...",
+    "scanning": "Scanning...",
+    "importedCount": "Imported files",
+    "noResults": "No results found",
+    "supportedVersions": "Supported Versions"
+  },
+  "sync": {
+    "title": "Settings Sync",
+    "subtitle": "Copy settings between instances",
+    "sourceInstance": "Source",
+    "targetInstance": "Target",
+    "selectInstance": "Select instance...",
+    "profile": "Sync profile",
+    "preview": "Preview",
+    "sync": "Sync",
+    "syncing": "Syncing...",
+    "quickSync": "Quick Sync",
+    "quickSyncHint": "Only mod configs (gameplay)",
+    "profiles": {
+      "gameplayOnly": "Gameplay Only",
+      "gameplayOnlyDesc": "Only mod configs (balance, recipes). Personal settings are not affected.",
+      "fullSync": "Full Sync",
+      "fullSyncDesc": "Everything except personal settings (FOV, sound, keybinds).",
+      "minimal": "Minimal",
+      "minimalDesc": "Only critical settings. Suitable for servers."
+    },
+    "categories": {
+      "personal": "Personal",
+      "personalDesc": "FOV, sound, keybinds - NEVER synced",
+      "performance": "Performance",
+      "performanceDesc": "Graphics, FPS limit - hardware dependent",
+      "modConfig": "Mod Configs",
+      "modConfigDesc": "Balance, recipes, mechanics",
+      "gameplay": "Gameplay Data",
+      "gameplayDesc": "Waypoints, recipe bookmarks",
+      "visual": "Visual",
+      "visualDesc": "Resource packs, shaders",
+      "unknown": "Unknown"
+    },
+    "previewTitle": "Sync Preview",
+    "willSync": "Will be synced",
+    "willSkip": "Will be skipped",
+    "filesCount": "files",
+    "totalSize": "Total size",
+    "byCategory": "By category",
+    "skipReasons": {
+      "categoryDisabled": "Category disabled in profile",
+      "explicitlyExcluded": "Explicitly excluded",
+      "personalSetting": "Personal setting",
+      "notFound": "File not found",
+      "identical": "Identical"
+    },
+    "result": {
+      "success": "Sync completed",
+      "synced": "Files synced",
+      "skipped": "Skipped",
+      "errors": "Errors",
+      "backupCreated": "Backup created"
+    },
+    "confirmSync": {
+      "title": "Confirm Sync",
+      "message": "Settings will be copied from one instance to another. A backup will be created automatically.",
+      "warning": "Personal settings (FOV, sound, keybinds) will NOT be changed."
+    },
+    "errors": {
+      "sameInstance": "Cannot sync instance with itself",
+      "noFiles": "No files to sync"
+    },
+    "advanced": {
+      "title": "Advanced Settings",
+      "exclude": "Exclude files",
+      "excludeHint": "File patterns to exclude (one per line)",
+      "include": "Include files",
+      "includeHint": "File patterns to force include"
+    },
+    "knownSettings": {
+      "title": "Known Settings",
+      "showAll": "Show all known files"
+    }
+  },
+  "collections": {
+    "title": "Mod Collections",
+    "create": "Create",
+    "createNew": "Create New Collection",
+    "edit": "Edit",
+    "import": "Import",
+    "export": "Export",
+    "duplicate": "Duplicate",
+    "name": "Name",
+    "namePlaceholder": "My Collection",
+    "description": "Description",
+    "descriptionPlaceholder": "Optional description",
+    "icon": "Icon",
+    "color": "Color",
+    "mods": "mods",
+    "builtin": "built-in",
+    "selectCollection": "Select a collection",
+    "modsInCollection": "Mods in collection",
+    "emptyCollection": "No mods in this collection",
+    "installTo": "Install to",
+    "modsWillBeInstalled": "mods will be installed",
+    "installAll": "Install All",
+    "installing": "Installing...",
+    "installed": "installed",
+    "skipped": "skipped",
+    "failed": "failed",
+    "confirmDelete": "Delete collection \"{name}\"?",
+    "addToCollection": "Add to collection",
+    "removeFromCollection": "Remove from collection",
+    "selectOrCreate": "Select a collection or create a new one",
+    "modAddedTo": "Mod added to collection",
+    "modRemovedFrom": "Mod removed from collection",
+    "builtinCollections": {
+      "optimization": "Optimization",
+      "tech": "Tech Mods",
+      "magic": "Magic Mods",
+      "adventure": "Adventure",
+      "building": "Building",
+      "qol": "Quality of Life"
+    }
+  },
+  "wiki": {
+    "tabInfo": "Info",
+    "tabWiki": "Wiki",
+    "loading": "Loading wiki...",
+    "localModNoWiki": "Local mods don't have wiki content",
+    "description": "Description",
+    "version": "Version",
+    "author": "Author",
+    "categories": "Categories",
+    "file": "File",
+    "size": "Size",
+    "settings": "Settings",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "autoUpdateOn": "Auto-update",
+    "autoUpdateOff": "No auto-update",
+    "installedAt": "Installed",
+    "updatedAt": "Updated",
+    "openProjectPage": "Open mod page",
+    "projectPage": "Project Page",
+    "wikiPage": "Wiki",
+    "issues": "Issues",
+    "sourceCode": "Source Code",
+    "license": "License",
+    "gallery": "Gallery",
+    "changelog": "Changelog",
+    "downloads": "Downloads",
+    "followers": "Followers",
+    "links": "Links",
+    "about": "About"
+  },
+  "errorReporter": {
+    "title": "Error Reports",
+    "selectAll": "Select all",
+    "deselect": "Deselect",
+    "selected": "selected",
+    "clearAll": "Clear all",
+    "noErrors": "No errors found",
+    "beforeReporting": "Before reporting",
+    "checkDuplicates": "Check if this error has already been reported",
+    "searchIssues": "Search on GitHub",
+    "selectToReport": "Select errors to report on GitHub",
+    "report": "Report"
+  },
+  "connect": {
+    "title": "Stuzhik Connect",
+    "subtitle": "Share modpacks with friends instantly",
+    "disabled": "Connect is disabled",
+    "enableHint": "Enable in settings to see friends online",
+    "openSettings": "Open settings",
+    "noPeers": "No one found",
+    "noPeersHint": "Make sure you're on the same local network or VPN",
+    "searching": "Searching...",
+    "foundPeers": "Found: {count}",
+    "anonymous": "Anonymous",
+    "online": "Online",
+    "inGame": "In game",
+    "lastSeen": "Last seen",
+    "requestModpack": "Request modpack",
+    "viewModpacks": "View modpacks",
+    "addFriend": "Send friend request",
+    "friendRequestSent": "Request sent",
+    "blockUser": "Block",
+    "quickJoin": "Quick Join",
+    "quickJoinHint": "Sync modpack and join server",
+    "syncing": "Syncing...",
+    "joining": "Joining...",
+    "syncingModpack": "Syncing modpack",
+    "launchingGame": "Launching game",
+    "connectingToServer": "Connecting to server",
+    "noServerRunning": "Friend is not on a server",
+    "yourCode": "Your code",
+    "yourCodeHint": "Share this code with friends",
+    "copied": "Copied!",
+    "enterCode": "Enter friend's code",
+    "enterCodePlaceholder": "STUZHIK-XXXX",
+    "connect": "Connect",
+    "invalidCode": "Invalid code format",
+    "connecting": "Connecting...",
+    "vpnHint": "To play with friends over the internet, we recommend:",
+    "network": {
+      "title": "Network Diagnostics",
+      "diagnose": "Check connection",
+      "diagnosing": "Checking...",
+      "localIp": "Local IP",
+      "udpPort": "UDP port",
+      "tcpPort": "TCP port",
+      "portOpen": "Open",
+      "portClosed": "Closed",
+      "status": "Status",
+      "ok": "Everything works",
+      "issues": "Issues detected",
+      "firewallBlocking": "Firewall blocking",
+      "firewallBlockingDesc": "Your firewall appears to be blocking connections. Allow the app to access the network.",
+      "noNetwork": "No network",
+      "noNetworkDesc": "Could not determine local IP address. Check your network connection.",
+      "useVpn": "Use VPN",
+      "useVpnDesc": "To play over the internet (not on the same LAN), use a VPN: Radmin VPN, ZeroTier, or Hamachi.",
+      "copyFirewallCommand": "Copy command",
+      "firewallHint": "Run this command in an administrator command prompt:",
+      "copied": "Copied!"
+    },
+    "settings": {
+      "title": "Connect Settings",
+      "enabled": "Enable Stuzhik Connect",
+      "nickname": "Your nickname",
+      "nicknameHint": "Leave empty to use Minecraft username",
+      "visibility": "Visibility",
+      "visibilityInvisible": "Invisible",
+      "visibilityFriends": "Friends only",
+      "visibilityAll": "Everyone",
+      "showNickname": "Show nickname",
+      "showModpacks": "Show modpack list",
+      "showServer": "Show current server",
+      "send": "Send (what others can get from you)",
+      "receive": "Receive (what you can get)",
+      "modpacks": "Modpacks",
+      "configs": "Configs",
+      "resourcepacks": "Resource packs",
+      "shaderpacks": "Shaders",
+      "permissionDeny": "Denied",
+      "permissionFriends": "Friends only",
+      "permissionAsk": "Ask",
+      "permissionAllow": "Allowed",
+      "port": "UDP port",
+      "portWarning": "Changing port may prevent finding friends",
+      "blockedUsers": "Blocked users",
+      "noBlockedUsers": "No blocked users",
+      "unblock": "Unblock",
+      "trustedFriends": "Trusted friends",
+      "noFriends": "No friends added",
+      "removeFriend": "Remove friend",
+      "friendAdded": "Friend added"
+    },
+    "consent": {
+      "requestTitle": "Transfer request",
+      "wantsModpack": "wants to get your modpack",
+      "wantsToSend": "wants to send you",
+      "allow": "Allow",
+      "deny": "Deny",
+      "remember": "Remember for this user",
+      "rememberForPeer": "Remember choice for this user",
+      "warning": "Only accept files from people you trust",
+      "types": {
+        "modpack": "Modpack",
+        "config": "Config",
+        "resourcepack": "Resource pack",
+        "shaderpack": "Shaders"
+      }
+    },
+    "transfer": {
+      "title": "File transfer",
+      "noTransfers": "No active transfers",
+      "uploading": "Uploading",
+      "downloading": "Downloading",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "connecting": "Connecting...",
+      "negotiating": "Negotiating...",
+      "progress": "{{done}} of {{total}}",
+      "speed": "{{speed}}/s",
+      "timeLeft": "{{time}} left",
+      "cancel": "Cancel",
+      "retry": "Retry",
+      "clearCompleted": "Clear completed",
+      "incoming": "Incoming request",
+      "accept": "Accept",
+      "decline": "Decline",
+      "wantsToSync": "wants to sync",
+      "filesCount": "files",
+      "totalSize": "{{size}}"
+    },
+    "queue": {
+      "title": "Transfer Queue",
+      "pending": "Pending",
+      "active": "Active",
+      "retry": "Retry",
+      "empty": "Queue is empty"
+    },
+    "history": {
+      "title": "History",
+      "transfers": "transfers",
+      "successful": "Successful",
+      "failed": "Failed",
+      "total": "Total",
+      "empty": "No transfer history",
+      "clear": "Clear history"
+    },
+    "notifications": {
+      "title": "Updates",
+      "hasUpdate": "has update",
+      "markAllRead": "Mark all as read"
+    },
+    "timeAgo": {
+      "justNow": "just now",
+      "minutes": "min ago",
+      "hours": "h ago",
+      "days": "d ago"
+    },
+    "enableNow": "Enable now",
+    "recommended": "Recommended",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "advanced": "Advanced"
+    },
+    "vpn": {
+      "radmin": {
+        "name": "Radmin VPN",
+        "description": "Simple and free. Install and it works. Perfect for beginners, no registration required."
+      },
+      "zerotier": {
+        "name": "ZeroTier",
+        "description": "Reliable and stable. Cloud-based, supports many devices. Registration required."
+      },
+      "tailscale": {
+        "name": "Tailscale",
+        "description": "Modern and secure. Uses WireGuard, excellent performance. For advanced users."
+      },
+      "hamachi": {
+        "name": "Hamachi",
+        "description": "A classic choice. Familiar to many, but has limitations in free version (5 devices)."
+      }
+    }
+  },
+  "server": {
+    "console": {
+      "rconConnected": "RCON connected",
+      "rconDisconnected": "RCON disconnected",
+      "filterAll": "All",
+      "filterErrors": "Errors",
+      "clearLogs": "Clear logs",
+      "autoScrollOn": "Auto-scroll on",
+      "autoScrollOff": "Auto-scroll off",
+      "stopping": "Stopping...",
+      "stopServer": "Stop server (stop)",
+      "starting": "Starting...",
+      "forceKillHint": "Force stop (may lose data!)",
+      "forceKillWarning": "Force stopping may result in data loss!",
+      "waitingLogs": "Waiting for logs...",
+      "serverStopped": "Server stopped. Click 'Play' to start.",
+      "enterCommand": "Enter command (↑↓ history)...",
+      "serverNotRunning": "Server not running",
+      "hours": "h",
+      "minutes": "m"
+    },
+    "import": {
+      "title": "Import Server",
+      "success": "Server imported!",
+      "files": "files",
+      "openServer": "Open Server",
+      "serverFolder": "Server Folder",
+      "selectFolder": "Select server folder...",
+      "selectFolderTitle": "Select server folder",
+      "browse": "Browse",
+      "detecting": "Detecting server type...",
+      "detectError": "Detection error",
+      "serverType": "Server Type",
+      "minecraftVersion": "Minecraft Version",
+      "loaderVersion": "Loader Version",
+      "modsCount": "Mods",
+      "port": "Port",
+      "maxPlayers": "Max Players",
+      "eulaAccepted": "EULA Accepted",
+      "confidence": "Confidence",
+      "detectionDetails": "Detection Details",
+      "name": "Name",
+      "namePlaceholder": "Enter server name",
+      "importBtn": "Import",
+      "importing": "Importing...",
+      "phases": {
+        "detecting": "Detecting server type...",
+        "scanning": "Scanning files...",
+        "copying": "Copying files...",
+        "saving": "Saving to database...",
+        "scanningMods": "Registering mods..."
+      }
+    },
+    "p2p": {
+      "title": "P2P Sync",
+      "description": "Allows players to download server modpack via Stuzhik Connect",
+      "serverAddress": "Server Address for Players",
+      "ipPlaceholder": "IP address",
+      "portPlaceholder": "Port",
+      "addressHint": "This address will be shown to players for connecting to the server",
+      "visibility": "Visibility & Access",
+      "whoCanSee": "Who can see the server",
+      "everyone": "Everyone",
+      "everyoneHint": "Maximum visibility",
+      "friendsOnly": "Friends only",
+      "friendsOnlyHint": "Trusted friends",
+      "authorizedOnly": "Authorized",
+      "authorizedOnlyHint": "Only from list",
+      "invisible": "Hidden",
+      "invisibleHint": "By invitation only",
+      "requireInvite": "Require invitation",
+      "requireInviteOn": "Players must enter a code to join",
+      "requireInviteOff": "Players can join directly (if they see the server)",
+      "syncSource": "Modpack Source for Players",
+      "clientInstance": "Installed Instance",
+      "clientInstanceHint": "Sync mods from client instance",
+      "selectClient": "Select client...",
+      "modpackFile": "Modpack File",
+      "modpackFileHint": "Send .stzhk/.mrpack directly to players",
+      "selectModpack": "Select modpack file",
+      "selectModpackTitle": "Select modpack file",
+      "unlinkModpack": "Unlink",
+      "selectAnother": "Select another",
+      "disableSync": "Disable modpack sync",
+      "syncFromClient": "Mods from instance will sync with players (client mods filtered automatically)",
+      "syncFromFile": "Modpack file will be sent to players, they can install it automatically",
+      "autoSync": "Auto-sync (Watch Mode)",
+      "autoSyncHint": "Automatically send modpack changes to all connected players",
+      "authorizedPlayers": "Authorized Players",
+      "peerIdPlaceholder": "Peer ID or nickname",
+      "noAuthorizedPeers": "Empty — all users can download modpack",
+      "authorizedHint": "If empty — modpack is available to everyone. Add Peer ID to restrict access.",
+      "invites": "Server Invites",
+      "createInvite": "Create",
+      "expiry": "Expiry",
+      "expiryNever": "Never",
+      "expiry1h": "1 hour",
+      "expiry24h": "24 hours",
+      "expiry7d": "7 days",
+      "expiry30d": "30 days",
+      "maxUses": "Max uses",
+      "maxUsesHint": "0 = unlimited",
+      "createInviteBtn": "Create invite",
+      "noInvites": "No active invites. Create an invite so players can quickly join.",
+      "inviteRevoked": "Revoked",
+      "inviteExpired": "Expired",
+      "uses": "uses",
+      "copyInvite": "Copy",
+      "revokeInvite": "Revoke",
+      "deleteInvite": "Delete",
+      "invitesHint": "Send invite code to players. They can join via Stuzhik Connect.",
+      "advancedSettings": "Advanced Sync Settings",
+      "includePatterns": "Include in sync (glob patterns)",
+      "excludePatterns": "Exclude from sync (glob patterns)",
+      "expired": "Expired",
+      "minutes": "min"
+    }
+  },
+  "docs": {
+    "title": "Documentation",
+    "changelog": "Changelog",
+    "sourceCode": "Source Code",
+    "openFolder": "Open folder",
+    "search": {
+      "placeholder": "Search documentation...",
+      "noResults": "Nothing found",
+      "quickLinks": "Quick links",
+      "navigate": "Navigate",
+      "select": "Select"
+    },
+    "sections": {
+      "gettingStarted": {
+        "title": "Getting Started",
+        "welcome": {
+          "title": "Welcome",
+          "intro": "Stuzhik is a modern Minecraft launcher that makes it easy to manage modpacks, servers, and game settings. The app supports Forge, Fabric, NeoForge, and Quilt mod loaders.",
+          "features": {
+            "instances": "Instances",
+            "instancesDesc": "Manage multiple Minecraft builds independently",
+            "mods": "Mods",
+            "modsDesc": "Install mods from Modrinth and CurseForge",
+            "servers": "Servers",
+            "serversDesc": "Create and manage servers",
+            "connect": "Stuzhik Connect",
+            "connectDesc": "Share modpacks with friends via P2P"
+          }
+        },
+        "quickStart": {
+          "title": "Quick Start",
+          "intro": "Follow these steps to get started with Stuzhik:",
+          "step1": {
+            "title": "Create an instance",
+            "desc": "Click the \"Create\" button and choose Minecraft version and mod loader"
+          },
+          "step2": {
+            "title": "Install Java",
+            "desc": "If the required Java version is not installed, go to Settings → Java"
+          },
+          "step3": {
+            "title": "Add mods",
+            "desc": "Open the instance and go to the \"Mods\" tab to search and install"
+          },
+          "step4": {
+            "title": "Launch the game",
+            "desc": "Click \"Play\" to launch the client or \"Start\" for a server"
+          }
+        },
+        "requirements": {
+          "title": "System Requirements",
+          "tipTitle": "Tip",
+          "tipText": "For modpacks, at least 8 GB RAM and an SSD for fast loading is recommended",
+          "component": "Component",
+          "minimum": "Minimum",
+          "recommended": "Recommended",
+          "os": "OS",
+          "disk": "Disk",
+          "javaAuto": "Auto-install",
+          "javaTitle": "Java Versions",
+          "javaText": "Stuzhik automatically downloads and installs the required Java version. Here are the versions needed for different Minecraft versions:"
+        }
+      },
+      "instances": {
+        "title": "Instances",
+        "overview": {
+          "title": "Overview",
+          "intro": "An instance is a separate Minecraft installation with its own mods, settings, and worlds. You can create an unlimited number of instances.",
+          "client": {
+            "title": "Client",
+            "desc": "For single-player or connecting to servers"
+          },
+          "server": {
+            "title": "Server",
+            "desc": "For hosting your own Minecraft server"
+          }
+        },
+        "creating": {
+          "title": "Creating an Instance",
+          "intro": "Creating a new instance takes just a few simple steps:",
+          "step1": {
+            "title": "Choose type",
+            "desc": "Client for playing or Server for hosting"
+          },
+          "step2": {
+            "title": "Select version",
+            "desc": "Choose Minecraft version and mod loader (Fabric, Forge, etc.)"
+          },
+          "step3": {
+            "title": "Configure settings",
+            "desc": "Allocate memory, set player name, and JVM arguments"
+          },
+          "loaders": {
+            "title": "Mod Loaders",
+            "loader": "Loader",
+            "desc": "Description",
+            "versions": "MC Versions",
+            "fabricDesc": "Lightweight and fast. Recommended for most mods",
+            "forgeDesc": "Classic choice. Many mods, but heavier",
+            "neoforgeDesc": "Fork of Forge with improvements. Modern alternative",
+            "quiltDesc": "Fabric-compatible. Experimental"
+          },
+          "codeRef": {
+            "lifecycle": "Instance lifecycle",
+            "wizard": "Instance creation wizard"
+          }
+        },
+        "structure": {
+          "title": "Folder Structure",
+          "intro": "Each instance has a standard folder structure:",
+          "codeRef": {
+            "module": "Instance management module"
+          }
+        },
+        "actions": {
+          "title": "Actions",
+          "intro": "Available instance operations:",
+          "action": "Action",
+          "desc": "Description",
+          "shortcut": "Shortcut",
+          "play": "Play",
+          "playDesc": "Launch client or server",
+          "edit": "Edit",
+          "editDesc": "Change version, memory, settings",
+          "repair": "Repair",
+          "repairDesc": "Reinstall game and loader files",
+          "backup": "Backup",
+          "backupDesc": "Create a backup copy",
+          "delete": "Delete",
+          "deleteDesc": "Completely delete the instance"
+        },
+        "backup": {
+          "title": "Backups",
+          "intro": "Stuzhik automatically creates backups before important operations:",
+          "feature1": "Auto-backup before installing/updating/removing mods",
+          "feature2": "Manual backup creation at any time",
+          "feature3": "Configurable backup count limit",
+          "feature4": "Option to include/exclude worlds (saves)",
+          "tipTitle": "Tip",
+          "tipText": "If you have a backup mod installed (FTB Backups, Chunk Pregenerator), Stuzhik will detect it and only backup mods and configs",
+          "codeRef": "Backup system"
+        }
+      },
+      "mods": {
+        "title": "Mods",
+        "sources": {
+          "title": "Mod Sources",
+          "intro": "Stuzhik supports installing mods from two major repositories:",
+          "modrinth": "Open platform. Fast API, quality mods",
+          "curseforge": "Largest catalog. Many old and new mods",
+          "rateTitle": "API Limits",
+          "limit": "Limit",
+          "cache": "Cache",
+          "codeRef": {
+            "modrinth": "Modrinth API integration",
+            "curseforge": "CurseForge API integration"
+          }
+        },
+        "installing": {
+          "title": "Installing Mods",
+          "intro": "Installing mods is as simple as possible:",
+          "step1": {
+            "title": "Open catalog",
+            "desc": "Go to the \"Mods\" tab and select \"Browse\""
+          },
+          "step2": {
+            "title": "Find a mod",
+            "desc": "Use search or filters to find the mod you need"
+          },
+          "step3": {
+            "title": "Install",
+            "desc": "Click the install button. Dependencies will be downloaded automatically"
+          },
+          "tipTitle": "Auto-dependencies",
+          "tipText": "Stuzhik automatically detects and installs all required mod dependencies"
+        },
+        "dragdrop": {
+          "title": "Drag & Drop",
+          "intro": "You can quickly add mods by dragging .jar files directly into the launcher window:",
+          "feature1": "Automatic mod detection via Modrinth/CurseForge API",
+          "feature2": "Connection to update system when detected",
+          "feature3": "Multiple file selection support",
+          "codeRef": "Mod management panel"
+        },
+        "management": {
+          "title": "Management",
+          "intro": "Full control over installed mods:",
+          "action": "Action",
+          "desc": "Description",
+          "toggle": "Enable/Disable",
+          "toggleDesc": "Rename .jar ↔ .jar.disabled",
+          "update": "Update",
+          "updateDesc": "Check and install new version",
+          "remove": "Remove",
+          "removeDesc": "Completely remove the mod",
+          "bulk": "Bulk actions",
+          "bulkDesc": "Select multiple mods for group operations",
+          "sideTitle": "Sides",
+          "sideText": "Each mod has compatibility information:",
+          "side": "Side",
+          "sideDesc": "Description",
+          "sideClient": "Client only (OptiFine, shaders)",
+          "sideServer": "Server only (plugins)",
+          "sideBoth": "Required on both sides",
+          "codeRef": "Client mod auto-detection"
+        },
+        "dependencies": {
+          "title": "Dependencies",
+          "intro": "Dependency management system:",
+          "feature1": "Auto-install when downloading a mod",
+          "feature2": "Warning on conflicts",
+          "feature3": "Incompatible mod detection via knowledge base",
+          "tipTitle": "Known conflicts",
+          "tipText": "Stuzhik knows about popular conflicts (OptiFine + Sodium, etc.) and will warn before installation"
+        }
+      },
+      "modpackEditor": {
+        "title": "Modpack Editor",
+        "overview": {
+          "title": "Overview",
+          "intro": "The modpack editor is a powerful tool for managing builds:",
+          "mods": {
+            "title": "Mods",
+            "desc": "Enable/disable, update, remove"
+          },
+          "configs": {
+            "title": "Configs",
+            "desc": "Edit mod settings"
+          },
+          "files": {
+            "title": "Files",
+            "desc": "Instance file browser"
+          },
+          "profiles": {
+            "title": "Profiles",
+            "desc": "Save and switch configurations"
+          }
+        },
+        "bulk": {
+          "title": "Bulk Operations",
+          "intro": "Work with multiple mods at once:",
+          "selectTitle": "Selecting mods",
+          "select1": "Ctrl+Click to select individual mods",
+          "select2": "Shift+Click to select a range",
+          "select3": "Ctrl+A to select all",
+          "actionsTitle": "Available actions",
+          "action": "Action",
+          "desc": "Description",
+          "toggleAll": "Enable/Disable all",
+          "toggleAllDesc": "Toggle state of selected mods",
+          "removeAll": "Remove all",
+          "removeAllDesc": "Remove selected mods",
+          "updateAll": "Update all",
+          "updateAllDesc": "Check updates for selected",
+          "codeRef": {
+            "bulk": "Bulk operations API",
+            "hook": "Multiselect hook"
+          }
+        },
+        "profiles": {
+          "title": "Mod Profiles",
+          "intro": "Save different mod configurations for quick switching:",
+          "step1": {
+            "title": "Configure mods",
+            "desc": "Enable/disable the mods you need"
+          },
+          "step2": {
+            "title": "Save profile",
+            "desc": "Enter a name and save the current configuration"
+          },
+          "step3": {
+            "title": "Switch",
+            "desc": "Select a profile for instant application"
+          },
+          "tipTitle": "Usage examples",
+          "tipText": "Create profiles: \"Performance\" (optimizations only), \"Full\" (all mods), \"Server\" (no client mods)",
+          "codeRef": "Profile system"
+        }
+      },
+      "codeEditor": {
+        "title": "Code Editor",
+        "overview": {
+          "title": "Overview",
+          "intro": "Professional editor for modpackers — edit configs, datapacks, KubeJS scripts with IntelliSense:",
+          "monaco": {
+            "title": "Monaco Editor",
+            "desc": "VSCode engine with syntax highlighting"
+          },
+          "intellisense": {
+            "title": "IntelliSense",
+            "desc": "Autocomplete for KubeJS and Minecraft"
+          },
+          "preview": {
+            "title": "Recipe Preview",
+            "desc": "Visualize KubeJS/CraftTweaker recipes"
+          },
+          "tipTitle": "Experimental feature",
+          "tipText": "The code editor is under active development. Bugs and incomplete functionality may occur"
+        },
+        "intellisense": {
+          "title": "IntelliSense",
+          "intro": "Smart autocomplete for modpack development:",
+          "kubejsTitle": "KubeJS support",
+          "kubejs1": "Autocomplete for events (ServerEvents, ClientEvents)",
+          "kubejs2": "Type and parameter hints",
+          "kubejs3": "Documentation right in the editor",
+          "minecraftTitle": "Minecraft data",
+          "minecraftText": "Stuzhik parses installed mods and provides autocomplete for item IDs, blocks, and tags.",
+          "codeRef": {
+            "provider": "KubeJS autocomplete provider",
+            "parser": "Mod JAR file parser"
+          }
+        },
+        "recipes": {
+          "title": "Recipe Preview",
+          "intro": "Visual representation of recipes right in the editor:",
+          "supportedTitle": "Supported formats",
+          "kubejs": "KubeJS recipes (shaped, shapeless, smelting)",
+          "crafttweaker": "CraftTweaker scripts (.zs)",
+          "datapack": "Datapack JSON recipes",
+          "tipTitle": "How to use",
+          "tipText": "Hover over a recipe or click the preview button to display the visual representation"
+        },
+        "shortcuts": {
+          "title": "Editor Shortcuts",
+          "autocomplete": "Open autocomplete",
+          "save": "Save file",
+          "fullscreen": "Fullscreen mode",
+          "search": "Search in file",
+          "goto": "Go to line"
+        }
+      },
+      "servers": {
+        "title": "Servers",
+        "overview": {
+          "title": "Overview",
+          "intro": "Full Minecraft server management right from the launcher:",
+          "console": {
+            "title": "Console",
+            "desc": "Real-time logs and command input"
+          },
+          "properties": {
+            "title": "Settings",
+            "desc": "Visual server.properties editor"
+          },
+          "players": {
+            "title": "Players",
+            "desc": "Whitelist, ops, bans management"
+          },
+          "p2p": {
+            "title": "P2P Sync",
+            "desc": "Sync modpack with players"
+          }
+        },
+        "console": {
+          "title": "Server Console",
+          "intro": "Integrated console with advanced features:",
+          "featuresTitle": "Features",
+          "feature1": "Real-time logs with color highlighting",
+          "feature2": "Command history (↑/↓ to navigate)",
+          "feature3": "Auto-scroll with pause when viewing",
+          "feature4": "Filter by level (INFO/WARN/ERROR)",
+          "colorsTitle": "Color scheme",
+          "level": "Level",
+          "color": "Color",
+          "colorGreen": "Green",
+          "colorYellow": "Yellow",
+          "colorRed": "Red",
+          "codeRef": {
+            "console": "Console backend",
+            "ui": "Console UI"
+          }
+        },
+        "rcon": {
+          "title": "RCON",
+          "intro": "Remote server management via RCON protocol:",
+          "param": "Parameter",
+          "value": "Value",
+          "port": "Port",
+          "protocol": "Protocol",
+          "auto": "Auto-connect",
+          "autoYes": "On server start",
+          "tipTitle": "Security",
+          "tipText": "RCON password is generated automatically and stored in server.properties. Don't share it with others",
+          "codeRef": "RCON client"
+        },
+        "import": {
+          "title": "Server Import",
+          "intro": "Import an existing server into Stuzhik:",
+          "step1": {
+            "title": "Select folder",
+            "desc": "Specify the path to the server folder"
+          },
+          "step2": {
+            "title": "Auto-detection",
+            "desc": "Stuzhik will detect MC version and loader"
+          },
+          "step3": {
+            "title": "Confirm",
+            "desc": "Review settings and import"
+          },
+          "detectionTitle": "Automatic detection",
+          "detectionText": "Stuzhik analyzes server files and detects Minecraft version, loader type (Forge/Fabric/NeoForge/Quilt/Vanilla), port, and other settings.",
+          "codeRef": "Server import"
+        },
+        "properties": {
+          "title": "server.properties",
+          "intro": "Visual server settings editor:",
+          "feature1": "~50 settings with descriptions",
+          "feature2": "Category grouping",
+          "feature3": "Type validation (boolean/number/string)",
+          "feature4": "Version-aware settings (different for MC versions)",
+          "codeRef": "server.properties parser"
+        }
+      },
+      "connect": {
+        "title": "Stuzhik Connect",
+        "overview": {
+          "title": "Overview",
+          "intro": "P2P system for sharing modpacks with friends without third-party services:",
+          "techTitle": "Technical details",
+          "component": "Component",
+          "value": "Value",
+          "encryption": "Encryption",
+          "serialization": "Serialization",
+          "compression": "Compression",
+          "tipTitle": "E2E Encryption",
+          "tipText": "All transfers are protected by end-to-end encryption. Even on local networks, data is inaccessible to third parties"
+        },
+        "privacy": {
+          "title": "Privacy",
+          "intro": "By default, all privacy settings are disabled — you have full control over visibility:",
+          "tipTitle": "Secure by default",
+          "tipText": "When you first enable Connect, you're invisible to others. Enable the options you need manually",
+          "setting": "Setting",
+          "default": "Default",
+          "desc": "Description",
+          "enabledDesc": "Connect is completely disabled",
+          "visibilityDesc": "You're invisible to others",
+          "nicknameDesc": "Your nickname is hidden",
+          "modpacksDesc": "Modpack list is hidden",
+          "downloadsDesc": "No one can download",
+          "codeRef": "Privacy settings"
+        },
+        "security": {
+          "title": "Security",
+          "intro": "Multi-layer data and connection protection:",
+          "encryptionTitle": "Encryption",
+          "encryption1": "X25519 for key exchange (Elliptic Curve)",
+          "encryption2": "AES-256-GCM for data encryption",
+          "encryption3": "Forward secrecy — new keys each session",
+          "protectionTitle": "Attack protection",
+          "protection1": "Path traversal — validation of all paths",
+          "protection2": "Rate limiting — 100 req/min per peer",
+          "protection3": "File limits — 500MB/file, 5GB/transfer",
+          "protection4": "Extension whitelist — only safe files",
+          "codeRef": {
+            "crypto": "Cryptographic module",
+            "security": "Attack protection"
+          }
+        },
+        "network": {
+          "title": "Network and VPN",
+          "intro": "Stuzhik Connect works on local networks. For playing over the internet, you need a VPN:",
+          "local": {
+            "title": "Local network",
+            "desc": "Automatic discovery via UDP broadcast"
+          },
+          "vpn": {
+            "title": "Internet (VPN)",
+            "desc": "Use VPN to create a virtual local network"
+          },
+          "vpnTitle": "Recommended VPNs",
+          "difficulty": "Difficulty",
+          "desc": "Description",
+          "easy": "Easy",
+          "medium": "Medium",
+          "advanced": "Advanced",
+          "radmin": "Install and it works. Perfect for beginners",
+          "zerotier": "Reliable. Works through the cloud",
+          "tailscale": "Modern. Uses WireGuard",
+          "codeRef": "Network diagnostics"
+        },
+        "quickJoin": {
+          "title": "Quick Join",
+          "intro": "Instantly connect to a friend's server with automatic modpack sync:",
+          "step1": {
+            "title": "Get code",
+            "desc": "Friend creates an invite and sends the code"
+          },
+          "step2": {
+            "title": "Enter code",
+            "desc": "Paste the code in the Quick Join field"
+          },
+          "step3": {
+            "title": "Auto-sync",
+            "desc": "Modpack downloads and game launches automatically"
+          }
+        }
+      },
+      "troubleshooting": {
+        "title": "Troubleshooting",
+        "common": {
+          "title": "Common Problems",
+          "intro": "Solutions for the most common issues:",
+          "memoryTitle": "OutOfMemoryError",
+          "memoryText": "The game doesn't have enough allocated memory:",
+          "memory1": "Increase maximum memory in instance settings",
+          "memory2": "6-8 GB is recommended for modpacks",
+          "memory3": "Remove HD texture packs (256x+)",
+          "javaTitle": "Wrong Java version",
+          "javaText": "Make sure you're using the correct Java version. MC 1.17+ requires Java 17+, MC 1.20.5+ requires Java 21.",
+          "conflictsTitle": "Mod conflicts",
+          "conflictsText": "OptiFine is incompatible with Sodium/Iris. Use Sodium + Iris for shaders."
+        },
+        "logAnalyzer": {
+          "title": "Log Analyzer",
+          "intro": "Built-in tool for automatic game log analysis:",
+          "feature1": "Automatic problem detection",
+          "feature2": "Fix suggestions",
+          "feature3": "Problematic mod identification",
+          "feature4": "Knowledge base integration",
+          "codeRef": "Log analyzer"
+        },
+        "faq": {
+          "title": "FAQ",
+          "q1": "How to increase FPS?",
+          "a1": "Install Sodium (for Fabric) or Rubidium (for Forge). Remove OptiFine if installed.",
+          "q2": "Where are files stored?",
+          "a2": "By default in AppData/Roaming/stuzhik (Windows) or ~/Library/Application Support/stuzhik (macOS).",
+          "q3": "How to transfer an instance?",
+          "a3": "Use the export feature in .stzhk or .mrpack format to transfer between computers.",
+          "q4": "Why does the game crash on startup?",
+          "a4": "Check Java version, memory, and mod conflicts. Use the log analyzer for diagnostics.",
+          "q5": "How to update all mods?",
+          "a5": "Select all mods (Ctrl+A) and click \"Update\". Or enable auto-update in settings."
+        }
+      },
+      "architecture": {
+        "title": "Architecture",
+        "stack": {
+          "title": "Tech Stack",
+          "intro": "Stuzhik is built on modern technologies:",
+          "frontend": "SolidJS + TypeScript + UnoCSS",
+          "backend": "Rust + Tokio + Tauri 2.x",
+          "database": "Database",
+          "databaseDesc": "SQLite (rusqlite)"
+        },
+        "structure": {
+          "title": "Project Structure",
+          "backendTitle": "Backend (Rust)",
+          "frontendTitle": "Frontend (TypeScript)"
+        },
+        "principles": {
+          "title": "Development Principles",
+          "performance": "Performance — minimal RAM/CPU usage",
+          "security": "Security — encryption, validation, sandboxing",
+          "responsive": "Responsiveness — UI never blocks",
+          "animations": "Animations — 100ms maximum"
+        }
+      },
+      "shortcuts": {
+        "title": "Keyboard Shortcuts",
+        "globalTitle": "Global",
+        "devConsole": "Developer Console",
+        "uiKit": "UI Kit (dev mode)",
+        "minimize": "Minimize window",
+        "closeModal": "Close modal",
+        "consoleTitle": "Server Console",
+        "prevCommand": "Previous command",
+        "nextCommand": "Next command",
+        "sendCommand": "Send command",
+        "editorTitle": "Code Editor",
+        "save": "Save file",
+        "autocomplete": "Autocomplete",
+        "fullscreen": "Fullscreen mode",
+        "search": "Search",
+        "tipTitle": "Important",
+        "tipText": "In release builds, F12 doesn't work. Use Ctrl+Shift+D for developer console"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+[package]
+name = "stuzhik-core"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+rusqlite = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+zip = "6.0.0"

@@ -1,0 +1,20 @@
+node_modules
+dist
+~
+docs/.vitepress/cache
+
+# Generated files
+src/generated/
+.source-snapshot.json
+
+# Testing
+coverage/
+.vitest/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.dbpackage-lock.json

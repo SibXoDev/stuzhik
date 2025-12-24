@@ -1,0 +1,305 @@
+/* Synced with launcher: uno.config.ts */
+:root {
+  /* Launcher colors */
+  --gray-850: #1a1b1f;
+  --gray-750: #2a2b2f;
+  --gray-700: #35363a;
+  --gray-600: #4a4b50;
+  --blue-600: #2563eb;
+  --blue-500: #3b82f6;
+
+  /* VitePress overrides */
+  --vp-c-brand-1: var(--blue-600);
+  --vp-c-brand-2: var(--blue-500);
+  --vp-c-brand-3: #1d4ed8;
+  --vp-c-brand-soft: rgba(37, 99, 235, 0.15);
+
+  --vp-c-bg: var(--gray-850);
+  --vp-c-bg-soft: var(--gray-750);
+  --vp-c-bg-mute: var(--gray-700);
+  --vp-c-bg-alt: var(--gray-850);
+
+  --vp-c-text-1: #f3f4f6;
+  --vp-c-text-2: #9ca3af;
+  --vp-c-text-3: #6b7280;
+
+  --vp-c-divider: var(--gray-750);
+  --vp-c-border: var(--gray-750);
+
+  /* No white borders */
+  --vp-c-gutter: var(--gray-850);
+}
+
+.dark {
+  --vp-c-brand-1: var(--blue-600);
+  --vp-c-brand-2: var(--blue-500);
+  --vp-c-brand-3: #1d4ed8;
+}
+
+/* Hero */
+.VPHero .name {
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-600));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.VPHero .text {
+  color: #f3f4f6;
+}
+
+.VPHero .tagline {
+  color: #9ca3af;
+}
+
+/* Features */
+.VPFeature {
+  background: var(--gray-750);
+  border: 1px solid var(--gray-700);
+  border-radius: 16px;
+  transition: all 0.1s ease;
+}
+
+.VPFeature:hover {
+  border-color: var(--gray-600);
+  transform: translateY(-2px);
+}
+
+/* Buttons */
+.VPButton.brand {
+  background: var(--blue-600);
+  border: none;
+  border-radius: 16px;
+}
+
+.VPButton.brand:hover {
+  background: var(--blue-500);
+}
+
+.VPButton.alt {
+  background: var(--gray-750) !important;
+  border: 1px solid var(--gray-700) !important;
+  border-radius: 16px !important;
+  color: #f3f4f6 !important;
+}
+
+.VPButton.alt:hover {
+  border-color: var(--gray-600) !important;
+}
+
+/* Layout */
+.VPContent {
+  background: var(--gray-850);
+}
+
+.VPSidebar {
+  background: var(--gray-850);
+  border-right: 1px solid var(--gray-750);
+}
+
+.VPNavBar {
+  background: var(--gray-850);
+  border-bottom: 1px solid var(--gray-750);
+}
+
+.VPNavBar .divider {
+  background: var(--gray-750);
+}
+
+/* Remove ALL white borders from headings */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4 {
+  border: none;
+  border-bottom: none;
+}
+
+.vp-doc h2 {
+  padding-bottom: 0;
+  margin-bottom: 16px;
+}
+
+/* Code blocks - solid background */
+.vp-doc [class*='language-'],
+.vp-doc pre {
+  background: var(--gray-750) !important;
+  border: 1px solid var(--gray-700);
+  border-radius: 12px;
+}
+
+.vp-code-group {
+  background: var(--gray-750);
+  border: 1px solid var(--gray-700);
+  border-radius: 12px;
+}
+
+.vp-code-group .tabs {
+  background: var(--gray-850);
+  border-bottom: 1px solid var(--gray-700);
+}
+
+/* Links */
+.vp-doc a {
+  color: var(--blue-500);
+  text-decoration: none;
+}
+
+.vp-doc a:hover {
+  color: var(--blue-600);
+}
+
+/* Tables */
+.vp-doc table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--gray-700);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.vp-doc tr {
+  border: none !important;
+  border-top: none !important;
+  background: transparent !important;
+  transition: background 0.1s ease;
+}
+
+.vp-doc tbody tr:hover {
+  background: var(--gray-750) !important;
+}
+
+.vp-doc th,
+.vp-doc td {
+  border: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.vp-doc thead {
+  background: var(--gray-750);
+}
+
+.vp-doc thead tr {
+  background: var(--gray-750) !important;
+}
+
+.vp-doc thead th {
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.vp-doc tbody tr:not(:last-child) td {
+  border-bottom: 1px solid var(--gray-700) !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--gray-850);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gray-700);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gray-600);
+}
+
+/* Selection */
+::selection {
+  background: rgba(37, 99, 235, 0.3);
+}
+
+/* Custom homepage sections */
+.home-section {
+  padding: 48px 24px;
+  max-width: 1152px;
+  margin: 0 auto;
+}
+
+.home-title {
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 32px;
+  color: #f3f4f6;
+}
+
+/* Tech grid */
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.tech-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 16px;
+  background: var(--gray-750);
+  border: 1px solid var(--gray-700);
+  border-radius: 16px;
+  transition: all 0.1s ease;
+}
+
+.tech-card:hover {
+  border-color: var(--gray-600);
+  transform: translateY(-2px);
+}
+
+.tech-name {
+  margin-top: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  color: #f3f4f6;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tech-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .tech-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .home-section {
+    padding: 32px 16px;
+  }
+
+  .home-title {
+    font-size: 24px;
+  }
+}
+
+/* Footer */
+.VPFooter {
+  border-top: 1px solid var(--gray-750);
+}
+
+/* Sidebar items */
+.VPSidebarItem .text {
+  color: #9ca3af;
+}
+
+.VPSidebarItem.is-active .text {
+  color: var(--blue-500);
+}

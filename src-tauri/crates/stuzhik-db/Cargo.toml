@@ -1,0 +1,12 @@
+[package]
+name = "stuzhik-db"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+stuzhik-core = { path = "../stuzhik-core" }
+rusqlite = { workspace = true }
+log = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true }

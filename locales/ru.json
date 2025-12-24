@@ -1,0 +1,2032 @@
+{
+  "common": {
+    "create": "Создать",
+    "delete": "Удалить",
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "save": "Сохранить",
+    "edit": "Редактировать",
+    "close": "Закрыть",
+    "back": "Назад",
+    "yes": "Да",
+    "no": "Нет",
+    "or": "или",
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успешно",
+    "install": "Установить",
+    "copy": "Копировать",
+    "enabled": "Включено",
+    "disabled": "Отключено",
+    "tools": "Инструменты",
+    "play": "Играть",
+    "stop": "Стоп",
+    "more": "ещё",
+    "showMore": "Показать больше",
+    "showLess": "Показать меньше",
+    "reset": "Сбросить",
+    "documentation": "Документация"
+  },
+  "titleBar": {
+    "devConsole": "Консоль разработчика",
+    "settings": "Настройки",
+    "downloads": "Загрузки",
+    "connect": "Друзья",
+    "docs": "Документация",
+    "changelog": "История изменений",
+    "minimize": "Свернуть",
+    "maximize": "Развернуть",
+    "restore": "Восстановить",
+    "close": "Закрыть"
+  },
+  "changelog": {
+    "title": "Changelog",
+    "versions": "версий",
+    "current": "Текущая",
+    "allReleases": "Все релизы",
+    "madeIn": "Сделано в России",
+    "types": {
+      "feature": "Новое",
+      "fix": "Исправления",
+      "improvement": "Улучшения",
+      "breaking": "Критические изменения"
+    }
+  },
+  "app": {
+    "subtitle": "Управляй экземплярами, модами и настройками"
+  },
+  "loaders": {
+    "notRequired": "Не требуется",
+    "notSupported": "Не поддерживается",
+    "notSupportedHint": "Загрузчик не поддерживает эту версию Minecraft. Выберите другую версию или загрузчик.",
+    "autoLatest": "Автоматически (последняя)",
+    "fabric": "Fabric",
+    "forge": "Forge",
+    "neoforge": "NeoForge",
+    "quilt": "Quilt",
+    "vanilla": "Vanilla"
+  },
+  "quickPlay": {
+    "installing": "Установка...",
+    "steps": {
+      "java": "Java",
+      "minecraft": "Minecraft",
+      "loader": "Загрузчик",
+      "complete": "Готово"
+    }
+  },
+  "instances": {
+    "title": "Экземпляры",
+    "create": "Создать экземпляр",
+    "creating": "Создание экземпляра",
+    "loading": "Загрузка экземпляров...",
+    "start": "Запустить",
+    "stop": "Остановить",
+    "quickLaunch": "Быстрый запуск",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "openFolder": "Открыть папку",
+    "moreActions": "Дополнительные действия",
+    "gameSettings": "Игровые настройки",
+    "console": "Консоль",
+    "serverSettings": "Настройки сервера",
+    "analyzeLogs": "Анализ логов",
+    "checkIntegrity": "Проверка целостности",
+    "exportStzhk": "Экспорт STZHK",
+    "repair": "Починить",
+    "unknownError": "Неизвестная ошибка. Попробуйте переустановить экземпляр.",
+    "confirmDelete": "Подтвердить удаление",
+    "modsFor": "Моды",
+    "stepBasic": "Основное",
+    "stepSettings": "Настройки",
+    "stepConfirm": "Подтверждение",
+    "name": "Название",
+    "minecraftVersion": "Версия Minecraft",
+    "type": "Тип",
+    "typeClient": "Клиент",
+    "typeServer": "Сервер",
+    "loader": "Загрузчик",
+    "loaderVersion": "Версия загрузчика",
+    "serverPort": "Порт сервера",
+    "memory": "Память",
+    "minMemory": "Минимальная память",
+    "maxMemory": "Максимальная память",
+    "javaArgs": "JVM аргументы",
+    "gameArgs": "Игровые аргументы",
+    "username": "Имя игрока",
+    "notes": "Заметки",
+    "prev": "Назад",
+    "next": "Далее",
+    "createButton": "Создать",
+    "newInstance": "Новая сборка",
+    "namePlaceholder": "Моя сборка",
+    "fromGlobalSettings": "Из глобальных настроек",
+    "notesPlaceholder": "Описание сборки...",
+    "noInstances": "Нет экземпляров",
+    "createFirst": "Создай свой первый экземпляр",
+    "emptyTitle": "Начните своё приключение",
+    "emptyDescription": "Создайте первый экземпляр Minecraft или установите готовый модпак",
+    "optionalFromSettings": "(опционально, используется из настроек)",
+    "serverMemoryHint": "Для серверов: Рекомендуется установить min = max для стабильной работы. Это предотвращает задержки при расширении heap.",
+    "installInfoMessage": "После создания начнётся автоматическая загрузка необходимых файлов",
+    "confirmTitle": "Подтверждение",
+    "confirmVersion": "Версия",
+    "confirmPort": "Порт",
+    "confirmPlayer": "Игрок",
+    "status": {
+      "stopped": "Остановлен",
+      "starting": "Запускается",
+      "running": "Запущен",
+      "stopping": "Останавливается",
+      "installing": "Устанавливается",
+      "error": "Ошибка"
+    },
+    "installationFailed": "Ошибка установки",
+    "failedAtStep": "Этап",
+    "retryInstallation": "Повторить установку",
+    "retry": "Повторить",
+    "downloads": "Загрузки",
+    "noLoaderVersions": "Нет доступных версий загрузчика",
+    "loaderNotSupported": "Загрузчик не поддерживает эту версию Minecraft",
+    "edit": {
+      "title": "Редактирование экземпляра",
+      "versions": "Версии",
+      "showVersions": "Изменить",
+      "hideVersions": "Скрыть",
+      "minecraftLabel": "Minecraft",
+      "loaderLabel": "Загрузчик",
+      "versionWarning": "Внимание: Изменение версий требует загрузки новых файлов. После сохранения вам будет предложено запустить починку экземпляра.",
+      "minecraftVersion": "Версия Minecraft",
+      "loaderVersion": "Версия загрузчика",
+      "optional": "(опционально)",
+      "name": "Название",
+      "namePlaceholder": "Моя сборка",
+      "memory": "Память (RAM)",
+      "available": "Доступно",
+      "allocateMemory": "Выделить памяти",
+      "memoryHint": "Рекомендуется: 2048-4096 MB для модпаков, 2048 MB для ванилы",
+      "minMemory": "Минимум памяти",
+      "maxMemory": "Максимум памяти",
+      "serverPort": "Порт сервера",
+      "username": "Имя игрока",
+      "fromGlobalSettings": "Из глобальных настроек",
+      "javaArgs": "Аргументы JVM",
+      "javaArgsHint": "Дополнительные параметры для Java VM",
+      "gameArgs": "Игровые аргументы",
+      "gameArgsPlaceholder": "--fullscreen --server mc.hypixel.net",
+      "notes": "Заметки",
+      "notesPlaceholder": "Описание сборки...",
+      "saving": "Сохранение...",
+      "repairDialog": {
+        "title": "Запустить починку?",
+        "message": "Версия Minecraft или загрузчик были изменены. Рекомендуется запустить починку экземпляра для загрузки необходимых файлов.",
+        "confirm": "Запустить",
+        "skip": "Пропустить"
+      },
+      "repairError": "Не удалось запустить починку",
+      "java": "Java",
+      "javaPath": "Путь к Java",
+      "javaAuto": "Автоматически",
+      "javaAutoHint": "Будет использована Java из настроек лаунчера",
+      "javaCustom": "Указать путь",
+      "javaSelect": "Выбрать Java",
+      "javaCompatible": "Совместима",
+      "javaWarning": "Предупреждение",
+      "javaIncompatible": "Несовместима"
+    }
+  },
+  "mods": {
+    "title": "Моды",
+    "installed": "Установлен",
+    "browse": "Каталог",
+    "search": "Поиск модов...",
+    "enable": "Включить",
+    "disable": "Отключить",
+    "remove": "Удалить",
+    "update": "Обновить",
+    "autoUpdate": "Автообновление",
+    "noMods": "Моды не установлены",
+    "page": "Страница",
+    "next": "Вперёд",
+    "installing": "Установка",
+    "downloads": "загрузок",
+    "incompatible": "Несовместим",
+    "hideIncompatible": "Скрыть несовместимые",
+    "recommendations": {
+      "title": "Рекомендуемые моды",
+      "basedOn": "На основе установленных модов",
+      "loading": "Подбираем рекомендации...",
+      "empty": "Пока нет рекомендаций. Установите больше модов!",
+      "reasons": {
+        "sameCategory": "Категория",
+        "popularWith": "Популярен с",
+        "addonFor": "Дополнение для",
+        "trending": "В тренде",
+        "optimization": "Оптимизация",
+        "commonDependency": "Часто используется"
+      }
+    }
+  },
+  "modpacks": {
+    "title": "Модпаки",
+    "editor": "Редактор",
+    "import": "Импорт",
+    "export": "Экспорт",
+    "search": "Поиск модпаков...",
+    "install": "Установить модпак"
+  },
+  "settings": {
+    "title": "Настройки",
+    "subtitle": "Настройки по умолчанию для новых экземпляров",
+    "loading": "Загрузка...",
+    "saved": "Настройки сохранены!",
+    "appearance": {
+      "title": "Внешний вид",
+      "background": "Фон приложения",
+      "backgroundTypes": {
+        "floatingLines": "Волны",
+        "aurora": "Северное сияние",
+        "dotGrid": "Точечная сетка",
+        "rippleGrid": "Волновая сетка",
+        "edgePixels": "Пиксели",
+        "static": "Тёмный",
+        "image": "Картинка"
+      },
+      "selectImage": "Выбрать",
+      "copying": "Копирование...",
+      "backgroundImage": "Фоновое изображение",
+      "change": "Изменить",
+      "dimming": "Затемнение",
+      "dimmingHint": "Затемняет фон для лучшей читаемости"
+    },
+    "language": {
+      "title": "Язык / Language",
+      "select": "Выберите язык / Select language",
+      "changesApply": "Изменения применяются сразу / Changes apply immediately"
+    },
+    "user": {
+      "title": "Пользователь",
+      "defaultUsername": "Имя игрока по умолчанию",
+      "usernamePlaceholder": "Player",
+      "usernameHint": "Используется для оффлайн режима"
+    },
+    "memory": {
+      "title": "Память",
+      "minMemory": "Минимальная память",
+      "maxMemory": "Максимальная память"
+    },
+    "java": {
+      "title": "Java & Запуск",
+      "defaultJvmArgs": "JVM аргументы по умолчанию",
+      "jvmArgsHint": "Оптимизационные параметры для Java VM",
+      "defaultGameArgs": "Игровые аргументы по умолчанию",
+      "autoInstall": "Автоматически устанавливать Java",
+      "management": {
+        "title": "Управление Java",
+        "scan": "Найти системные Java",
+        "scanning": "Поиск...",
+        "found": "Найдено версий",
+        "add": "Добавить",
+        "added": "Добавлено",
+        "installed": "Установлено",
+        "customPath": "Указать путь вручную",
+        "download": "Скачать",
+        "downloadHint": "Java скачивается с Adoptium (Eclipse Temurin)"
+      }
+    },
+    "gpu": {
+      "title": "Видеокарта",
+      "select": "Выбор GPU",
+      "auto": "Автоматически",
+      "autoHint": "Система выберет GPU автоматически",
+      "discrete": "Дискретная",
+      "integrated": "Встроенная",
+      "unknown": "Неизвестно",
+      "recommended": "Рекомендуется",
+      "detecting": "Определение GPU...",
+      "noGpus": "GPU не обнаружены",
+      "multipleGpus": "Обнаружено несколько GPU",
+      "multipleGpusHint": "На ноутбуках с гибридной графикой рекомендуется выбрать дискретную видеокарту для лучшей производительности"
+    },
+    "launchBehavior": {
+      "title": "При запуске игры",
+      "description": "Что делать с лаунчером когда игра запущена",
+      "minimizeToTray": "Свернуть в трей",
+      "minimizeToTrayHint": "Лаунчер скроется в системный трей",
+      "keepOpen": "Оставить открытым",
+      "keepOpenHint": "Лаунчер останется видимым",
+      "close": "Закрыть",
+      "closeHint": "Лаунчер закроется полностью"
+    },
+    "mods": {
+      "title": "Моды",
+      "autoUpdate": "Автоматически обновлять моды"
+    },
+    "downloads": {
+      "title": "Загрузки",
+      "threads": "Потоков загрузки",
+      "maxConcurrent": "Максимум одновременных загрузок",
+      "bandwidthLimit": "Лимит скорости",
+      "unlimited": "Без ограничений",
+      "bandwidthHint": "0 = без ограничений"
+    },
+    "auth": {
+      "title": "Авторизация",
+      "type": "Тип авторизации",
+      "offline": "Оффлайн режим",
+      "elyBy": "Ely.by",
+      "microsoft": "Microsoft (скоро)",
+      "elyByServer": "Сервер Ely.by"
+    },
+    "storage": {
+      "title": "Хранилище",
+      "calculate": "Рассчитать размер",
+      "calculating": "Расчёт...",
+      "totalUsed": "Всего занято",
+      "instances": "Экземпляры",
+      "shared": "Общие файлы",
+      "libraries": "Библиотеки",
+      "assets": "Ассеты",
+      "versions": "Версии MC",
+      "javaTotal": "Java",
+      "java": {
+        "title": "Управление Java",
+        "description": "Установленные версии Java Runtime",
+        "analyze": "Анализ",
+        "versions": "версий",
+        "installedVersions": "Установленные версии",
+        "usedBy": "Используется",
+        "notUsed": "Не используется ни одним экземпляром",
+        "allUsed": "Все версии Java используются",
+        "cleanupAll": "Удалить неиспользуемые",
+        "cleanupConfirm": {
+          "title": "Удалить Java?",
+          "message": "Удалить",
+          "confirm": "Удалить"
+        },
+        "cleanupAllConfirm": {
+          "title": "Удалить неиспользуемые Java?",
+          "message": "Удалить все неиспользуемые версии Java",
+          "confirm": "Удалить все"
+        }
+      },
+      "cache": "Кэш",
+      "logs": "Логи",
+      "byInstances": "По экземплярам:",
+      "openFolder": "Открыть папку",
+      "refresh": "Обновить",
+      "clearCache": "Очистить кэш",
+      "clearLogs": "Очистить логи",
+      "orphaned": {
+        "title": "Мёртвые папки",
+        "description": "Папки экземпляров без записи в базе данных",
+        "check": "Проверить",
+        "found": "Найдено",
+        "deleteAll": "Удалить все"
+      }
+    },
+    "folders": {
+      "title": "Папки приложения",
+      "base": "Основная папка",
+      "instances": "Экземпляры",
+      "shared": "Общие файлы",
+      "java": "Java",
+      "cache": "Кэш",
+      "logs": "Логи",
+      "openFolder": "Открыть папку"
+    },
+    "actions": {
+      "reset": "Сбросить",
+      "save": "Сохранить",
+      "saving": "Сохранение..."
+    },
+    "dialogs": {
+      "clearCache": {
+        "title": "Очистить кэш?",
+        "message": "Это безопасно, но некоторые данные придётся загрузить заново.",
+        "confirm": "Очистить"
+      },
+      "clearLogs": {
+        "title": "Очистить логи?",
+        "message": "Очистить логи приложения?",
+        "confirm": "Очистить"
+      },
+      "deleteFolder": {
+        "title": "Удалить папку?",
+        "message": "Это действие необратимо.",
+        "confirm": "Удалить"
+      },
+      "deleteAllOrphaned": {
+        "title": "Удалить все мёртвые папки?",
+        "message": "папок будет удалено",
+        "irreversible": "Это действие необратимо.",
+        "confirm": "Удалить все"
+      },
+      "resetSettings": {
+        "title": "Сбросить настройки?",
+        "message": "Все настройки будут сброшены к значениям по умолчанию.",
+        "confirm": "Сбросить"
+      },
+      "imageError": "Не удалось установить изображение"
+    },
+    "fileTypes": {
+      "images": "Изображения"
+    },
+    "units": {
+      "bytes": "Б",
+      "kilobytes": "КБ",
+      "megabytes": "МБ",
+      "gigabytes": "ГБ",
+      "terabytes": "ТБ"
+    }
+  },
+  "errors": {
+    "unknown": "Неизвестная ошибка",
+    "networkError": "Ошибка сети",
+    "notFound": "Не найдено"
+  },
+  "notifications": {
+    "peerDiscovered": "Найден пользователь",
+    "incomingRequest": "Запрос на синхронизацию",
+    "transferCompleted": "Передача завершена",
+    "transferFailed": "Ошибка передачи",
+    "friendRequest": "Запрос в друзья",
+    "friendAdded": "Добавлен в друзья"
+  },
+  "logAnalyzer": {
+    "title": "Анализатор логов",
+    "analyzeExternal": "Анализ логов",
+    "analyzeExternalHint": "Откройте лог-файл с любого места на диске",
+    "analyze": "Анализировать",
+    "openFile": "Открыть файл",
+    "import": "Импорт",
+    "export": "Экспорт",
+    "archive": "Архив",
+    "analyzing": "Анализ логов...",
+    "noProblems": "Проблем не обнаружено",
+    "detectedProblems": "Обнаруженные проблемы",
+    "optimizations": "Рекомендации по оптимизации",
+    "completedIn": "Выполнено за",
+    "ms": "мс",
+    "lines": "Строк",
+    "critical": "Критических",
+    "errors": "Ошибок",
+    "warnings": "Предупреждений",
+    "crashDetected": "Обнаружен краш",
+    "possibleCulprit": "Возможный виновник",
+    "stackTrace": "Stack trace",
+    "relatedMods": "Связанные моды",
+    "solutions": "Решения",
+    "difficulty": {
+      "easy": "Легко",
+      "medium": "Средне",
+      "hard": "Сложно",
+      "expert": "Эксперт"
+    },
+    "successRate": "Вероятность успеха",
+    "apply": "Применить",
+    "documentation": "Документация",
+    "clickToAnalyze": "Нажмите \"Анализировать\" для проверки логов",
+    "fixAllProblems": "Исправить все проблемы",
+    "noFixableProblems": "Нет проблем с автоисправлением",
+    "logLine": "Строка лога",
+    "description": "Описание",
+    "instanceNotSelected": "Экземпляр не выбран",
+    "exportArchiveOnlyInstances": "Экспорт архива доступен только для экземпляров",
+    "exportArchiveUnavailable": "Экспорт архива временно недоступен. Используйте экспорт в JSON.",
+    "fixPreview": "Предпросмотр исправлений",
+    "selectFixesToApply": "Выберите исправления для применения",
+    "selectedCount": "Выбрано",
+    "applySelected": "Применить выбранные",
+    "viewMode": "Режим просмотра:",
+    "report": "Отчёт"
+  },
+  "autoFix": {
+    "requiresRestart": "Требуется перезапуск экземпляра",
+    "applying": "Применение...",
+    "success": "Исправление применено",
+    "failed": "Не удалось применить исправление",
+    "backupCreated": "Backup создан",
+    "types": {
+      "removeMod": "Удалить мод",
+      "downloadMod": "Скачать мод",
+      "increaseRam": "Увеличить память",
+      "changeJvmArg": "Изменить JVM аргумент",
+      "reinstallMod": "Переустановить мод",
+      "deleteConfig": "Удалить конфиг",
+      "installJava": "Установить Java",
+      "updateLoader": "Обновить загрузчик",
+      "resetConfigs": "Сбросить конфиги",
+      "verifyFiles": "Проверить файлы"
+    },
+    "status": {
+      "detected": "Обнаружено",
+      "awaitingRestart": "Ожидает перезапуска",
+      "resolved": "Решено",
+      "failed": "Не удалось"
+    }
+  },
+  "conflictPredictor": {
+    "checking": "Проверка совместимости...",
+    "warningTitle": "Возможные проблемы",
+    "dangerTitle": "Обнаружены конфликты!",
+    "installing": "Установка мода",
+    "foundIssues": "Обнаруженные проблемы",
+    "conflictsWith": "Конфликтует с",
+    "moreInfo": "Подробнее",
+    "installAnyway": "Установить всё равно",
+    "installAtRisk": "Установить на свой риск",
+    "severity": {
+      "info": "Информация",
+      "warning": "Предупреждение",
+      "error": "Ошибка",
+      "critical": "Критично"
+    },
+    "category": {
+      "incompatible": "Несовместимость",
+      "duplicate": "Дублирующий функционал",
+      "loaderMismatch": "Несовместимый загрузчик",
+      "versionConflict": "Конфликт версий",
+      "missingDependency": "Отсутствующая зависимость",
+      "mixinConflict": "Конфликт Mixin",
+      "knownIssue": "Известная проблема"
+    },
+    "noConflicts": "Конфликтов не обнаружено. Мод можно безопасно установить.",
+    "hasKnownIssues": "Есть известные проблемы"
+  },
+  "crashHistory": {
+    "title": "История крашей",
+    "tabStatistics": "Статистика",
+    "tabHistory": "История",
+    "tabTrends": "Тренды",
+    "totalCrashes": "Всего крашей",
+    "lastWeek": "За неделю",
+    "last24h": "За 24 часа",
+    "fixRate": "Успешно исправлено",
+    "overallTrend": "Общий тренд",
+    "avgTimeBetween": "Среднее время между крашами",
+    "problematicMods": "Проблемные моды",
+    "crashes": "крашей",
+    "noCrashes": "Крашей не зафиксировано",
+    "noHistory": "История пуста",
+    "noTrends": "Недостаточно данных для анализа трендов",
+    "crashReport": "Краш-репорт",
+    "logAnalysis": "Анализ логов",
+    "problems": "проблем",
+    "moreProblems": "ещё проблем",
+    "markFixed": "Отметить решённым",
+    "fixedVia": "Исправлено",
+    "clearHistory": "Очистить историю",
+    "confirmClear": "Вы уверены, что хотите очистить историю крашей?",
+    "trendWorsening": "Ухудшается",
+    "trendImproving": "Улучшается",
+    "trendStable": "Стабильно",
+    "trendUnknown": "Недостаточно данных"
+  },
+  "liveCrash": {
+    "title": "Live-мониторинг",
+    "live": "Live",
+    "off": "Выкл",
+    "monitoring": "Мониторинг активен",
+    "notMonitoring": "Мониторинг выключен",
+    "active": "Активен",
+    "inactive": "Неактивен",
+    "errors": "Ошибок",
+    "warnings": "Предупреждений",
+    "crashDetected": "Обнаружен краш!",
+    "noIssues": "Проблем не обнаружено",
+    "notMonitoringDesc": "Мониторинг неактивен. Запустите игру и включите мониторинг.",
+    "startMonitoring": "Включить мониторинг",
+    "start": "Включить",
+    "stop": "Выключить",
+    "clear": "Очистить",
+    "openAnalyzer": "Открыть анализатор логов"
+  },
+  "errorReporter": {
+    "title": "Отчеты об ошибках",
+    "selectAll": "Выбрать все",
+    "deselect": "Снять выделение",
+    "selected": "выбрано",
+    "clearAll": "Очистить все",
+    "noErrors": "Ошибок не обнаружено",
+    "beforeReporting": "Перед отправкой",
+    "checkDuplicates": "Проверьте, не была ли эта ошибка уже отправлена",
+    "searchIssues": "Поиск в GitHub",
+    "selectToReport": "Выберите ошибки для отправки в GitHub",
+    "report": "Отправить"
+  },
+  "solutionFinder": {
+    "title": "Поиск решений",
+    "searching": "Поиск решений...",
+    "noSolutions": "Решений не найдено",
+    "foundSolutions": "Найдено решений",
+    "searchTime": "Время поиска",
+    "sourcesChecked": "Источников проверено",
+    "confidence": "Уверенность",
+    "helped": "Помогло",
+    "people": "людям",
+    "viewSource": "Источник",
+    "applyFix": "Применить",
+    "didItHelp": "Помогло?",
+    "yes": "Да",
+    "no": "Нет",
+    "thanksFeedback": "Спасибо за отзыв!",
+    "sources": {
+      "builtIn": "Встроенная база",
+      "github": "GitHub",
+      "reddit": "Reddit",
+      "modPage": "Страница мода",
+      "community": "Сообщество"
+    },
+    "confidenceLevels": {
+      "high": "Высокая",
+      "medium": "Средняя",
+      "low": "Низкая"
+    },
+    "knowledgeBase": {
+      "outofmemory": {
+        "title": "Увеличить выделенную RAM",
+        "description": "В настройках экземпляра увеличьте максимальную память (рекомендуется 6-8GB для модпаков)"
+      },
+      "outofmemoryTextures": {
+        "title": "Удалить HD текстурпаки",
+        "description": "Текстурпаки высокого разрешения (256x+) потребляют много VRAM и RAM"
+      },
+      "optifine": {
+        "title": "Удалить OptiFine",
+        "description": "OptiFine несовместим с Sodium/Iris/Rubidium. Используйте Sodium + Iris для шейдеров"
+      },
+      "missingDependency": {
+        "title": "Автоустановка зависимостей",
+        "description": "Используйте функцию 'Resolve Dependencies' для автоматической установки недостающих модов"
+      },
+      "mixinUpdate": {
+        "title": "Обновить моды",
+        "description": "Mixin конфликты часто исправляются в новых версиях модов. Проверьте обновления"
+      },
+      "mixinRemove": {
+        "title": "Удалить конфликтующий мод",
+        "description": "Если два мода изменяют один метод через Mixin, один из них нужно удалить"
+      },
+      "javaVersion": {
+        "title": "Установить правильную версию Java",
+        "description": "MC 1.17+ требует Java 17+, MC 1.20.5+ требует Java 21. Установите нужную версию"
+      },
+      "corrupted": {
+        "title": "Переустановить мод",
+        "description": "Файл мода повреждён. Удалите его и скачайте заново с Modrinth/CurseForge"
+      },
+      "config": {
+        "title": "Сбросить конфиги",
+        "description": "Удалите папку config для сброса настроек. Мод создаст новые конфиги при запуске"
+      },
+      "kubejs": {
+        "title": "Проверить KubeJS скрипты",
+        "description": "Ошибки в KubeJS обычно указывают на проблемы в скриптах. Проверьте kubejs/startup_scripts/ и kubejs/server_scripts/"
+      }
+    },
+    "problemTypes": {
+      "outOfMemory": "Нехватка оперативной памяти",
+      "missingDependency": "Отсутствует зависимость",
+      "modConflict": "Конфликт модов",
+      "mixinConflict": "Конфликт Mixin",
+      "javaIssue": "Проблема с Java",
+      "configError": "Ошибка конфигурации",
+      "corruptedFile": "Повреждённый файл",
+      "versionMismatch": "Несоответствие версий",
+      "crashDuringStartup": "Краш при запуске",
+      "crashDuringGame": "Краш во время игры",
+      "performanceIssue": "Проблема производительности",
+      "networkIssue": "Сетевая проблема",
+      "renderingIssue": "Проблема рендеринга",
+      "worldCorruption": "Повреждение мира",
+      "unknown": "Неизвестная проблема"
+    }
+  },
+  "knowledgeBase": {
+    "feedbackTitle": "Помогло ли решение?",
+    "solution": "Решение",
+    "didItHelp": "Это решение помогло исправить проблему?",
+    "notesOptional": "Заметки (опционально)",
+    "notesPlaceholder": "Опишите что получилось или не получилось...",
+    "yesHelped": "Да, помогло",
+    "noDidntHelp": "Нет, не помогло",
+    "skipFeedback": "Пропустить",
+    "personallyRecommended": "⭐ Рекомендуется на основе вашего опыта",
+    "successRate": "Процент успеха",
+    "timesApplied": "Применений",
+    "timesHelped": "Помогло",
+    "noPersonalHistory": "Нет личной статистики",
+    "stats": {
+      "title": "Статистика базы знаний",
+      "totalFeedback": "Всего отзывов",
+      "totalSolutions": "Решений с рейтингом",
+      "avgSuccessRate": "Средний успех"
+    }
+  },
+  "performance": {
+    "title": "Производительность",
+    "monitoring": "Мониторинг",
+    "startMonitoring": "Мониторинг",
+    "stopMonitoring": "Остановить",
+    "memoryUsage": "Память",
+    "cpuUsage": "CPU",
+    "tps": "TPS",
+    "mspt": "MSPT",
+    "modPerformance": "Производительность модов",
+    "tickTime": "Время тика",
+    "impactScore": "Влияние",
+    "recommendations": "Рекомендации",
+    "bottlenecks": "Узкие места",
+    "sparkDetected": "Обнаружен Spark",
+    "sparkNotInstalled": "Spark не установлен",
+    "installSpark": "Установите Spark для детального анализа производительности модов",
+    "installSparkHint": "Установите Spark для детального анализа производительности модов",
+    "installSparkButton": "Установить Spark",
+    "installingSpark": "Установка...",
+    "noData": "Нет данных",
+    "lastUpdate": "Последнее обновление",
+    "realtime": "Реальное время",
+    "memoryHistory": "История памяти",
+    "clickToStart": "Нажмите \"Мониторинг\" для начала сбора данных",
+    "instanceNotRunning": "Экземпляр не запущен",
+    "noSparkData": "Нет данных Spark. Создайте отчёт командой /spark profiler",
+    "noRecommendations": "Нет рекомендаций - всё работает хорошо!",
+    "overallScore": "Общая оценка",
+    "severity": {
+      "critical": "Критично",
+      "high": "Высокая",
+      "medium": "Средняя",
+      "low": "Низкая"
+    },
+    "impact": {
+      "minimal": "Минимальное",
+      "low": "Низкое",
+      "medium": "Среднее",
+      "high": "Высокое",
+      "critical": "Критическое"
+    },
+    "bottleneckCategories": {
+      "memory": "Память",
+      "tickTime": "Время тика",
+      "networkLag": "Сетевая задержка",
+      "renderLag": "Задержка рендеринга",
+      "chunkLoading": "Загрузка чанков",
+      "garbageCollection": "Сборка мусора",
+      "diskIO": "Дисковый I/O"
+    }
+  },
+  "modpackCompare": {
+    "title": "Сравнение модпаков",
+    "subtitle": "Найдите различия между двумя модпаками",
+    "source1": "1-й модпак",
+    "source2": "2-й модпак",
+    "sourceType": {
+      "file": "Файл",
+      "instance": "Экземпляр",
+      "modrinth": "Modrinth",
+      "curseforge": "CurseForge"
+    },
+    "selectFile": "Выбрать файл...",
+    "selectInstance": "Выберите экземпляр...",
+    "searchModpack": "Поиск модпака...",
+    "latestVersion": "Последняя версия",
+    "compare": "Сравнить",
+    "comparing": "Сравнение...",
+    "newComparison": "Новое сравнение",
+    "selectBoth": "Выберите оба модпака для сравнения",
+    "tabs": {
+      "mods": "Моды",
+      "configs": "Конфиги",
+      "other": "Другие файлы"
+    },
+    "stats": {
+      "modsFirst": "Модов (1-й)",
+      "modsSecond": "Модов (2-й)",
+      "identical": "Одинаковых",
+      "different": "Разных версий"
+    },
+    "mods": {
+      "onlyInFirst": "Только в 1-м",
+      "onlyInSecond": "Только во 2-м",
+      "differentVersions": "Разные версии",
+      "identical": "Одинаковые моды",
+      "allIdentical": "Все моды одинаковые",
+      "diffFirst": "1-й",
+      "diffSecond": "2-й"
+    },
+    "configs": {
+      "onlyInFirst": "Только в 1-м",
+      "onlyInSecond": "Только во 2-м",
+      "differentContent": "Разное содержимое",
+      "allIdentical": "Конфиги одинаковые"
+    },
+    "other": {
+      "onlyInFirst": "Только в 1-м",
+      "onlyInSecond": "Только во 2-м",
+      "allIdentical": "Другие файлы одинаковые"
+    },
+    "download": {
+      "title": "Скачать мод",
+      "selectFolder": "Выбрать папку...",
+      "selectFolderTitle": "Выберите папку для скачивания",
+      "selectFolderRequired": "Выберите папку для скачивания",
+      "searching": "Поиск...",
+      "noResults": "Моды не найдены",
+      "download": "Скачать",
+      "downloadAll": "Скачать все недостающие",
+      "downloadAllHint": "Скачать все моды из второго модпака",
+      "downloaded": "Скачано",
+      "failed": "Ошибка"
+    },
+    "export": {
+      "title": "Экспорт результатов",
+      "exportJson": "Экспорт в JSON",
+      "exportText": "Экспорт в текст",
+      "copied": "Скопировано в буфер обмена"
+    },
+    "closeConfirm": {
+      "title": "Закрыть сравнение?",
+      "message": "Результаты сравнения будут потеряны. Вы уверены, что хотите закрыть это окно?"
+    },
+    "fileTypes": {
+      "modpacks": "Модпаки"
+    },
+    "patch": {
+      "title": "Патчи",
+      "applyToInstance": "Применить патч к этому экземпляру",
+      "instanceMustBeStopped": "Экземпляр должен быть остановлен для применения патчей",
+      "browse": "Выбрать...",
+      "applyAnother": "Применить другой патч",
+      "create": "Создать патч",
+      "createTitle": "Создание патча",
+      "createHint": "Создать файл патча из этих различий",
+      "description": "Описание",
+      "descriptionPlaceholder": "Опишите, что изменяет этот патч...",
+      "author": "Автор",
+      "authorPlaceholder": "Ваше имя",
+      "save": "Сохранить патч",
+      "creating": "Создание...",
+      "apply": "Применить патч",
+      "applying": "Применение...",
+      "selectFile": "Выбрать файл патча...",
+      "preview": "Предпросмотр",
+      "previewTitle": "Предпросмотр патча",
+      "modsToAdd": "Моды для добавления",
+      "modsToRemove": "Моды для удаления",
+      "configsToChange": "Конфиги для изменения",
+      "configsToRemove": "Конфиги для удаления",
+      "filesToAdd": "Файлы для добавления",
+      "filesToRemove": "Файлы для удаления",
+      "warnings": "Предупреждения",
+      "errors": "Ошибки",
+      "success": "Патч успешно применён",
+      "failed": "Ошибка при применении патча",
+      "compatibility": {
+        "title": "Совместимость",
+        "checking": "Проверка совместимости...",
+        "compatible": "Совместим",
+        "compatibleWithWarnings": "Совместим с предупреждениями",
+        "incompatible": "Несовместим",
+        "alreadyApplied": "Уже применён",
+        "compatibleDesc": "Патч полностью совместим с этим экземпляром",
+        "compatibleWithWarningsDesc": "Патч можно применить, но есть предупреждения",
+        "incompatibleDesc": "Патч несовместим с этим экземпляром",
+        "alreadyAppliedDesc": "Этот патч уже был применён к экземпляру",
+        "mcVersion": "Версия Minecraft",
+        "loader": "Загрузчик",
+        "loaderVersion": "Версия загрузчика",
+        "match": "совпадает",
+        "mismatch": "не совпадает",
+        "recommendation": "Рекомендация",
+        "selectInstance": "Выберите экземпляр для проверки совместимости"
+      }
+    }
+  },
+  "backup": {
+    "title": "Бэкапы",
+    "enabled": "Автоматические бэкапы",
+    "enabledDescription": "Создавать бэкапы перед изменениями модов",
+    "disabled": "Отключено",
+    "disabledForInstance": "Отключено для этого экземпляра",
+    "useGlobal": "Использовать глобальную настройку",
+    "maxCount": "Максимум бэкапов",
+    "maxCountDescription": "Старые бэкапы автоматически удаляются",
+    "includeSaves": "Бэкапить миры",
+    "includeSavesDescription": "Включить папку saves в бэкап",
+    "backupModDetected": "Обнаружен мод бэкапов",
+    "backupModMessage": "Миры бэкапятся модом '{mod}', мы бэкапим только моды и конфиги",
+    "noBackupMod": "Мод бэкапов не обнаружен",
+    "noBackupModMessage": "Бэкапим моды, конфиги и миры",
+    "createManual": "Создать бэкап",
+    "creating": "Создание бэкапа...",
+    "created": "Бэкап создан",
+    "restore": "Восстановить",
+    "restoring": "Восстановление...",
+    "restored": "Бэкап восстановлен",
+    "delete": "Удалить бэкап",
+    "confirmDelete": "Удалить этот бэкап?",
+    "noBackups": "Нет бэкапов",
+    "noBackupsDescription": "Бэкапы создаются автоматически перед изменениями",
+    "files": "файлов",
+    "trigger": {
+      "beforeModInstall": "Перед установкой мода",
+      "beforeModRemove": "Перед удалением мода",
+      "beforeModUpdate": "Перед обновлением мода",
+      "beforeAutoFix": "Перед автофиксом",
+      "manual": "Ручной бэкап"
+    }
+  },
+  "resources": {
+    "title": "Ресурсы",
+    "shaders": "Шейдеры",
+    "resourcePacks": "Ресурспаки",
+    "shader": "Шейдер",
+    "resourcePack": "Ресурспак",
+    "installed": "Установлено",
+    "browse": "Каталог",
+    "searchInstalled": "Поиск установленных...",
+    "addLocal": "Добавить локальный",
+    "scanTooltip": "Сканировать папку на неотслеживаемые файлы",
+    "noInstalled": "Нет установленных",
+    "searchModrinth": "Поиск на Modrinth...",
+    "installGlobal": "Установить глобально (доступно для всех экземпляров)",
+    "searchHint": "Найдите шейдеры или ресурспаки на Modrinth",
+    "downloads": "загрузок",
+    "global": "Глобальный",
+    "disable": "Отключить",
+    "enable": "Включить",
+    "version": "Версия",
+    "source": "Источник",
+    "fileSize": "Размер файла",
+    "installing": "Установка...",
+    "removing": "Удаление...",
+    "scanning": "Сканирование...",
+    "importedCount": "Импортировано файлов",
+    "noResults": "Ничего не найдено",
+    "supportedVersions": "Поддерживаемые версии"
+  },
+  "sync": {
+    "title": "Синхронизация настроек",
+    "subtitle": "Копирование настроек между экземплярами",
+    "sourceInstance": "Откуда",
+    "targetInstance": "Куда",
+    "selectInstance": "Выберите экземпляр...",
+    "profile": "Профиль синхронизации",
+    "preview": "Предпросмотр",
+    "sync": "Синхронизировать",
+    "syncing": "Синхронизация...",
+    "quickSync": "Быстрая синхронизация",
+    "quickSyncHint": "Только конфиги модов (геймплей)",
+    "profiles": {
+      "gameplayOnly": "Только геймплей",
+      "gameplayOnlyDesc": "Только конфиги модов (баланс, рецепты). Личные настройки не трогает.",
+      "fullSync": "Полная синхронизация",
+      "fullSyncDesc": "Всё кроме личных настроек (FOV, звук, управление).",
+      "minimal": "Минимальный",
+      "minimalDesc": "Только критичные настройки. Подходит для серверов."
+    },
+    "categories": {
+      "personal": "Личные",
+      "personalDesc": "FOV, звук, управление - НИКОГДА не синхронизируются",
+      "performance": "Производительность",
+      "performanceDesc": "Графика, FPS лимит - зависят от железа",
+      "modConfig": "Конфиги модов",
+      "modConfigDesc": "Баланс, рецепты, механики",
+      "gameplay": "Игровые данные",
+      "gameplayDesc": "Waypoints, закладки рецептов",
+      "visual": "Визуальные",
+      "visualDesc": "Ресурспаки, шейдеры",
+      "unknown": "Неизвестно"
+    },
+    "previewTitle": "Предпросмотр синхронизации",
+    "willSync": "Будет синхронизировано",
+    "willSkip": "Будет пропущено",
+    "filesCount": "файлов",
+    "totalSize": "Общий размер",
+    "byCategory": "По категориям",
+    "skipReasons": {
+      "categoryDisabled": "Категория отключена в профиле",
+      "explicitlyExcluded": "Явно исключено",
+      "personalSetting": "Личная настройка",
+      "notFound": "Файл не найден",
+      "identical": "Идентичен"
+    },
+    "result": {
+      "success": "Синхронизация завершена",
+      "synced": "Синхронизировано файлов",
+      "skipped": "Пропущено",
+      "errors": "Ошибок",
+      "backupCreated": "Создан бэкап"
+    },
+    "confirmSync": {
+      "title": "Подтвердите синхронизацию",
+      "message": "Настройки будут скопированы из одного экземпляра в другой. Бэкап будет создан автоматически.",
+      "warning": "Личные настройки (FOV, звук, управление) НЕ будут изменены."
+    },
+    "errors": {
+      "sameInstance": "Нельзя синхронизировать экземпляр с самим собой",
+      "noFiles": "Нет файлов для синхронизации"
+    },
+    "advanced": {
+      "title": "Расширенные настройки",
+      "exclude": "Исключить файлы",
+      "excludeHint": "Паттерны файлов для исключения (по одному на строку)",
+      "include": "Включить файлы",
+      "includeHint": "Паттерны файлов для принудительного включения"
+    },
+    "knownSettings": {
+      "title": "Известные настройки",
+      "showAll": "Показать все известные файлы"
+    }
+  },
+  "collections": {
+    "title": "Коллекции модов",
+    "create": "Создать",
+    "createNew": "Создать новую коллекцию",
+    "edit": "Редактировать",
+    "import": "Импорт",
+    "export": "Экспорт",
+    "duplicate": "Дублировать",
+    "name": "Название",
+    "namePlaceholder": "Моя коллекция",
+    "description": "Описание",
+    "descriptionPlaceholder": "Необязательное описание",
+    "icon": "Иконка",
+    "color": "Цвет",
+    "mods": "модов",
+    "builtin": "встроенная",
+    "selectCollection": "Выберите коллекцию",
+    "modsInCollection": "Моды в коллекции",
+    "emptyCollection": "В этой коллекции нет модов",
+    "installTo": "Установить в",
+    "modsWillBeInstalled": "модов будет установлено",
+    "installAll": "Установить все",
+    "installing": "Установка...",
+    "installed": "установлено",
+    "skipped": "пропущено",
+    "failed": "ошибок",
+    "confirmDelete": "Удалить коллекцию \"{name}\"?",
+    "addToCollection": "Добавить в коллекцию",
+    "removeFromCollection": "Удалить из коллекции",
+    "selectOrCreate": "Выберите коллекцию или создайте новую",
+    "modAddedTo": "Мод добавлен в коллекцию",
+    "modRemovedFrom": "Мод удалён из коллекции",
+    "builtinCollections": {
+      "optimization": "Оптимизация",
+      "tech": "Техно моды",
+      "magic": "Магические моды",
+      "adventure": "Приключения",
+      "building": "Строительство",
+      "qol": "Качество жизни"
+    }
+  },
+  "wiki": {
+    "tabInfo": "Информация",
+    "tabWiki": "Wiki",
+    "loading": "Загрузка wiki...",
+    "localModNoWiki": "У локальных модов нет wiki контента",
+    "description": "Описание",
+    "version": "Версия",
+    "author": "Автор",
+    "categories": "Категории",
+    "file": "Файл",
+    "size": "Размер",
+    "settings": "Настройки",
+    "enabled": "Включён",
+    "disabled": "Отключён",
+    "autoUpdateOn": "Автообновление",
+    "autoUpdateOff": "Без автообновления",
+    "installedAt": "Установлен",
+    "updatedAt": "Обновлён",
+    "openProjectPage": "Открыть страницу мода",
+    "projectPage": "Страница проекта",
+    "wikiPage": "Wiki",
+    "issues": "Проблемы",
+    "sourceCode": "Исходный код",
+    "license": "Лицензия",
+    "gallery": "Галерея",
+    "changelog": "История версий",
+    "downloads": "Загрузок",
+    "followers": "Подписчиков",
+    "links": "Ссылки",
+    "about": "Подробности"
+  },
+  "errorReporter": {
+    "title": "Отчеты об ошибках",
+    "selectAll": "Выбрать все",
+    "deselect": "Снять выделение",
+    "selected": "выбрано",
+    "clearAll": "Очистить все",
+    "noErrors": "Ошибок не обнаружено",
+    "beforeReporting": "Перед отправкой",
+    "checkDuplicates": "Проверьте, не была ли эта ошибка уже отправлена",
+    "searchIssues": "Поиск в GitHub",
+    "selectToReport": "Выберите ошибки для отправки в GitHub",
+    "report": "Отправить"
+  },
+  "connect": {
+    "title": "Stuzhik Connect",
+    "subtitle": "Делись модпаками с друзьями мгновенно",
+    "disabled": "Connect отключён",
+    "enableHint": "Включите в настройках, чтобы видеть друзей в сети",
+    "openSettings": "Открыть настройки",
+    "noPeers": "Никого не найдено",
+    "noPeersHint": "Убедитесь, что вы в одной локальной сети или VPN",
+    "searching": "Поиск...",
+    "foundPeers": "Найдено: {count}",
+    "anonymous": "Аноним",
+    "online": "В сети",
+    "inGame": "Играет",
+    "lastSeen": "Был в сети",
+    "requestModpack": "Запросить модпак",
+    "viewModpacks": "Посмотреть модпаки",
+    "addFriend": "Запрос в друзья",
+    "friendRequestSent": "Запрос отправлен",
+    "blockUser": "Заблокировать",
+    "quickJoin": "Присоединиться",
+    "quickJoinHint": "Синхронизировать модпак и зайти на сервер",
+    "syncing": "Синхронизация...",
+    "joining": "Подключение...",
+    "syncingModpack": "Синхронизация модпака",
+    "launchingGame": "Запуск игры",
+    "connectingToServer": "Подключение к серверу",
+    "noServerRunning": "Друг не на сервере",
+    "yourCode": "Твой код",
+    "yourCodeHint": "Поделись этим кодом с друзьями",
+    "copied": "Скопировано!",
+    "enterCode": "Введи код друга",
+    "enterCodePlaceholder": "STUZHIK-XXXX",
+    "connect": "Подключиться",
+    "invalidCode": "Неверный формат кода",
+    "connecting": "Подключение...",
+    "vpnHint": "Для игры с друзьями через интернет рекомендуем:",
+    "network": {
+      "title": "Диагностика сети",
+      "diagnose": "Проверить подключение",
+      "diagnosing": "Проверка...",
+      "localIp": "Локальный IP",
+      "udpPort": "UDP порт",
+      "tcpPort": "TCP порт",
+      "portOpen": "Открыт",
+      "portClosed": "Закрыт",
+      "status": "Статус",
+      "ok": "Всё работает",
+      "issues": "Есть проблемы",
+      "firewallBlocking": "Брандмауэр блокирует",
+      "firewallBlockingDesc": "Похоже, брандмауэр Windows блокирует подключения. Разрешите приложению доступ к сети.",
+      "noNetwork": "Нет сети",
+      "noNetworkDesc": "Не удалось определить локальный IP-адрес. Проверьте подключение к сети.",
+      "useVpn": "Используйте VPN",
+      "useVpnDesc": "Для игры через интернет (не в одной локальной сети) используйте VPN: Radmin VPN, ZeroTier или Hamachi.",
+      "copyFirewallCommand": "Скопировать команду",
+      "firewallHint": "Выполните эту команду в командной строке от имени администратора:",
+      "copied": "Скопировано!"
+    },
+    "settings": {
+      "title": "Настройки Connect",
+      "enabled": "Включить Stuzhik Connect",
+      "nickname": "Ваш никнейм",
+      "nicknameHint": "Оставьте пустым для использования ника из Minecraft",
+      "visibility": "Видимость",
+      "visibilityInvisible": "Невидим",
+      "visibilityFriends": "Только друзья",
+      "visibilityAll": "Все в сети",
+      "showNickname": "Показывать никнейм",
+      "showModpacks": "Показывать список модпаков",
+      "showServer": "Показывать на каком сервере играю",
+      "send": "Отправка (что другие могут получить от вас)",
+      "receive": "Получение (что вы можете получить)",
+      "modpacks": "Модпаки",
+      "configs": "Конфиги",
+      "resourcepacks": "Ресурспаки",
+      "shaderpacks": "Шейдеры",
+      "permissionDeny": "Запрещено",
+      "permissionFriends": "Только друзья",
+      "permissionAsk": "Спрашивать",
+      "permissionAllow": "Разрешено",
+      "port": "UDP порт",
+      "portWarning": "Изменение порта может помешать найти друзей",
+      "blockedUsers": "Заблокированные пользователи",
+      "noBlockedUsers": "Нет заблокированных пользователей",
+      "unblock": "Разблокировать",
+      "trustedFriends": "Доверенные друзья",
+      "noFriends": "Нет добавленных друзей",
+      "removeFriend": "Удалить из друзей",
+      "friendAdded": "Друг добавлен"
+    },
+    "consent": {
+      "requestTitle": "Запрос на передачу",
+      "wantsModpack": "хочет получить ваш модпак",
+      "wantsToSend": "хочет отправить вам",
+      "allow": "Разрешить",
+      "deny": "Отклонить",
+      "remember": "Запомнить для этого пользователя",
+      "rememberForPeer": "Запомнить выбор для этого пользователя",
+      "warning": "Принимайте файлы только от тех, кому доверяете",
+      "types": {
+        "modpack": "Модпак",
+        "config": "Конфигурацию",
+        "resourcepack": "Ресурспак",
+        "shaderpack": "Шейдеры"
+      }
+    },
+    "transfer": {
+      "title": "Передача файлов",
+      "noTransfers": "Нет активных передач",
+      "uploading": "Отправка",
+      "downloading": "Загрузка",
+      "completed": "Завершено",
+      "failed": "Ошибка",
+      "cancelled": "Отменено",
+      "connecting": "Подключение...",
+      "negotiating": "Согласование...",
+      "progress": "{{done}} из {{total}}",
+      "speed": "{{speed}}/с",
+      "timeLeft": "Осталось {{time}}",
+      "cancel": "Отменить",
+      "retry": "Повторить",
+      "clearCompleted": "Очистить завершённые",
+      "incoming": "Входящий запрос",
+      "accept": "Принять",
+      "decline": "Отклонить",
+      "wantsToSync": "хочет синхронизировать",
+      "filesCount": "файлов",
+      "totalSize": "{{size}}"
+    },
+    "queue": {
+      "title": "Очередь передач",
+      "pending": "Ожидает",
+      "active": "Активно",
+      "retry": "Повторить",
+      "empty": "Очередь пуста"
+    },
+    "history": {
+      "title": "История",
+      "transfers": "передач",
+      "successful": "Успешно",
+      "failed": "Ошибки",
+      "total": "Всего",
+      "empty": "Нет истории передач",
+      "clear": "Очистить историю"
+    },
+    "notifications": {
+      "title": "Обновления",
+      "hasUpdate": "имеет обновление",
+      "markAllRead": "Отметить все прочитанными"
+    },
+    "timeAgo": {
+      "justNow": "только что",
+      "minutes": "мин. назад",
+      "hours": "ч. назад",
+      "days": "дн. назад"
+    },
+    "enableNow": "Включить сейчас",
+    "recommended": "Рекомендуем",
+    "difficulty": {
+      "easy": "Просто",
+      "medium": "Средне",
+      "advanced": "Продвинутый"
+    },
+    "vpn": {
+      "radmin": {
+        "name": "Radmin VPN",
+        "description": "Простой и бесплатный. Установил — работает. Идеален для новичков, не требует регистрации."
+      },
+      "zerotier": {
+        "name": "ZeroTier",
+        "description": "Надёжный и стабильный. Работает через облако, поддерживает много устройств. Нужна регистрация."
+      },
+      "tailscale": {
+        "name": "Tailscale",
+        "description": "Современный и безопасный. Использует WireGuard, отличная производительность. Для продвинутых пользователей."
+      },
+      "hamachi": {
+        "name": "Hamachi",
+        "description": "Классика жанра. Знакомый многим, но имеет ограничения в бесплатной версии (5 устройств)."
+      }
+    }
+  },
+  "server": {
+    "console": {
+      "rconConnected": "RCON подключён",
+      "rconDisconnected": "RCON отключён",
+      "filterAll": "Все",
+      "filterErrors": "Ошибки",
+      "clearLogs": "Очистить логи",
+      "autoScrollOn": "Автопрокрутка вкл",
+      "autoScrollOff": "Автопрокрутка выкл",
+      "stopping": "Остановка...",
+      "stopServer": "Остановить сервер (stop)",
+      "starting": "Запуск...",
+      "forceKillHint": "Принудительно остановить (может потерять данные!)",
+      "forceKillWarning": "Принудительная остановка может привести к потере данных!",
+      "waitingLogs": "Ожидание логов...",
+      "serverStopped": "Сервер остановлен. Нажмите 'Играть' для запуска.",
+      "enterCommand": "Введите команду (↑↓ история)...",
+      "serverNotRunning": "Сервер не запущен",
+      "hours": "ч",
+      "minutes": "м"
+    },
+    "import": {
+      "title": "Импорт сервера",
+      "success": "Сервер импортирован!",
+      "files": "файлов",
+      "openServer": "Открыть сервер",
+      "serverFolder": "Папка сервера",
+      "selectFolder": "Выберите папку с сервером...",
+      "selectFolderTitle": "Выберите папку сервера",
+      "browse": "Обзор",
+      "detecting": "Определение типа сервера...",
+      "detectError": "Ошибка определения",
+      "serverType": "Тип сервера",
+      "minecraftVersion": "Версия Minecraft",
+      "loaderVersion": "Версия загрузчика",
+      "modsCount": "Модов",
+      "port": "Порт",
+      "maxPlayers": "Макс. игроков",
+      "eulaAccepted": "EULA принята",
+      "confidence": "Уверенность",
+      "detectionDetails": "Детали определения",
+      "name": "Название",
+      "namePlaceholder": "Введите название сервера",
+      "importBtn": "Импортировать",
+      "importing": "Импорт...",
+      "phases": {
+        "detecting": "Определение типа сервера...",
+        "scanning": "Сканирование файлов...",
+        "copying": "Копирование файлов...",
+        "saving": "Сохранение в базу данных...",
+        "scanningMods": "Регистрация модов..."
+      }
+    },
+    "p2p": {
+      "title": "P2P синхронизация",
+      "description": "Позволяет игрокам скачивать модпак сервера через Stuzhik Connect",
+      "serverAddress": "Адрес сервера для игроков",
+      "ipPlaceholder": "IP адрес",
+      "portPlaceholder": "Порт",
+      "addressHint": "Этот адрес будет показан игрокам для подключения к серверу",
+      "visibility": "Видимость и доступ",
+      "whoCanSee": "Кто видит сервер",
+      "everyone": "Все в сети",
+      "everyoneHint": "Максимальная видимость",
+      "friendsOnly": "Только друзья",
+      "friendsOnlyHint": "Доверенные друзья",
+      "authorizedOnly": "Авторизованные",
+      "authorizedOnlyHint": "Только из списка",
+      "invisible": "Скрыт",
+      "invisibleHint": "Только по приглашению",
+      "requireInvite": "Требовать приглашение",
+      "requireInviteOn": "Игроки должны ввести код для присоединения",
+      "requireInviteOff": "Игроки могут присоединиться напрямую (если видят сервер)",
+      "syncSource": "Источник модпака для игроков",
+      "clientInstance": "Установленный экземпляр",
+      "clientInstanceHint": "Синхронизировать моды из клиентского экземпляра",
+      "selectClient": "Выберите клиент...",
+      "modpackFile": "Файл модпака",
+      "modpackFileHint": "Отправить .stzhk/.mrpack напрямую игрокам",
+      "selectModpack": "Выбрать файл модпака",
+      "selectModpackTitle": "Выберите файл модпака",
+      "unlinkModpack": "Отвязать",
+      "selectAnother": "Выбрать другой",
+      "disableSync": "Отключить синхронизацию модпака",
+      "syncFromClient": "Моды из экземпляра будут синхронизироваться с игроками (клиентские моды фильтруются автоматически)",
+      "syncFromFile": "Файл модпака будет отправлен игрокам, и они смогут установить его автоматически",
+      "autoSync": "Авто-синхронизация (Watch Mode)",
+      "autoSyncHint": "Автоматически отправлять изменения модпака всем подключённым игрокам",
+      "authorizedPlayers": "Авторизованные игроки",
+      "peerIdPlaceholder": "Peer ID или ник",
+      "noAuthorizedPeers": "Пусто — все пользователи смогут скачивать модпак",
+      "authorizedHint": "Если список пуст — модпак доступен всем. Добавьте Peer ID чтобы ограничить доступ.",
+      "invites": "Приглашения на сервер",
+      "createInvite": "Создать",
+      "expiry": "Срок действия",
+      "expiryNever": "Бессрочно",
+      "expiry1h": "1 час",
+      "expiry24h": "24 часа",
+      "expiry7d": "7 дней",
+      "expiry30d": "30 дней",
+      "maxUses": "Макс. использований",
+      "maxUsesHint": "0 = без лимита",
+      "createInviteBtn": "Создать приглашение",
+      "noInvites": "Нет активных приглашений. Создайте приглашение, чтобы игроки могли быстро присоединиться.",
+      "inviteRevoked": "Отозван",
+      "inviteExpired": "Истёк",
+      "uses": "исп.",
+      "copyInvite": "Скопировать",
+      "revokeInvite": "Отозвать",
+      "deleteInvite": "Удалить",
+      "invitesHint": "Отправьте код приглашения игрокам. Они смогут присоединиться через Stuzhik Connect.",
+      "advancedSettings": "Расширенные настройки синхронизации",
+      "includePatterns": "Включать в синхронизацию (glob patterns)",
+      "excludePatterns": "Исключать из синхронизации (glob patterns)",
+      "expired": "Истёк",
+      "minutes": "мин"
+    }
+  },
+  "docs": {
+    "title": "Документация",
+    "changelog": "История изменений",
+    "sourceCode": "Исходный код",
+    "openFolder": "Открыть папку",
+    "search": {
+      "placeholder": "Поиск в документации...",
+      "noResults": "Ничего не найдено",
+      "quickLinks": "Быстрые ссылки",
+      "navigate": "Навигация",
+      "select": "Выбрать"
+    },
+    "sections": {
+      "gettingStarted": {
+        "title": "Начало работы",
+        "welcome": {
+          "title": "Добро пожаловать",
+          "intro": "Stuzhik — лаунчер Minecraft нового поколения. Управляйте модпаками, серверами и настройками без лишних действий. Поддерживаются все популярные загрузчики: Forge, Fabric, NeoForge, Quilt. Приложение написано на Rust для максимальной производительности и минимального потребления ресурсов.",
+          "features": {
+            "instances": "Экземпляры",
+            "instancesDesc": "Изолированные сборки с собственными модами, мирами и настройками. Каждый экземпляр независим.",
+            "mods": "Моды",
+            "modsDesc": "Интеграция с Modrinth и CurseForge. Автоматические зависимости, обновления, детекция конфликтов.",
+            "servers": "Серверы",
+            "serversDesc": "Встроенная консоль, RCON, редактор server.properties. Автоотключение клиентских модов.",
+            "connect": "Stuzhik Connect",
+            "connectDesc": "Передача модпаков друзьям через P2P. Сквозное шифрование, Quick Join по коду."
+          }
+        },
+        "quickStart": {
+          "title": "Быстрый старт",
+          "intro": "Четыре простых шага до игры. Java скачивается автоматически — никаких дополнительных установок:",
+          "step1": {
+            "title": "Создайте экземпляр",
+            "desc": "Главная → Создать. Выберите тип (клиент/сервер), версию Minecraft, загрузчик модов. Имя сгенерируется автоматически."
+          },
+          "step2": {
+            "title": "Java (автоматически)",
+            "desc": "Stuzhik сам скачает нужную версию Java при первом запуске. Для ручной настройки: Настройки → Java."
+          },
+          "step3": {
+            "title": "Добавьте моды",
+            "desc": "Откройте экземпляр → вкладка Моды → Каталог. Ищите по названию, фильтруйте по категориям. Зависимости ставятся автоматически."
+          },
+          "step4": {
+            "title": "Запустите игру",
+            "desc": "Кнопка Играть для клиента, Запустить для сервера. Логи отображаются в реальном времени."
+          }
+        },
+        "requirements": {
+          "title": "Системные требования",
+          "tipTitle": "Совет",
+          "tipText": "Для модпаков рекомендуется минимум 8 GB RAM и SSD для быстрой загрузки",
+          "component": "Компонент",
+          "minimum": "Минимум",
+          "recommended": "Рекомендуется",
+          "os": "ОС",
+          "disk": "Диск",
+          "javaAuto": "Автоустановка",
+          "javaTitle": "Версии Java",
+          "javaText": "Stuzhik автоматически скачивает и устанавливает нужную версию Java. Вот какие версии требуются для разных версий Minecraft:"
+        },
+        "folders": {
+          "title": "Папки приложения",
+          "intro": "Все данные Stuzhik хранятся локально. Нажмите на папку, чтобы открыть её в проводнике:",
+          "base": "Корневая папка Stuzhik — все данные приложения",
+          "instances": "Экземпляры — ваши сборки Minecraft",
+          "java": "Установленные версии Java (автоскачивание)",
+          "logs": "Логи приложения — для диагностики проблем",
+          "cache": "Кэш — можно безопасно очистить",
+          "globalTitle": "Глобальные ресурсы",
+          "resourcepacks": "Ресурспаки — общие для всех экземпляров",
+          "shaderpacks": "Шейдеры — общие для всех экземпляров",
+          "libraries": "Библиотеки Minecraft — общие файлы",
+          "assets": "Ассеты Minecraft — текстуры, звуки, языки"
+        }
+      },
+      "instances": {
+        "title": "Экземпляры",
+        "overview": {
+          "title": "Обзор",
+          "intro": "Экземпляр — изолированная среда Minecraft со своими модами, конфигами и мирами. Вы можете держать одновременно несколько сборок: одну для выживания, другую для технических модов, третью — сервер для друзей. Они не влияют друг на друга.",
+          "client": {
+            "title": "Клиент",
+            "desc": "Полноценный Minecraft с графическим интерфейсом для одиночной игры или подключения к серверам"
+          },
+          "server": {
+            "title": "Сервер",
+            "desc": "Выделенный сервер без графики. Консоль, RCON, автоматическое отключение клиентских модов"
+          }
+        },
+        "creating": {
+          "title": "Создание экземпляра",
+          "intro": "Создание нового экземпляра занимает несколько простых шагов:",
+          "step1": {
+            "title": "Выберите тип",
+            "desc": "Клиент для игры или Сервер для хостинга"
+          },
+          "step2": {
+            "title": "Укажите версию",
+            "desc": "Выберите версию Minecraft и загрузчик модов (Fabric, Forge и др.)"
+          },
+          "step3": {
+            "title": "Настройте параметры",
+            "desc": "Выделите память, укажите имя игрока и JVM аргументы"
+          },
+          "loaders": {
+            "title": "Загрузчики модов",
+            "loader": "Загрузчик",
+            "desc": "Описание",
+            "versions": "Версии MC",
+            "fabricDesc": "Лёгкий и быстрый. Рекомендуется для большинства модов",
+            "forgeDesc": "Классический. Много модов, но тяжелее",
+            "neoforgeDesc": "Форк Forge с улучшениями. Современная альтернатива",
+            "quiltDesc": "Совместим с Fabric. Экспериментальный"
+          },
+          "codeRef": {
+            "lifecycle": "Жизненный цикл экземпляра",
+            "wizard": "Мастер создания экземпляра"
+          }
+        },
+        "structure": {
+          "title": "Структура папок",
+          "intro": "Каждый экземпляр — это отдельная папка со стандартной структурой Minecraft. Все ваши миры, моды и настройки изолированы и не влияют на другие сборки.",
+          "openInstances": "Открыть папку экземпляров",
+          "foldersTitle": "Структура папки экземпляра",
+          "tipTitle": "Совет",
+          "tipText": "Папки resourcepacks/ и shaderpacks/ внутри экземпляра переопределяют глобальные. Это позволяет иметь разные настройки для разных сборок.",
+          "codeRef": {
+            "module": "Модуль управления экземплярами"
+          }
+        },
+        "actions": {
+          "title": "Действия",
+          "intro": "Доступные операции с экземплярами:",
+          "action": "Действие",
+          "desc": "Описание",
+          "shortcut": "Сочетание",
+          "play": "Играть",
+          "playDesc": "Запуск клиента или сервера",
+          "edit": "Редактировать",
+          "editDesc": "Изменение версии, памяти, настроек",
+          "repair": "Починить",
+          "repairDesc": "Переустановка файлов игры и загрузчика",
+          "backup": "Бэкап",
+          "backupDesc": "Создание резервной копии",
+          "delete": "Удалить",
+          "deleteDesc": "Полное удаление экземпляра"
+        },
+        "backup": {
+          "title": "Резервные копии",
+          "intro": "Stuzhik автоматически создаёт резервные копии перед важными операциями:",
+          "feature1": "Автобэкап перед установкой/обновлением/удалением модов",
+          "feature2": "Ручное создание бэкапов в любой момент",
+          "feature3": "Настраиваемый лимит количества бэкапов",
+          "feature4": "Опция включения/исключения миров (saves)",
+          "tipTitle": "Совет",
+          "tipText": "Если у вас установлен мод бэкапов (FTB Backups, Chunk Pregenerator), Stuzhik определит это и будет бэкапить только моды и конфиги",
+          "codeRef": "Система резервного копирования"
+        }
+      },
+      "mods": {
+        "title": "Моды",
+        "sources": {
+          "title": "Источники модов",
+          "intro": "Stuzhik поддерживает установку модов из двух крупнейших репозиториев:",
+          "modrinth": "Открытая платформа. Быстрый API, качественные моды",
+          "curseforge": "Крупнейший каталог. Много старых и новых модов",
+          "rateTitle": "Ограничения API",
+          "limit": "Лимит",
+          "cache": "Кэш",
+          "codeRef": {
+            "modrinth": "Интеграция с Modrinth API",
+            "curseforge": "Интеграция с CurseForge API"
+          }
+        },
+        "installing": {
+          "title": "Установка модов",
+          "intro": "Установка модов максимально проста:",
+          "step1": {
+            "title": "Откройте каталог",
+            "desc": "Перейдите на вкладку \"Моды\" и выберите \"Каталог\""
+          },
+          "step2": {
+            "title": "Найдите мод",
+            "desc": "Используйте поиск или фильтры для поиска нужного мода"
+          },
+          "step3": {
+            "title": "Установите",
+            "desc": "Нажмите кнопку установки. Зависимости скачаются автоматически"
+          },
+          "tipTitle": "Автозависимости",
+          "tipText": "Stuzhik автоматически определяет и устанавливает все необходимые зависимости мода"
+        },
+        "dragdrop": {
+          "title": "Drag & Drop",
+          "intro": "Вы можете быстро добавить моды, перетащив .jar файлы прямо в окно лаунчера:",
+          "feature1": "Автоматическое определение мода через Modrinth/CurseForge API",
+          "feature2": "Подключение к системе обновлений при обнаружении",
+          "feature3": "Поддержка множественного выбора файлов",
+          "codeRef": "Панель управления модами"
+        },
+        "management": {
+          "title": "Управление",
+          "intro": "Полный контроль над установленными модами:",
+          "action": "Действие",
+          "desc": "Описание",
+          "toggle": "Вкл/Выкл",
+          "toggleDesc": "Переименование .jar ↔ .jar.disabled",
+          "update": "Обновить",
+          "updateDesc": "Проверка и установка новой версии",
+          "remove": "Удалить",
+          "removeDesc": "Полное удаление мода",
+          "bulk": "Массовые действия",
+          "bulkDesc": "Выбор нескольких модов для групповых операций",
+          "sideTitle": "Стороны (side)",
+          "sideText": "Каждый мод имеет информацию о совместимости:",
+          "side": "Сторона",
+          "sideDesc": "Описание",
+          "sideClient": "Только для клиента (OptiFine, шейдеры)",
+          "sideServer": "Только для сервера (плагины)",
+          "sideBoth": "Требуется на обеих сторонах",
+          "codeRef": "Автодетекция клиентских модов"
+        },
+        "dependencies": {
+          "title": "Зависимости",
+          "intro": "Система управления зависимостями:",
+          "feature1": "Автоустановка при скачивании мода",
+          "feature2": "Предупреждение при конфликтах",
+          "feature3": "Детекция несовместимых модов через knowledge base",
+          "tipTitle": "Известные конфликты",
+          "tipText": "Stuzhik знает о популярных конфликтах (OptiFine + Sodium, и др.) и предупредит перед установкой"
+        }
+      },
+      "modpackEditor": {
+        "title": "Редактор модпаков",
+        "overview": {
+          "title": "Обзор",
+          "intro": "Редактор модпаков — мощный инструмент для управления сборками:",
+          "mods": {
+            "title": "Моды",
+            "desc": "Включение/выключение, обновление, удаление"
+          },
+          "configs": {
+            "title": "Конфиги",
+            "desc": "Редактирование настроек модов"
+          },
+          "files": {
+            "title": "Файлы",
+            "desc": "Браузер файлов экземпляра"
+          },
+          "profiles": {
+            "title": "Профили",
+            "desc": "Сохранение и переключение конфигураций"
+          }
+        },
+        "bulk": {
+          "title": "Массовые операции",
+          "intro": "Работайте сразу с несколькими модами:",
+          "selectTitle": "Выбор модов",
+          "select1": "Ctrl+Click для выбора отдельных модов",
+          "select2": "Shift+Click для выбора диапазона",
+          "select3": "Ctrl+A для выбора всех",
+          "actionsTitle": "Доступные действия",
+          "action": "Действие",
+          "desc": "Описание",
+          "toggleAll": "Вкл/Выкл все",
+          "toggleAllDesc": "Переключить состояние выбранных модов",
+          "removeAll": "Удалить все",
+          "removeAllDesc": "Удалить выбранные моды",
+          "updateAll": "Обновить все",
+          "updateAllDesc": "Проверить обновления для выбранных",
+          "codeRef": {
+            "bulk": "API массовых операций",
+            "hook": "Хук мультиселекта"
+          }
+        },
+        "profiles": {
+          "title": "Профили модов",
+          "intro": "Сохраняйте разные конфигурации модов для быстрого переключения:",
+          "step1": {
+            "title": "Настройте моды",
+            "desc": "Включите/выключите нужные моды"
+          },
+          "step2": {
+            "title": "Сохраните профиль",
+            "desc": "Введите имя и сохраните текущую конфигурацию"
+          },
+          "step3": {
+            "title": "Переключайтесь",
+            "desc": "Выберите профиль для мгновенного применения"
+          },
+          "tipTitle": "Примеры использования",
+          "tipText": "Создайте профили: \"Производительность\" (только оптимизации), \"Полный\" (все моды), \"Сервер\" (без клиентских)",
+          "codeRef": "Система профилей"
+        }
+      },
+      "codeEditor": {
+        "title": "Редактор кода",
+        "overview": {
+          "title": "Обзор",
+          "intro": "Профессиональный редактор для модпакеров — редактирование конфигов, датапаков, KubeJS скриптов с IntelliSense:",
+          "monaco": {
+            "title": "Monaco Editor",
+            "desc": "Движок VSCode с подсветкой синтаксиса"
+          },
+          "intellisense": {
+            "title": "IntelliSense",
+            "desc": "Автодополнение для KubeJS и Minecraft"
+          },
+          "preview": {
+            "title": "Превью рецептов",
+            "desc": "Визуализация рецептов KubeJS/CraftTweaker"
+          },
+          "tipTitle": "Экспериментальная функция",
+          "tipText": "Редактор кода находится в активной разработке. Возможны баги и неполная функциональность"
+        },
+        "intellisense": {
+          "title": "IntelliSense",
+          "intro": "Умное автодополнение для разработки модпаков:",
+          "kubejsTitle": "KubeJS поддержка",
+          "kubejs1": "Автодополнение событий (ServerEvents, ClientEvents)",
+          "kubejs2": "Подсказки типов и параметров",
+          "kubejs3": "Документация прямо в редакторе",
+          "minecraftTitle": "Minecraft данные",
+          "minecraftText": "Stuzhik парсит установленные моды и предоставляет автодополнение для ID предметов, блоков, тегов.",
+          "codeRef": {
+            "provider": "Провайдер автодополнения KubeJS",
+            "parser": "Парсер JAR файлов модов"
+          }
+        },
+        "recipes": {
+          "title": "Превью рецептов",
+          "intro": "Визуальное представление рецептов прямо в редакторе:",
+          "supportedTitle": "Поддерживаемые форматы",
+          "kubejs": "KubeJS рецепты (shaped, shapeless, smelting)",
+          "crafttweaker": "CraftTweaker скрипты (.zs)",
+          "datapack": "JSON рецепты датапаков",
+          "tipTitle": "Как использовать",
+          "tipText": "Наведите курсор на рецепт или нажмите кнопку превью для отображения визуального представления"
+        },
+        "shortcuts": {
+          "title": "Горячие клавиши редактора",
+          "autocomplete": "Открыть автодополнение",
+          "save": "Сохранить файл",
+          "fullscreen": "Полноэкранный режим",
+          "search": "Поиск в файле",
+          "goto": "Перейти к строке"
+        }
+      },
+      "servers": {
+        "title": "Серверы",
+        "overview": {
+          "title": "Обзор",
+          "intro": "Полноценное управление Minecraft серверами прямо из лаунчера:",
+          "console": {
+            "title": "Консоль",
+            "desc": "Логи в реальном времени и отправка команд"
+          },
+          "properties": {
+            "title": "Настройки",
+            "desc": "Визуальный редактор server.properties"
+          },
+          "players": {
+            "title": "Игроки",
+            "desc": "Управление whitelist, ops, банами"
+          },
+          "p2p": {
+            "title": "P2P Sync",
+            "desc": "Синхронизация модпака с игроками"
+          }
+        },
+        "console": {
+          "title": "Серверная консоль",
+          "intro": "Интегрированная консоль с расширенными возможностями:",
+          "featuresTitle": "Возможности",
+          "feature1": "Логи в реальном времени с цветовой подсветкой",
+          "feature2": "История команд (↑/↓ для навигации)",
+          "feature3": "Автоскролл с паузой при просмотре",
+          "feature4": "Фильтрация по уровню (INFO/WARN/ERROR)",
+          "colorsTitle": "Цветовая схема",
+          "level": "Уровень",
+          "color": "Цвет",
+          "colorGreen": "Зелёный",
+          "colorYellow": "Жёлтый",
+          "colorRed": "Красный",
+          "codeRef": {
+            "console": "Backend консоли",
+            "ui": "UI консоли"
+          }
+        },
+        "rcon": {
+          "title": "RCON",
+          "intro": "Удалённое управление сервером через RCON протокол:",
+          "param": "Параметр",
+          "value": "Значение",
+          "port": "Порт",
+          "protocol": "Протокол",
+          "auto": "Автоподключение",
+          "autoYes": "При запуске сервера",
+          "tipTitle": "Безопасность",
+          "tipText": "RCON пароль генерируется автоматически и хранится в server.properties. Не делитесь им с другими",
+          "codeRef": "Клиент RCON"
+        },
+        "import": {
+          "title": "Импорт сервера",
+          "intro": "Импортируйте существующий сервер в Stuzhik:",
+          "step1": {
+            "title": "Выберите папку",
+            "desc": "Укажите путь к папке с сервером"
+          },
+          "step2": {
+            "title": "Автодетекция",
+            "desc": "Stuzhik определит версию MC и загрузчик"
+          },
+          "step3": {
+            "title": "Подтвердите",
+            "desc": "Проверьте настройки и импортируйте"
+          },
+          "detectionTitle": "Автоматическое определение",
+          "detectionText": "Stuzhik анализирует файлы сервера и определяет версию Minecraft, тип загрузчика (Forge/Fabric/NeoForge/Quilt/Vanilla), порт и другие настройки.",
+          "codeRef": "Импорт сервера"
+        },
+        "properties": {
+          "title": "server.properties",
+          "intro": "Визуальный редактор настроек сервера:",
+          "feature1": "~50 настроек с описаниями",
+          "feature2": "Группировка по категориям",
+          "feature3": "Валидация типов (boolean/number/string)",
+          "feature4": "Version-aware настройки (разные для версий MC)",
+          "codeRef": "Парсер server.properties"
+        }
+      },
+      "connect": {
+        "title": "Stuzhik Connect",
+        "overview": {
+          "title": "Обзор",
+          "intro": "Встроенная P2P система для передачи модпаков между игроками. Без облачных сервисов, без регистрации — напрямую от вас к другу. Передаются только изменённые файлы (delta sync) для экономии трафика.",
+          "techTitle": "Технические характеристики",
+          "component": "Компонент",
+          "value": "Значение",
+          "encryption": "Шифрование",
+          "serialization": "Сериализация",
+          "compression": "Сжатие",
+          "tipTitle": "Сквозное шифрование",
+          "tipText": "Все данные шифруются на вашем устройстве и расшифровываются только получателем. Даже перехват трафика бесполезен — ключи уникальны для каждой сессии"
+        },
+        "privacy": {
+          "title": "Приватность",
+          "intro": "По умолчанию все настройки приватности выключены — вы полностью контролируете видимость:",
+          "tipTitle": "Безопасность по умолчанию",
+          "tipText": "При первом включении Connect вы невидимы для других. Включите нужные опции вручную",
+          "setting": "Настройка",
+          "default": "По умолчанию",
+          "desc": "Описание",
+          "enabledDesc": "Connect полностью выключен",
+          "visibilityDesc": "Вы невидимы для других",
+          "nicknameDesc": "Ваш ник скрыт",
+          "modpacksDesc": "Список модпаков скрыт",
+          "downloadsDesc": "Никто не может скачивать",
+          "codeRef": "Настройки приватности"
+        },
+        "security": {
+          "title": "Безопасность",
+          "intro": "Многоуровневая защита данных и соединений:",
+          "encryptionTitle": "Шифрование",
+          "encryption1": "X25519 для обмена ключами (Elliptic Curve)",
+          "encryption2": "AES-256-GCM для шифрования данных",
+          "encryption3": "Forward secrecy — новые ключи каждую сессию",
+          "protectionTitle": "Защита от атак",
+          "protection1": "Path traversal — валидация всех путей",
+          "protection2": "Rate limiting — 100 req/min на пира",
+          "protection3": "File limits — 500MB/файл, 5GB/передача",
+          "protection4": "Extension whitelist — только безопасные файлы",
+          "codeRef": {
+            "crypto": "Криптографический модуль",
+            "security": "Защита от атак"
+          }
+        },
+        "network": {
+          "title": "Сеть и VPN",
+          "intro": "Stuzhik Connect работает в локальной сети. Для игры через интернет нужен VPN:",
+          "local": {
+            "title": "Локальная сеть",
+            "desc": "Автоматическое обнаружение через UDP broadcast"
+          },
+          "vpn": {
+            "title": "Интернет (VPN)",
+            "desc": "Используйте VPN для создания виртуальной локальной сети"
+          },
+          "vpnTitle": "Рекомендуемые VPN",
+          "difficulty": "Сложность",
+          "desc": "Описание",
+          "easy": "Просто",
+          "medium": "Средне",
+          "advanced": "Продвинутый",
+          "radmin": "Установил — работает. Идеален для новичков",
+          "zerotier": "Надёжный. Работает через облако",
+          "tailscale": "Современный. Использует WireGuard",
+          "codeRef": "Диагностика сети"
+        },
+        "quickJoin": {
+          "title": "Quick Join",
+          "intro": "Мгновенное подключение к серверу друга с автоматической синхронизацией модпака:",
+          "step1": {
+            "title": "Получите код",
+            "desc": "Друг создаёт приглашение и отправляет код"
+          },
+          "step2": {
+            "title": "Введите код",
+            "desc": "Вставьте код в поле Quick Join"
+          },
+          "step3": {
+            "title": "Автосинхронизация",
+            "desc": "Модпак скачается и игра запустится автоматически"
+          }
+        }
+      },
+      "troubleshooting": {
+        "title": "Решение проблем",
+        "common": {
+          "title": "Частые проблемы",
+          "intro": "Решения для самых распространённых проблем. Большинство вылетов связаны с памятью, Java или конфликтами модов:",
+          "memoryTitle": "OutOfMemoryError",
+          "memoryText": "Игре не хватает выделенной оперативной памяти. Это самая частая проблема с большими модпаками:",
+          "memory1": "Увеличьте параметр -Xmx в настройках экземпляра (рекомендуется 6-8 GB для 100+ модов)",
+          "memory2": "Удалите HD текстурпаки (256x и выше) — они потребляют много видеопамяти",
+          "memory3": "Используйте Spark Profiler для поиска утечек памяти в модах",
+          "javaTitle": "Неправильная версия Java",
+          "javaText": "Minecraft требует определённую версию Java: 1.16 и ниже → Java 8, 1.17-1.20.4 → Java 17, 1.20.5+ → Java 21. Stuzhik скачивает нужную версию автоматически, но если вы указали системную Java вручную, проверьте совместимость.",
+          "openJava": "Открыть папку с Java",
+          "conflictsTitle": "Конфликты модов",
+          "conflictsText": "OptiFine конфликтует с Sodium, Iris и многими другими модами через mixin. Решение: удалите OptiFine и используйте связку Sodium + Iris (для шейдеров). Для Forge: Rubidium + Oculus."
+        },
+        "logAnalyzer": {
+          "title": "Анализатор логов",
+          "intro": "Встроенный инструмент автоматически анализирует логи и crash-reports. Он ищет известные ошибки и предлагает решения:",
+          "openLogs": "Открыть папку логов",
+          "feature1": "Автоматическое определение типа проблемы (память, Java, моды)",
+          "feature2": "Подсказки для исправления на основе базы знаний",
+          "feature3": "Определение проблемного мода по stack trace",
+          "feature4": "Поддержка логов Forge, Fabric, Quilt и vanilla",
+          "tipTitle": "Совет",
+          "tipText": "Если Stuzhik не может определить проблему автоматически, скопируйте содержимое latest.log и отправьте в поддержку мода или на форум.",
+          "codeRef": "Анализатор логов"
+        },
+        "faq": {
+          "title": "FAQ",
+          "q1": "Как увеличить FPS?",
+          "a1": "Установите Sodium (для Fabric) или Rubidium (для Forge). Удалите OptiFine если он установлен.",
+          "q2": "Где хранятся файлы?",
+          "a2": "По умолчанию в AppData/Roaming/stuzhik (Windows) или ~/Library/Application Support/stuzhik (macOS).",
+          "q3": "Как перенести экземпляр?",
+          "a3": "Используйте функцию экспорта в формате .stzhk или .mrpack для переноса между компьютерами.",
+          "q4": "Почему игра вылетает при запуске?",
+          "a4": "Проверьте версию Java, память и конфликты модов. Используйте анализатор логов для диагностики.",
+          "q5": "Как обновить все моды?",
+          "a5": "Выберите все моды (Ctrl+A) и нажмите \"Обновить\". Или включите автообновление в настройках."
+        }
+      },
+      "architecture": {
+        "title": "Архитектура",
+        "stack": {
+          "title": "Стек технологий",
+          "intro": "Stuzhik построен на современных технологиях:",
+          "frontend": "SolidJS + TypeScript + UnoCSS",
+          "backend": "Rust + Tokio + Tauri 2.x",
+          "database": "База данных",
+          "databaseDesc": "SQLite (rusqlite)"
+        },
+        "structure": {
+          "title": "Структура проекта",
+          "backendTitle": "Backend (Rust)",
+          "frontendTitle": "Frontend (TypeScript)"
+        },
+        "principles": {
+          "title": "Принципы разработки",
+          "performance": "Производительность и малое потребление ресурсов — минимальный RAM/CPU footprint",
+          "security": "Безопасность по умолчанию — шифрование, валидация путей, песочница",
+          "responsive": "Отзывчивый интерфейс — UI никогда не блокируется, тяжёлые операции в Rust",
+          "animations": "Быстрые анимации — максимум 100ms для любых переходов"
+        }
+      },
+      "shortcuts": {
+        "title": "Горячие клавиши",
+        "globalTitle": "Глобальные",
+        "devConsole": "Консоль разработчика",
+        "uiKit": "UI Kit (dev mode)",
+        "minimize": "Свернуть окно",
+        "closeModal": "Закрыть модалку",
+        "consoleTitle": "Серверная консоль",
+        "prevCommand": "Предыдущая команда",
+        "nextCommand": "Следующая команда",
+        "sendCommand": "Отправить команду",
+        "editorTitle": "Редактор кода",
+        "save": "Сохранить файл",
+        "autocomplete": "Автодополнение",
+        "fullscreen": "Полноэкранный режим",
+        "search": "Поиск",
+        "tipTitle": "Важно",
+        "tipText": "В release-сборке F12 не работает. Используйте Ctrl+Shift+D для консоли разработчика"
+      }
+    }
+  }
+}
