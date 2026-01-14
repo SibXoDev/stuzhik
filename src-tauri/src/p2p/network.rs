@@ -9,24 +9,51 @@
 use std::net::UdpSocket;
 use std::process::Command;
 
+/// Sanitize app name for use in shell commands to prevent command injection.
+/// Only allows alphanumeric characters, spaces, hyphens, and underscores.
+/// Returns sanitized string or error if input is invalid.
+fn sanitize_app_name(name: &str) -> Result<String, &'static str> {
+    // Reject empty names
+    if name.is_empty() {
+        return Err("App name cannot be empty");
+    }
+
+    // Reject names that are too long (prevent buffer overflow attacks)
+    if name.len() > 64 {
+        return Err("App name too long (max 64 characters)");
+    }
+
+    // Only allow safe characters: alphanumeric, space, hyphen, underscore
+    let sanitized: String = name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-' || *c == '_')
+        .collect();
+
+    // Ensure we got at least some characters
+    if sanitized.is_empty() {
+        return Err("App name contains no valid characters");
+    }
+
+    // Ensure the sanitized version matches the original (no filtering occurred)
+    if sanitized != name {
+        return Err("App name contains invalid characters");
+    }
+
+    Ok(sanitized)
+}
+
 /// Result of a firewall configuration attempt
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum FirewallResult {
     /// Successfully configured
-    Success {
-        message: String,
-    },
+    Success { message: String },
     /// Needs admin privileges - will prompt for elevation
-    NeedsElevation {
-        message: String,
-    },
+    NeedsElevation { message: String },
     /// User cancelled the elevation prompt
     Cancelled,
     /// Failed to configure
-    Error {
-        message: String,
-    },
+    Error { message: String },
     /// Already configured
     AlreadyConfigured,
 }
@@ -104,7 +131,12 @@ pub async fn diagnose_network(discovery_port: u16, connect_enabled: bool) -> Net
     let firewall_rules_exist = check_firewall_rules_exist("Stuzhik").await;
 
     // Check UDP port with fallbacks (base, +10, +20, +30)
-    let udp_fallbacks = [discovery_port, discovery_port + 10, discovery_port + 20, discovery_port + 30];
+    let udp_fallbacks = [
+        discovery_port,
+        discovery_port + 10,
+        discovery_port + 20,
+        discovery_port + 30,
+    ];
     let udp_status = check_port_with_fallbacks(&udp_fallbacks, connect_enabled, true).await;
 
     // Check TCP port with fallbacks
@@ -181,8 +213,10 @@ fn get_all_interfaces() -> Vec<NetworkInterface> {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-        // Use ipconfig to get all interfaces
-        if let Ok(output) = Command::new("ipconfig")
+        // Use ipconfig with UTF-8 codepage (65001) to get all interfaces
+        // This ensures Cyrillic and other non-ASCII characters are properly decoded
+        if let Ok(output) = Command::new("cmd")
+            .args(["/c", "chcp 65001 >nul && ipconfig"])
             .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
@@ -195,13 +229,10 @@ fn get_all_interfaces() -> Vec<NetworkInterface> {
     {
         // Use ip addr on Linux, ifconfig on macOS
         #[cfg(target_os = "linux")]
-        let cmd_result = Command::new("ip")
-            .args(["addr", "show"])
-            .output();
+        let cmd_result = Command::new("ip").args(["addr", "show"]).output();
 
         #[cfg(target_os = "macos")]
-        let cmd_result = Command::new("ifconfig")
-            .output();
+        let cmd_result = Command::new("ifconfig").output();
 
         if let Ok(output) = cmd_result {
             let output_str = String::from_utf8_lossy(&output.stdout);
@@ -216,9 +247,9 @@ fn get_all_interfaces() -> Vec<NetworkInterface> {
 
     // Filter out localhost and link-local addresses
     interfaces.retain(|iface| {
-        !iface.ip.starts_with("127.") &&
-        !iface.ip.starts_with("169.254.") &&
-        !iface.ip.starts_with("fe80:")
+        !iface.ip.starts_with("127.")
+            && !iface.ip.starts_with("169.254.")
+            && !iface.ip.starts_with("fe80:")
     });
 
     interfaces
@@ -328,14 +359,14 @@ fn parse_macos_ifconfig(output: &str, interfaces: &mut Vec<NetworkInterface>) {
 /// Check if interface name looks like a VPN
 fn is_vpn_interface(name: &str) -> bool {
     let name_lower = name.to_lowercase();
-    name_lower.contains("vpn") ||
-    name_lower.contains("radmin") ||
-    name_lower.contains("zerotier") ||
-    name_lower.contains("tailscale") ||
-    name_lower.contains("hamachi") ||
-    name_lower.contains("tun") ||
-    name_lower.contains("tap") ||
-    name_lower.contains("wg") // WireGuard
+    name_lower.contains("vpn")
+        || name_lower.contains("radmin")
+        || name_lower.contains("zerotier")
+        || name_lower.contains("tailscale")
+        || name_lower.contains("hamachi")
+        || name_lower.contains("tun")
+        || name_lower.contains("tap")
+        || name_lower.contains("wg") // WireGuard
 }
 
 /// Check if a port is available (can be bound)
@@ -345,7 +376,11 @@ fn check_port_available(port: u16) -> bool {
 }
 
 /// Check ports with fallbacks and return detailed status
-async fn check_port_with_fallbacks(ports: &[u16], connect_enabled: bool, is_udp: bool) -> PortStatus {
+async fn check_port_with_fallbacks(
+    ports: &[u16],
+    connect_enabled: bool,
+    is_udp: bool,
+) -> PortStatus {
     let base_port = ports[0];
 
     for &port in ports {
@@ -406,7 +441,10 @@ async fn check_udp_is_our_service(port: u16) -> bool {
     };
 
     // Set timeout
-    if socket.set_read_timeout(Some(Duration::from_millis(200))).is_err() {
+    if socket
+        .set_read_timeout(Some(Duration::from_millis(200)))
+        .is_err()
+    {
         return false;
     }
 
@@ -424,13 +462,14 @@ async fn check_udp_is_our_service(port: u16) -> bool {
 
 /// Check if we can connect to TCP port (something listening)
 async fn check_tcp_can_connect(port: u16) -> bool {
-    use tokio::net::TcpStream;
     use std::time::Duration;
+    use tokio::net::TcpStream;
 
     let connect_result = tokio::time::timeout(
         Duration::from_millis(500),
-        TcpStream::connect(format!("127.0.0.1:{}", port))
-    ).await;
+        TcpStream::connect(format!("127.0.0.1:{}", port)),
+    )
+    .await;
 
     matches!(connect_result, Ok(Ok(_)))
 }
@@ -438,19 +477,29 @@ async fn check_tcp_can_connect(port: u16) -> bool {
 /// Configure firewall with elevated privileges
 /// This will prompt the user for admin/sudo access
 pub async fn configure_firewall(app_name: &str, udp_port: u16, tcp_port: u16) -> FirewallResult {
+    // SECURITY: Sanitize app_name to prevent command injection
+    let safe_name = match sanitize_app_name(app_name) {
+        Ok(name) => name,
+        Err(e) => {
+            return FirewallResult::Error {
+                message: format!("Invalid app name: {}", e),
+            }
+        }
+    };
+
     #[cfg(target_os = "windows")]
     {
-        configure_firewall_windows(app_name, udp_port, tcp_port).await
+        configure_firewall_windows(&safe_name, udp_port, tcp_port).await
     }
 
     #[cfg(target_os = "linux")]
     {
-        configure_firewall_linux(app_name, udp_port, tcp_port).await
+        configure_firewall_linux(&safe_name, udp_port, tcp_port).await
     }
 
     #[cfg(target_os = "macos")]
     {
-        configure_firewall_macos(app_name, udp_port, tcp_port).await
+        configure_firewall_macos(&safe_name, udp_port, tcp_port).await
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
@@ -463,9 +512,15 @@ pub async fn configure_firewall(app_name: &str, udp_port: u16, tcp_port: u16) ->
 
 /// Check if firewall rules already exist
 pub async fn check_firewall_rules_exist(app_name: &str) -> bool {
+    // SECURITY: Sanitize app_name to prevent command injection
+    let safe_name = match sanitize_app_name(app_name) {
+        Ok(name) => name,
+        Err(_) => return false, // Invalid name means no rules exist
+    };
+
     #[cfg(target_os = "windows")]
     {
-        check_firewall_rules_windows(app_name).await
+        check_firewall_rules_windows(&safe_name).await
     }
 
     #[cfg(target_os = "linux")]
@@ -488,7 +543,11 @@ pub async fn check_firewall_rules_exist(app_name: &str) -> bool {
 // ==================== Windows Implementation ====================
 
 #[cfg(target_os = "windows")]
-async fn configure_firewall_windows(app_name: &str, udp_port: u16, tcp_port: u16) -> FirewallResult {
+async fn configure_firewall_windows(
+    app_name: &str,
+    udp_port: u16,
+    tcp_port: u16,
+) -> FirewallResult {
     use std::os::windows::process::CommandExt;
 
     // Get the current executable path
@@ -570,7 +629,12 @@ async fn configure_firewall_windows(app_name: &str, udp_port: u16, tcp_port: u16
     );
 
     let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &elevated_script])
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &elevated_script,
+        ])
         .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output();
 
@@ -637,7 +701,11 @@ async fn configure_firewall_linux(_app_name: &str, udp_port: u16, tcp_port: u16)
     // Then fall back to polkit or regular sudo
 
     // Check if ufw is available
-    let has_ufw = Command::new("which").arg("ufw").output().map(|o| o.status.success()).unwrap_or(false);
+    let has_ufw = Command::new("which")
+        .arg("ufw")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
 
     // Check if firewalld is available
     let has_firewalld = Command::new("which")
@@ -665,9 +733,7 @@ async fn configure_ufw(udp_port: u16, tcp_port: u16) -> FirewallResult {
     ];
 
     for cmd in commands {
-        let result = Command::new("pkexec")
-            .args(["sh", "-c", &cmd])
-            .output();
+        let result = Command::new("pkexec").args(["sh", "-c", &cmd]).output();
 
         match result {
             Ok(o) if o.status.success() => continue,
@@ -702,9 +768,7 @@ async fn configure_firewalld(udp_port: u16, tcp_port: u16) -> FirewallResult {
     ];
 
     for cmd in commands {
-        let result = Command::new("pkexec")
-            .args(["sh", "-c", &cmd])
-            .output();
+        let result = Command::new("pkexec").args(["sh", "-c", &cmd]).output();
 
         match result {
             Ok(o) if o.status.success() => continue,
@@ -744,9 +808,7 @@ async fn configure_iptables(udp_port: u16, tcp_port: u16) -> FirewallResult {
     ];
 
     for cmd in commands {
-        let result = Command::new("pkexec")
-            .args(["sh", "-c", &cmd])
-            .output();
+        let result = Command::new("pkexec").args(["sh", "-c", &cmd]).output();
 
         match result {
             Ok(o) if o.status.success() => continue,
@@ -783,10 +845,7 @@ async fn check_firewall_rules_linux() -> bool {
     }
 
     // Check firewalld
-    if let Ok(o) = Command::new("firewall-cmd")
-        .arg("--list-ports")
-        .output()
-    {
+    if let Ok(o) = Command::new("firewall-cmd").arg("--list-ports").output() {
         let stdout = String::from_utf8_lossy(&o.stdout);
         if stdout.contains("19847") || stdout.contains("19848") {
             return true;
@@ -799,7 +858,11 @@ async fn check_firewall_rules_linux() -> bool {
 // ==================== macOS Implementation ====================
 
 #[cfg(target_os = "macos")]
-async fn configure_firewall_macos(app_name: &str, _udp_port: u16, _tcp_port: u16) -> FirewallResult {
+async fn configure_firewall_macos(
+    app_name: &str,
+    _udp_port: u16,
+    _tcp_port: u16,
+) -> FirewallResult {
     // macOS uses the Application Firewall which works per-app, not per-port
     // We need to add the app to the firewall exceptions
 
@@ -820,9 +883,7 @@ async fn configure_firewall_macos(app_name: &str, _udp_port: u16, _tcp_port: u16
         exe_path, exe_path
     );
 
-    let result = Command::new("osascript")
-        .args(["-e", &script])
-        .output();
+    let result = Command::new("osascript").args(["-e", &script]).output();
 
     match result {
         Ok(o) if o.status.success() => FirewallResult::Success {
@@ -889,14 +950,24 @@ pub fn get_firewall_explanation(udp_port: u16, tcp_port: u16) -> String {
 
 /// Remove firewall rules created by Stuzhik
 pub async fn remove_firewall_rules(app_name: &str) -> FirewallResult {
+    // SECURITY: Sanitize app_name to prevent command injection
+    let safe_name = match sanitize_app_name(app_name) {
+        Ok(name) => name,
+        Err(e) => {
+            return FirewallResult::Error {
+                message: format!("Invalid app name: {}", e),
+            }
+        }
+    };
+
     #[cfg(target_os = "windows")]
     {
-        remove_firewall_rules_windows(app_name).await
+        remove_firewall_rules_windows(&safe_name).await
     }
 
     #[cfg(target_os = "linux")]
     {
-        remove_firewall_rules_linux(app_name).await
+        remove_firewall_rules_linux(&safe_name).await
     }
 
     #[cfg(target_os = "macos")]
@@ -978,7 +1049,12 @@ async fn remove_firewall_rules_windows(app_name: &str) -> FirewallResult {
     );
 
     let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &elevated_script])
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            &elevated_script,
+        ])
         .creation_flags(0x08000000)
         .output();
 
@@ -1009,10 +1085,7 @@ async fn remove_firewall_rules_linux(app_name: &str) -> FirewallResult {
 
     if ufw_check.map(|o| o.status.success()).unwrap_or(false) {
         // UFW - remove by comment
-        let script = format!(
-            "ufw delete allow comment '{}'",
-            app_name
-        );
+        let script = format!("ufw delete allow comment '{}'", app_name);
 
         let output = Command::new("pkexec")
             .args(["bash", "-c", &script])

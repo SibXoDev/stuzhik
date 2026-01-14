@@ -11,16 +11,10 @@ export default defineConfig(async () => ({
     solid(),
   ],
 
-  preflights: [
-    {
-      getCSS: () => `
-        body, h1, h2, h3, h4, h5, h6, p, ul, ol, li {
-          margin: 0;
-          padding: 0;
-        }
-      `,
-    },
-  ],
+  // Syntax highlighting optimization
+  optimizeDeps: {
+    include: ['highlight.js/lib/core'],
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

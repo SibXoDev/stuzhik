@@ -133,8 +133,8 @@ impl SessionKey {
     fn from_shared_secret(shared: SharedSecret) -> Self {
         // Use the shared secret directly as AES-256 key
         // (X25519 output is already 32 bytes of high-entropy material)
-        let cipher = Aes256Gcm::new_from_slice(shared.as_bytes())
-            .expect("Shared secret is always 32 bytes");
+        let cipher =
+            Aes256Gcm::new_from_slice(shared.as_bytes()).expect("Shared secret is always 32 bytes");
 
         Self {
             cipher,
@@ -152,8 +152,8 @@ impl SessionKey {
             )));
         }
 
-        let cipher = Aes256Gcm::new_from_slice(key)
-            .map_err(|e| CryptoError::InvalidKey(e.to_string()))?;
+        let cipher =
+            Aes256Gcm::new_from_slice(key).map_err(|e| CryptoError::InvalidKey(e.to_string()))?;
 
         Ok(Self {
             cipher,

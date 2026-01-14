@@ -6,9 +6,12 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 const CURSEFORGE_API_BASE: &str = "https://api.curseforge.com/v1";
-// NOTE: Это публичный ключ CurseForge для open-source проектов
-// Для production рекомендуется получить свой ключ на https://console.curseforge.com/
-const CURSEFORGE_API_KEY: &str = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm";
+
+const DEFAULT_CURSEFORGE_API_KEY: &str = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm";
+
+fn get_curseforge_api_key() -> String {
+    std::env::var("CURSEFORGE_API_KEY").unwrap_or_else(|_| DEFAULT_CURSEFORGE_API_KEY.to_string())
+}
 
 static CATEGORY_NAMES: OnceLock<HashMap<u32, String>> = OnceLock::new();
 
@@ -166,7 +169,7 @@ pub struct CurseForgeClient {
 
 impl CurseForgeClient {
     pub fn new() -> Result<Self> {
-        let api_key = CURSEFORGE_API_KEY.parse().map_err(|_| {
+        let api_key = get_curseforge_api_key().parse().map_err(|_| {
             LauncherError::InvalidConfig("Invalid CurseForge API key format".to_string())
         })?;
 
@@ -238,6 +241,43 @@ impl CurseForgeClient {
                 Ok(response.data)
             })
             .await
+    }
+
+    /// Batch получение модов по ID (для получения иконок и другой информации)
+    pub async fn get_mods(&self, mod_ids: &[u64]) -> Result<Vec<CurseForgeMod>> {
+        if mod_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let limiter = curseforge_limiter();
+        limiter.acquire().await;
+
+        let url = format!("{}/mods", CURSEFORGE_API_BASE);
+        let body = serde_json::json!({
+            "modIds": mod_ids
+        });
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| LauncherError::ApiError(format!("CurseForge batch get_mods request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            return Err(LauncherError::ApiError(format!(
+                "CurseForge batch get_mods failed: HTTP {}",
+                response.status()
+            )));
+        }
+
+        let result: CurseForgeResponse<Vec<CurseForgeMod>> = response
+            .json()
+            .await
+            .map_err(|e| LauncherError::ApiError(format!("Failed to parse CurseForge batch response: {}", e)))?;
+
+        Ok(result.data)
     }
 
     /// Поиск модов (с кешированием и rate limiting)
@@ -464,6 +504,61 @@ impl CurseForgeClient {
             })
             .await
     }
+
+    /// Look up mods by their fingerprints (MurmurHash2)
+    /// Returns matching files with their mod info
+    pub async fn get_fingerprint_matches(
+        &self,
+        fingerprints: &[u32],
+    ) -> Result<Vec<FingerprintMatch>> {
+        let limiter = curseforge_limiter();
+        limiter.acquire().await;
+
+        let url = format!("{}/fingerprints", CURSEFORGE_API_BASE);
+
+        #[derive(Serialize)]
+        struct FingerprintRequest {
+            fingerprints: Vec<u32>,
+        }
+
+        #[derive(Deserialize)]
+        struct FingerprintResponse {
+            data: FingerprintData,
+        }
+
+        #[derive(Deserialize)]
+        struct FingerprintData {
+            #[serde(rename = "exactMatches")]
+            exact_matches: Vec<FingerprintMatch>,
+        }
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&FingerprintRequest {
+                fingerprints: fingerprints.to_vec(),
+            })
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Ok(Vec::new());
+        }
+
+        let result: FingerprintResponse = response.json().await?;
+        Ok(result.data.exact_matches)
+    }
+}
+
+/// Match result from fingerprint lookup
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FingerprintMatch {
+    pub id: u64,
+    pub file: CurseForgeFile,
+    /// The fingerprint that matched this file
+    #[serde(default)]
+    pub fingerprint: u32,
 }
 
 impl Default for CurseForgeClient {

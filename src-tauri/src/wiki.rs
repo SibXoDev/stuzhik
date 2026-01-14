@@ -17,6 +17,8 @@ pub struct WikiContent {
     pub mod_name: String,
     /// Slug/ID мода
     pub slug: String,
+    /// Автор мода
+    pub author: Option<String>,
     /// Полное описание (markdown для Modrinth, HTML для CurseForge)
     pub body: String,
     /// Формат контента
@@ -99,23 +101,49 @@ pub struct VersionChangelog {
 pub async fn get_modrinth_wiki(slug: &str) -> Result<WikiContent> {
     let project = ModrinthClient::get_project(slug).await?;
 
+    // Modrinth project API doesn't return author, so we search for it
+    let author = {
+        let client = ModrinthClient::new();
+        match client.search_mods(slug, None, None, 1, 0).await {
+            Ok(result) => {
+                // Find exact match by slug
+                result
+                    .hits
+                    .iter()
+                    .find(|h| h.slug == project.slug)
+                    .map(|h| h.author.clone())
+            }
+            Err(_) => None,
+        }
+    };
+
     Ok(WikiContent {
         mod_name: project.title,
         slug: project.slug.clone(),
+        author,
         body: project.body,
         content_format: ContentFormat::Markdown,
         project_url: Some(format!("https://modrinth.com/mod/{}", project.slug)),
-        wiki_url: None,    // Modrinth API не предоставляет wiki URL напрямую
-        discord_url: None, // Нет в базовом API
-        issues_url: None,
-        source_url: None,
+        wiki_url: project.wiki_url,
+        discord_url: project.discord_url,
+        issues_url: project.issues_url,
+        source_url: project.source_url,
         license: Some(LicenseInfo {
             id: project.license.id,
             name: project.license.name,
             url: project.license.url,
         }),
         categories: project.categories,
-        gallery: vec![], // Требует дополнительного API вызова
+        gallery: project
+            .gallery
+            .into_iter()
+            .map(|img| GalleryImage {
+                url: img.url,
+                title: img.title,
+                description: img.description,
+                featured: img.featured,
+            })
+            .collect(),
         downloads: project.downloads,
         followers: project.followers,
         date_created: None, // Нет в базовом API
@@ -136,6 +164,8 @@ pub async fn get_curseforge_wiki(mod_id: u64) -> Result<WikiContent> {
     let issues_url = mod_info.links.issues_url.clone();
     let source_url = mod_info.links.source_url.clone();
     let categories = mod_info.get_category_names();
+    // Get author from first author in list
+    let author = mod_info.authors.first().map(|a| a.name.clone());
     let gallery: Vec<GalleryImage> = mod_info
         .screenshots
         .iter()
@@ -162,6 +192,7 @@ pub async fn get_curseforge_wiki(mod_id: u64) -> Result<WikiContent> {
     Ok(WikiContent {
         mod_name,
         slug: slug.clone(),
+        author,
         body: summary,
         content_format: ContentFormat::PlainText,
         project_url: Some(format!(
@@ -268,7 +299,10 @@ pub async fn get_curseforge_changelog(
 
         // Получаем changelog только для первых N файлов
         let changelog = if idx < changelog_limit {
-            client.get_file_changelog(mod_id, f.id).await.unwrap_or(None)
+            client
+                .get_file_changelog(mod_id, f.id)
+                .await
+                .unwrap_or(None)
         } else {
             None
         };
@@ -334,7 +368,10 @@ async fn lookup_mod_by_hash(hash: &str) -> Option<String> {
     if let Some(version) = versions.into_values().next() {
         // Get project info to get the slug
         let project_resp = client
-            .get(format!("https://api.modrinth.com/v2/project/{}", version.project_id))
+            .get(format!(
+                "https://api.modrinth.com/v2/project/{}",
+                version.project_id
+            ))
             .header("User-Agent", crate::USER_AGENT)
             .send()
             .await
@@ -358,7 +395,11 @@ async fn lookup_mod_by_hash(hash: &str) -> Option<String> {
 
 /// Получить wiki контент мода
 #[tauri::command]
-pub async fn get_mod_wiki(slug: String, source: String, file_hash: Option<String>) -> Result<WikiContent> {
+pub async fn get_mod_wiki(
+    slug: String,
+    source: String,
+    file_hash: Option<String>,
+) -> Result<WikiContent> {
     match source.as_str() {
         "modrinth" => get_modrinth_wiki(&slug).await,
         "curseforge" => {
@@ -390,17 +431,21 @@ pub async fn get_mod_wiki(slug: String, source: String, file_hash: Option<String
                     let hit_slug = hit.slug.to_lowercase();
                     let hit_title = hit.title.to_lowercase();
 
-                    if hit_slug == clean_name || hit_title == clean_name
-                        || hit_slug.contains(&clean_name) || clean_name.contains(&hit_slug)
-                        || hit_title.contains(&clean_name) {
+                    if hit_slug == clean_name
+                        || hit_title == clean_name
+                        || hit_slug.contains(&clean_name)
+                        || clean_name.contains(&hit_slug)
+                        || hit_title.contains(&clean_name)
+                    {
                         return get_modrinth_wiki(&hit.slug).await;
                     }
                 }
             }
 
-            Err(LauncherError::InvalidConfig(
-                format!("Could not find mod '{}' on Modrinth. Try searching manually.", slug)
-            ))
+            Err(LauncherError::InvalidConfig(format!(
+                "Could not find mod '{}' on Modrinth. Try searching manually.",
+                slug
+            )))
         }
         _ => Err(LauncherError::InvalidConfig(format!(
             "Unknown source: {}",
@@ -447,17 +492,21 @@ pub async fn get_mod_changelog(
                     let hit_slug = hit.slug.to_lowercase();
                     let hit_title = hit.title.to_lowercase();
 
-                    if hit_slug == clean_name || hit_title == clean_name
-                        || hit_slug.contains(&clean_name) || clean_name.contains(&hit_slug)
-                        || hit_title.contains(&clean_name) {
+                    if hit_slug == clean_name
+                        || hit_title == clean_name
+                        || hit_slug.contains(&clean_name)
+                        || clean_name.contains(&hit_slug)
+                        || hit_title.contains(&clean_name)
+                    {
                         return get_modrinth_changelog(&hit.slug, limit).await;
                     }
                 }
             }
 
-            Err(LauncherError::InvalidConfig(
-                format!("Could not find mod '{}' on Modrinth. Try searching manually.", slug)
-            ))
+            Err(LauncherError::InvalidConfig(format!(
+                "Could not find mod '{}' on Modrinth. Try searching manually.",
+                slug
+            )))
         }
         _ => Err(LauncherError::InvalidConfig(format!(
             "Unknown source: {}",
@@ -485,6 +534,7 @@ mod tests {
         let wiki = WikiContent {
             mod_name: "Test Mod".to_string(),
             slug: "test-mod".to_string(),
+            author: Some("Test Author".to_string()),
             body: "# Description\nThis is a test".to_string(),
             content_format: ContentFormat::Markdown,
             project_url: Some("https://modrinth.com/mod/test-mod".to_string()),

@@ -141,9 +141,10 @@ impl RconClient {
 
         // Send packet
         let data = packet.to_bytes();
-        stream.write_all(&data).await.map_err(|e| {
-            ServerError::RconError(format!("Failed to send packet: {}", e))
-        })?;
+        stream
+            .write_all(&data)
+            .await
+            .map_err(|e| ServerError::RconError(format!("Failed to send packet: {}", e)))?;
 
         // Read response length
         let mut length_buf = [0u8; 4];
@@ -161,13 +162,13 @@ impl RconClient {
 
         // Read response body
         let mut body_buf = vec![0u8; length];
-        stream.read_exact(&mut body_buf).await.map_err(|e| {
-            ServerError::RconError(format!("Failed to read response body: {}", e))
-        })?;
+        stream
+            .read_exact(&mut body_buf)
+            .await
+            .map_err(|e| ServerError::RconError(format!("Failed to read response body: {}", e)))?;
 
-        RconPacket::from_bytes(&body_buf).ok_or_else(|| {
-            ServerError::RconError("Failed to parse response packet".to_string())
-        })
+        RconPacket::from_bytes(&body_buf)
+            .ok_or_else(|| ServerError::RconError("Failed to parse response packet".to_string()))
     }
 
     /// Get next request ID
@@ -265,7 +266,12 @@ impl RconClient {
 
     /// Whitelist on/off
     pub async fn whitelist_toggle(&self, enabled: bool) -> ServerResult<String> {
-        self.command(if enabled { "whitelist on" } else { "whitelist off" }).await
+        self.command(if enabled {
+            "whitelist on"
+        } else {
+            "whitelist off"
+        })
+        .await
     }
 
     /// Say message to all players
@@ -457,28 +463,40 @@ pub async fn try_auto_connect(instance_id: &str) -> bool {
     for attempt in 1..=MAX_RETRIES {
         log::info!(
             "Attempting RCON auto-connect for {} on port {} (attempt {}/{})",
-            instance_id, port, attempt, MAX_RETRIES
+            instance_id,
+            port,
+            attempt,
+            MAX_RETRIES
         );
 
         match RconClient::connect("127.0.0.1", port, &password).await {
             Ok(client) => {
                 let mut connections = RCON_CONNECTIONS.write().await;
                 connections.insert(instance_id.to_string(), Arc::new(client));
-                log::info!("RCON auto-connected for {} after {} attempt(s)", instance_id, attempt);
+                log::info!(
+                    "RCON auto-connected for {} after {} attempt(s)",
+                    instance_id,
+                    attempt
+                );
                 return true;
             }
             Err(e) => {
                 if attempt < MAX_RETRIES {
                     log::debug!(
                         "RCON connect attempt {} failed for {}: {}, retrying in {}s...",
-                        attempt, instance_id, e, delay_secs
+                        attempt,
+                        instance_id,
+                        e,
+                        delay_secs
                     );
                     tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
                     delay_secs *= 2; // Exponential backoff
                 } else {
                     log::warn!(
                         "RCON auto-connect failed for {} after {} attempts: {}",
-                        instance_id, MAX_RETRIES, e
+                        instance_id,
+                        MAX_RETRIES,
+                        e
                     );
                 }
             }

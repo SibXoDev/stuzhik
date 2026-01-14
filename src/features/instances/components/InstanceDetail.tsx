@@ -15,6 +15,7 @@ import GameSettingsDialog from "./GameSettingsDialog";
 import BackupManager from "./BackupManager";
 import PatchesPanel from "./PatchesPanel";
 import ServerConsole from "./ServerConsole";
+import ClientConsole from "./ClientConsole";
 import ServerSettings from "./ServerSettings";
 import { ModProfilesPanel } from "../../modpack-editor";
 import { EditorPanel } from "../../editor";
@@ -294,6 +295,7 @@ const InstanceDetail: Component<Props> = (props) => {
         { id: "collections", label: t().collections?.title || "Коллекции", icon: "i-hugeicons-folder-library" },
         { id: "patches", label: t().modpackCompare?.patch?.title || "Патчи", icon: "i-hugeicons-file-import" },
         { id: "performance", label: t().performance?.title || "Производительность", icon: "i-hugeicons-activity-01" },
+        { id: "console", label: t().console?.title || "Консоль", icon: "i-hugeicons-command-line" },
         { id: "backups", label: t().backup?.title || "Бэкапы", icon: "i-hugeicons-floppy-disk" },
         { id: "logs", label: t().instances.analyzeLogs || "Логи", icon: "i-hugeicons-file-view" },
       ];
@@ -306,26 +308,24 @@ const InstanceDetail: Component<Props> = (props) => {
     <Show when={inst()} fallback={null}>
     <div class="flex flex-col gap-4 flex-1 min-h-0">
       {/* Header with back button and instance info */}
-      <div class="flex items-start gap-4">
+      <div class="flex items-start gap-3">
         <button class="btn-ghost flex-shrink-0" onClick={props.onBack}>
           <i class="i-hugeicons-arrow-left-01 w-5 h-5" />
-          {t().common.back}
         </button>
 
         <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-3">
             {/* Loader Icon */}
-            <div class="w-16 h-16 rounded-2xl bg-black/30 flex-center flex-shrink-0 border border-gray-700/50">
-              <LoaderIcon loader={inst()?.loader} class="w-10 h-10" />
+            <div class="w-12 h-12 rounded-2xl bg-black/30 flex-center flex-shrink-0 border border-gray-700/50">
+              <LoaderIcon loader={inst()?.loader} class="w-7 h-7" />
             </div>
 
             {/* Info */}
             <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-3 mb-1">
-                <h2 class="text-2xl font-bold truncate">{inst()?.name}</h2>
-                {/* Instance Type Badge - always show in details */}
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <h2 class="text-lg font-bold truncate">{inst()?.name}</h2>
                 <span
-                  class={`px-2.5 py-1 text-sm rounded-full flex-shrink-0 ${
+                  class={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
                     inst()?.instance_type === "server"
                       ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
                       : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
@@ -333,12 +333,12 @@ const InstanceDetail: Component<Props> = (props) => {
                 >
                   {inst()?.instance_type === "server" ? "Server" : "Client"}
                 </span>
-                <span class={`px-3 py-1 text-sm rounded-full border ${getStatusClass(status())}`}>
+                <span class={`px-2 py-0.5 text-xs rounded-full border ${getStatusClass(status())}`}>
                   {getStatusText(status())}
                 </span>
               </div>
-              <div class="flex items-center gap-3 text-sm text-gray-400">
-                <span>Minecraft {inst()?.version}</span>
+              <div class="flex flex-wrap items-center gap-2 text-xs text-gray-400">
+                <span>MC {inst()?.version}</span>
                 <span class="w-1 h-1 rounded-full bg-gray-600" />
                 <span class="capitalize">{inst()?.loader || "vanilla"}</span>
                 <Show when={inst()?.loader_version}>
@@ -357,13 +357,12 @@ const InstanceDetail: Component<Props> = (props) => {
         </div>
 
         {/* Action buttons */}
-        <div class="flex flex-col items-end gap-1 flex-shrink-0">
-          <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1 flex-shrink-0">
             <Show
               when={status() === "running" || status() === "stopping" || status() === "starting"}
               fallback={
                 <button
-                  class="btn-primary px-6"
+                  class="btn-primary px-3 lg:px-6"
                   onClick={handleServerStart}
                   disabled={status() === "starting" || status() === "installing"}
                 >
@@ -372,18 +371,18 @@ const InstanceDetail: Component<Props> = (props) => {
                     fallback={
                       <>
                         <i class="i-hugeicons-play w-4 h-4" />
-                        {inst()?.instance_type === "server" ? "Запустить" : (t().instances.start || "Играть")}
+                        <span class="hidden sm:inline">{inst()?.instance_type === "server" ? "Запустить" : (t().instances.start || "Играть")}</span>
                       </>
                     }
                   >
                     <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                    {t().instances.status.starting}
+                    <span class="hidden sm:inline">{t().instances.status.starting}</span>
                   </Show>
                 </button>
               }
             >
               <button
-                class="btn-danger px-6"
+                class="btn-danger px-3 lg:px-6"
                 onClick={() => instanceId() && props.onStop(instanceId())}
                 disabled={status() === "stopping"}
               >
@@ -392,12 +391,12 @@ const InstanceDetail: Component<Props> = (props) => {
                   fallback={
                     <>
                       <i class="i-hugeicons-stop w-4 h-4" />
-                      {t().instances.stop || "Стоп"}
+                      <span class="hidden sm:inline">{t().instances.stop || "Стоп"}</span>
                     </>
                   }
                 >
                   <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                  Остановка...
+                  <span class="hidden sm:inline">Остановка...</span>
                 </Show>
               </button>
             </Show>
@@ -442,14 +441,6 @@ const InstanceDetail: Component<Props> = (props) => {
                 <span class="text-sm">{t().instances.confirmDelete || "Удалить?"}</span>
               </Show>
             </button>
-          </div>
-
-          {/* Hint when stopping */}
-          <Show when={status() === "stopping" && inst()?.instance_type === "server"}>
-            <span class="text-xs text-gray-500">
-              Force Kill в консоли если зависнет
-            </span>
-          </Show>
         </div>
       </div>
 
@@ -577,16 +568,19 @@ const InstanceDetail: Component<Props> = (props) => {
         </div>
       </Show>
 
-      {/* Tabs */}
-      <Tabs
-        tabs={tabs()}
-        activeTab={activeTab()}
-        onTabChange={(id) => setActiveTab(id as Tab)}
-        variant="underline"
-      />
+      {/* Tabs - wrapper with min-w-0 to allow shrinking in flex column */}
+      <div class="min-w-0 w-full flex-shrink-0">
+        <Tabs
+          tabs={tabs()}
+          activeTab={activeTab()}
+          onTabChange={(id) => setActiveTab(id as Tab)}
+          variant="underline"
+        />
+      </div>
 
       {/* Tab content - scrollable for most tabs, but console and editor manage their own scroll */}
       <div class={`flex-1 min-h-0 ${activeTab() === "console" || activeTab() === "editor" ? "flex flex-col" : "overflow-y-auto"}`}>
+        {/* ModsList uses global verification store - no need to keep mounted */}
         <Show when={activeTab() === "mods" && instanceId()}>
           <ModsList
             instanceId={instanceId()}
@@ -659,11 +653,22 @@ const InstanceDetail: Component<Props> = (props) => {
         </Show>
 
         <Show when={activeTab() === "console" && instanceId()}>
-          <ServerConsole
-            instanceId={instanceId()}
-            isRunning={status() === "running"}
-            instanceStatus={status()}
-          />
+          <Show
+            when={isServer()}
+            fallback={
+              <ClientConsole
+                instanceId={instanceId()}
+                isRunning={status() === "running"}
+                instanceStatus={status()}
+              />
+            }
+          >
+            <ServerConsole
+              instanceId={instanceId()}
+              isRunning={status() === "running"}
+              instanceStatus={status()}
+            />
+          </Show>
         </Show>
 
         <Show when={activeTab() === "settings" && instanceId()}>

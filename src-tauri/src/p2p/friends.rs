@@ -3,7 +3,7 @@
 //! Использует Ed25519 для подписи и верификации.
 
 use base64::{engine::general_purpose::STANDARD, Engine};
-use ed25519_dalek::{SigningKey, VerifyingKey, Signature, Signer, Verifier};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -59,13 +59,17 @@ impl FriendsManager {
 
     /// Подписать данные нашим приватным ключом
     pub fn sign(&self, data: &[u8]) -> Result<String, String> {
-        let private_key = self.private_key.as_ref()
+        let private_key = self
+            .private_key
+            .as_ref()
             .ok_or_else(|| "No private key available".to_string())?;
 
-        let key_bytes = STANDARD.decode(private_key)
+        let key_bytes = STANDARD
+            .decode(private_key)
             .map_err(|e| format!("Failed to decode private key: {}", e))?;
 
-        let key_array: [u8; 32] = key_bytes.try_into()
+        let key_array: [u8; 32] = key_bytes
+            .try_into()
             .map_err(|_| "Invalid private key length")?;
 
         let signing_key = SigningKey::from_bytes(&key_array);
@@ -76,19 +80,23 @@ impl FriendsManager {
 
     /// Проверить подпись публичным ключом друга
     pub fn verify(&self, public_key: &str, data: &[u8], signature: &str) -> Result<bool, String> {
-        let key_bytes = STANDARD.decode(public_key)
+        let key_bytes = STANDARD
+            .decode(public_key)
             .map_err(|e| format!("Failed to decode public key: {}", e))?;
 
-        let key_array: [u8; 32] = key_bytes.try_into()
+        let key_array: [u8; 32] = key_bytes
+            .try_into()
             .map_err(|_| "Invalid public key length")?;
 
         let verifying_key = VerifyingKey::from_bytes(&key_array)
             .map_err(|e| format!("Invalid public key: {}", e))?;
 
-        let sig_bytes = STANDARD.decode(signature)
+        let sig_bytes = STANDARD
+            .decode(signature)
             .map_err(|e| format!("Failed to decode signature: {}", e))?;
 
-        let sig_array: [u8; 64] = sig_bytes.try_into()
+        let sig_array: [u8; 64] = sig_bytes
+            .try_into()
             .map_err(|_| "Invalid signature length")?;
 
         let sig = Signature::from_bytes(&sig_array);
@@ -102,7 +110,12 @@ impl FriendsManager {
     }
 
     /// Добавить друга
-    pub fn add_friend(&mut self, public_key: String, nickname: String, note: Option<String>) -> Result<(), String> {
+    pub fn add_friend(
+        &mut self,
+        public_key: String,
+        nickname: String,
+        note: Option<String>,
+    ) -> Result<(), String> {
         if self.friends.contains_key(&public_key) {
             return Err("Friend already exists".to_string());
         }
@@ -139,7 +152,11 @@ impl FriendsManager {
     }
 
     /// Обновить никнейм друга
-    pub fn update_friend_nickname(&mut self, public_key: &str, nickname: String) -> Result<(), String> {
+    pub fn update_friend_nickname(
+        &mut self,
+        public_key: &str,
+        nickname: String,
+    ) -> Result<(), String> {
         if let Some(friend) = self.friends.get_mut(public_key) {
             friend.nickname = nickname;
             Ok(())
@@ -149,7 +166,11 @@ impl FriendsManager {
     }
 
     /// Обновить заметку о друге
-    pub fn update_friend_note(&mut self, public_key: &str, note: Option<String>) -> Result<(), String> {
+    pub fn update_friend_note(
+        &mut self,
+        public_key: &str,
+        note: Option<String>,
+    ) -> Result<(), String> {
         if let Some(friend) = self.friends.get_mut(public_key) {
             friend.note = note;
             Ok(())
@@ -173,7 +194,9 @@ mod tests {
         assert_eq!(public_key.len(), 44); // Base64 encoded 32 bytes
 
         // Добавляем друга
-        manager.add_friend("friend_key".to_string(), "Test Friend".to_string(), None).unwrap();
+        manager
+            .add_friend("friend_key".to_string(), "Test Friend".to_string(), None)
+            .unwrap();
 
         // Проверяем
         assert!(manager.is_friend("friend_key"));
@@ -201,7 +224,9 @@ mod tests {
         assert!(valid);
 
         // Проверяем что изменённые данные не проходят верификацию
-        let invalid = manager.verify(public_key, b"Modified data", &signature).unwrap();
+        let invalid = manager
+            .verify(public_key, b"Modified data", &signature)
+            .unwrap();
         assert!(!invalid);
     }
 
@@ -218,9 +243,12 @@ mod tests {
         let bob_public = bob.get_public_key().unwrap().to_string();
 
         // Alice добавляет Bob как друга
-        alice.add_friend(bob_public.clone(), "Bob".to_string(), None).unwrap();
+        alice
+            .add_friend(bob_public.clone(), "Bob".to_string(), None)
+            .unwrap();
         // Bob добавляет Alice как друга
-        bob.add_friend(alice_public.clone(), "Alice".to_string(), None).unwrap();
+        bob.add_friend(alice_public.clone(), "Alice".to_string(), None)
+            .unwrap();
 
         // Alice подписывает сообщение
         let message = b"Trust message from Alice";

@@ -392,7 +392,13 @@ async fn detect_mc_version_from_libraries(libraries_dir: &Path) -> Option<String
 /// Detect from JAR files
 async fn detect_from_jars(
     server_dir: &Path,
-) -> Option<(PathBuf, ServerLoader, Option<String>, Option<String>, Vec<String>)> {
+) -> Option<(
+    PathBuf,
+    ServerLoader,
+    Option<String>,
+    Option<String>,
+    Vec<String>,
+)> {
     let mut entries = fs::read_dir(server_dir).await.ok()?;
     let mut evidence = Vec::new();
 
@@ -449,7 +455,9 @@ fn parse_forge_jar_name(name: &str) -> Option<(String, String)> {
 }
 
 /// Inspect JAR manifest
-async fn inspect_jar_manifest(jar_path: &Path) -> Option<(Option<String>, ServerLoader, Vec<String>)> {
+async fn inspect_jar_manifest(
+    jar_path: &Path,
+) -> Option<(Option<String>, ServerLoader, Vec<String>)> {
     // Use spawn_blocking for sync zip operations
     let jar_path = jar_path.to_path_buf();
 
@@ -538,7 +546,9 @@ async fn detect_from_run_scripts(server_dir: &Path) -> Option<(ServerLoader, Vec
                 return Some((ServerLoader::NeoForge, evidence));
             }
 
-            if content_lower.contains("minecraftforge") || content_lower.contains("net/minecraftforge") {
+            if content_lower.contains("minecraftforge")
+                || content_lower.contains("net/minecraftforge")
+            {
                 evidence.push(format!(
                     "Run script references Forge: {}",
                     script_path.display()
@@ -699,7 +709,11 @@ async fn scan_directory(src: &Path, dst: &Path) -> ServerResult<(Vec<FileEntry>,
                 let metadata = entry.metadata().await?;
                 let size = metadata.len();
                 total_size += size;
-                files.push(FileEntry { src: path, dst: dest, size });
+                files.push(FileEntry {
+                    src: path,
+                    dst: dest,
+                    size,
+                });
             }
         }
     }
@@ -789,11 +803,9 @@ where
 
                 if size > 10 * 1024 * 1024 {
                     // > 10MB - use blocking copy
-                    tokio::task::spawn_blocking(move || {
-                        std::fs::copy(&src_clone, &dst_clone)
-                    })
-                    .await
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
+                    tokio::task::spawn_blocking(move || std::fs::copy(&src_clone, &dst_clone))
+                        .await
+                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
                 } else {
                     // Small files - use async copy
                     fs::copy(&src, &dst).await
@@ -806,7 +818,8 @@ where
             match handle.await {
                 Ok(Ok(_)) => {
                     let copied = files_copied.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
-                    let bytes = bytes_copied.fetch_add(size, std::sync::atomic::Ordering::SeqCst) + size;
+                    let bytes =
+                        bytes_copied.fetch_add(size, std::sync::atomic::Ordering::SeqCst) + size;
 
                     // Emit progress every 100 files or at least every 10MB
                     if copied % 100 == 0 || bytes % (10 * 1024 * 1024) < size {
@@ -927,7 +940,11 @@ where
 
     log::info!(
         "Imported server '{}' (id: {}, loader: {:?}, files: {}, size: {} bytes)",
-        instance_name, instance_id, detected.loader, final_files_copied, final_bytes_copied
+        instance_name,
+        instance_id,
+        detected.loader,
+        final_files_copied,
+        final_bytes_copied
     );
 
     Ok(ImportResult {

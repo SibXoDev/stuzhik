@@ -40,6 +40,8 @@ impl LaunchBehavior {
 pub struct Settings {
     // Интерфейс
     pub language: Language,
+    /// Режим разработчика (показывает Console, Source Code в TitleBar)
+    pub developer_mode: bool,
 
     // Пользователь
     pub default_username: Option<String>,
@@ -89,6 +91,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             language: Language::Russian,
+            developer_mode: false, // По умолчанию выключен
             default_username: None,
             default_memory_min: 2048,
             default_memory_max: 4096,
@@ -145,6 +148,10 @@ impl SettingsManager {
             language: Self::get_setting("language")?
                 .and_then(|s| Language::parse(&s))
                 .unwrap_or(default.language),
+
+            developer_mode: Self::get_setting("developer_mode")?
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(default.developer_mode),
 
             default_username: Self::get_setting("default_username")?.or(default.default_username),
 
@@ -207,6 +214,7 @@ impl SettingsManager {
     /// Сохранить все настройки
     pub fn save_all(settings: Settings) -> Result<()> {
         Self::set_setting("language", settings.language.code())?;
+        Self::set_setting("developer_mode", &settings.developer_mode.to_string())?;
 
         if let Some(username) = settings.default_username {
             Self::set_setting("default_username", &username)?;

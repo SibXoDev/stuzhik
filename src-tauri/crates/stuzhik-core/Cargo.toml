@@ -11,4 +11,4 @@ chrono = { workspace = true }
 rusqlite = { workspace = true }
 tokio = { workspace = true }
 reqwest = { workspace = true }
-zip = "6.0.0"
+zip = { version = "7.0.0", default-features = false, features = ["deflate", "bzip2", "zstd", "aes-crypto"] }

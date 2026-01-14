@@ -162,7 +162,10 @@ fn detect_gpus_windows() -> Vec<GpuDevice> {
                 let parts: Vec<&str> = clean_line.split(',').collect();
                 if parts.len() >= 2 {
                     let name = parts[0].trim().to_string();
-                    let vendor = parts.get(1).map(|s| s.trim().to_string()).unwrap_or_default();
+                    let vendor = parts
+                        .get(1)
+                        .map(|s| s.trim().to_string())
+                        .unwrap_or_default();
 
                     if name.is_empty() {
                         continue;

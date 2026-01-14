@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use sha1::{Digest as Sha1Digest, Sha1};
-use sha2::{Sha512};
+use sha2::Sha512;
 use tokio::fs;
 use tokio::io::AsyncReadExt;
 use tokio::sync::RwLock;
@@ -132,7 +132,10 @@ pub async fn load_cache(data_dir: &Path) -> ServerResult<()> {
         if let Ok(cache) = serde_json::from_str::<ModSideCache>(&content) {
             if cache.version == ModSideCache::CURRENT_VERSION {
                 *get_cache().write().await = cache;
-                log::info!("Loaded mod side cache with {} entries", get_cache().read().await.mods.len());
+                log::info!(
+                    "Loaded mod side cache with {} entries",
+                    get_cache().read().await.mods.len()
+                );
             }
         }
     }
@@ -377,7 +380,10 @@ pub async fn scan_for_client_mods(mods_dir: impl AsRef<Path>) -> ServerResult<Ve
         return Ok(client_mods);
     }
 
-    log::info!("Scanning {} mods for client-side detection...", jar_files.len());
+    log::info!(
+        "Scanning {} mods for client-side detection...",
+        jar_files.len()
+    );
 
     // Check cache first
     let cache = get_cache().read().await;
@@ -400,7 +406,10 @@ pub async fn scan_for_client_mods(mods_dir: impl AsRef<Path>) -> ServerResult<Ve
     );
 
     // Batch lookup uncached mods via Modrinth
-    let hashes: Vec<(String, String)> = uncached.iter().map(|(_, s1, s512)| (s1.clone(), s512.clone())).collect();
+    let hashes: Vec<(String, String)> = uncached
+        .iter()
+        .map(|(_, s1, s512)| (s1.clone(), s512.clone()))
+        .collect();
     let api_results = lookup_modrinth_batch(&hashes).await;
 
     // Update cache with new results
@@ -750,9 +759,15 @@ pub async fn enable_all_disabled_mods(instance_id: String) -> Result<Vec<String>
 }
 
 #[tauri::command]
-pub async fn get_mod_info(instance_id: String, file_name: String) -> Result<Option<ModSideInfo>, String> {
+pub async fn get_mod_info(
+    instance_id: String,
+    file_name: String,
+) -> Result<Option<ModSideInfo>, String> {
     let instances_dir = crate::paths::instances_dir();
-    let path = instances_dir.join(&instance_id).join("mods").join(&file_name);
+    let path = instances_dir
+        .join(&instance_id)
+        .join("mods")
+        .join(&file_name);
 
     get_mod_side_info(&path).await.map_err(|e| e.to_string())
 }
@@ -768,7 +783,10 @@ pub async fn mark_mod_as_client_only(instance_id: String, file_name: String) -> 
 }
 
 #[tauri::command]
-pub async fn mark_mod_as_server_compatible(instance_id: String, file_name: String) -> Result<(), String> {
+pub async fn mark_mod_as_server_compatible(
+    instance_id: String,
+    file_name: String,
+) -> Result<(), String> {
     let instances_dir = crate::paths::instances_dir();
     let mods_dir = instances_dir.join(&instance_id).join("mods");
 

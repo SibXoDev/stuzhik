@@ -1,12 +1,16 @@
 use crate::error::Result;
 use rand::{rngs::OsRng, TryRngCore};
 use sha1::{Digest, Sha1};
-use sha2::Sha256;
+use sha2::{Sha256, Sha512};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
 /// Генерация короткого ID (base62) заданной длины
+///
+/// # Safety
+/// Использует `from_utf8_unchecked` потому что ALPHABET содержит только ASCII символы (0-9, A-Z, a-z),
+/// поэтому результат всегда валидный UTF-8.
 pub fn gen_short_id(len: usize) -> String {
     const ALPHABET: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     let mut out = vec![0u8; len];
@@ -20,41 +24,43 @@ pub fn gen_short_id(len: usize) -> String {
         out[i] = ALPHABET[idx];
     }
 
+    // SAFETY: ALPHABET содержит только ASCII символы, результат всегда валидный UTF-8
     unsafe { String::from_utf8_unchecked(out) }
+}
+
+/// Helper macro to reduce code duplication in hash functions.
+/// All hash functions share the same pattern: open file, read in chunks, update hasher, finalize.
+macro_rules! impl_file_hash {
+    ($hasher:ty, $path:expr) => {{
+        let mut file = File::open($path)?;
+        let mut hasher = <$hasher>::new();
+        let mut buffer = [0u8; 8192];
+
+        loop {
+            let n = file.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buffer[..n]);
+        }
+
+        Ok(format!("{:x}", hasher.finalize()))
+    }};
 }
 
 /// Вычисление SHA1 хеша файла
 pub fn calculate_sha1<P: AsRef<Path>>(path: P) -> Result<String> {
-    let mut file = File::open(path)?;
-    let mut hasher = Sha1::new();
-    let mut buffer = [0; 8192];
-
-    loop {
-        let n = file.read(&mut buffer)?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buffer[..n]);
-    }
-
-    Ok(format!("{:x}", hasher.finalize()))
+    impl_file_hash!(Sha1, path)
 }
 
 /// Вычисление SHA256 хеша файла
 pub fn calculate_sha256<P: AsRef<Path>>(path: P) -> Result<String> {
-    let mut file = File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0; 8192];
+    impl_file_hash!(Sha256, path)
+}
 
-    loop {
-        let n = file.read(&mut buffer)?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buffer[..n]);
-    }
-
-    Ok(format!("{:x}", hasher.finalize()))
+/// Вычисление SHA512 хеша файла (используется Modrinth API)
+pub fn calculate_sha512<P: AsRef<Path>>(path: P) -> Result<String> {
+    impl_file_hash!(Sha512, path)
 }
 
 /// Верификация файла по хешу
@@ -121,6 +127,11 @@ pub fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
 
 /// Проверка соответствия версии требованию
 pub fn version_matches_requirement(version: &str, requirement: &str) -> bool {
+    // Handle wildcards - any version matches
+    if requirement == "*" || requirement.is_empty() {
+        return true;
+    }
+
     let version = match parse_version(version) {
         Some(v) => v,
         None => return false,

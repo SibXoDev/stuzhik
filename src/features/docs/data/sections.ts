@@ -393,7 +393,7 @@ export const docSections: DocSection[] = [
     id: "code-editor",
     titleKey: "docs.sections.codeEditor.title",
     icon: "i-hugeicons-source-code",
-    keywords: ["editor", "code", "monaco", "intellisense", "kubejs", "crafttweaker", "config", "редактор", "код"],
+    keywords: ["editor", "code", "intellisense", "kubejs", "crafttweaker", "config", "редактор", "код", "highlighting"],
     subsections: [
       {
         id: "overview",
@@ -401,7 +401,7 @@ export const docSections: DocSection[] = [
         content: [
           p("docs.sections.codeEditor.overview.intro"),
           cards([
-            { icon: "i-hugeicons-code", title: "docs.sections.codeEditor.overview.monaco.title", description: "docs.sections.codeEditor.overview.monaco.desc", navigateTo: { sectionId: "code-editor", subsectionId: "shortcuts" } },
+            { icon: "i-hugeicons-code", title: "docs.sections.codeEditor.overview.highlighting.title", description: "docs.sections.codeEditor.overview.highlighting.desc", navigateTo: { sectionId: "code-editor", subsectionId: "shortcuts" } },
             { icon: "i-hugeicons-magic-wand-01", title: "docs.sections.codeEditor.overview.intellisense.title", description: "docs.sections.codeEditor.overview.intellisense.desc", navigateTo: { sectionId: "code-editor", subsectionId: "intellisense" } },
             { icon: "i-hugeicons-view", title: "docs.sections.codeEditor.overview.preview.title", description: "docs.sections.codeEditor.overview.preview.desc", navigateTo: { sectionId: "code-editor", subsectionId: "recipes" } },
           ]),
@@ -433,7 +433,6 @@ ServerEvents.recipes(event => {
           h3("docs.sections.codeEditor.intellisense.minecraftTitle"),
           p("docs.sections.codeEditor.intellisense.minecraftText"),
           codeRef([
-            { path: "src/shared/monaco/types/kubejs.d.ts", line: 1, description: "docs.sections.codeEditor.intellisense.codeRef.provider", language: "typescript" },
             { path: "src-tauri/src/code_editor/minecraft_data/jar_parser.rs", line: 1, description: "docs.sections.codeEditor.intellisense.codeRef.parser", language: "rust" },
           ]),
         ],
@@ -777,7 +776,7 @@ ServerEvents.recipes(event => {
 ├── modpacks/          # Модпаки
 ├── server/            # Серверная логика
 ├── p2p/               # Stuzhik Connect
-├── code_editor/       # Monaco IntelliSense
+├── code_editor/       # Редактор кода
 ├── smart_downloader/  # Загрузки с зеркалами
 ├── log_analyzer/      # Анализ логов
 └── performance/       # RAM/CPU мониторинг`),

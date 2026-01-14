@@ -98,8 +98,8 @@ impl PeerGroupManager {
             .await
             .map_err(|e| format!("Failed to read groups file: {}", e))?;
 
-        let groups: Vec<PeerGroup> = serde_json::from_str(&data)
-            .map_err(|e| format!("Failed to parse groups: {}", e))?;
+        let groups: Vec<PeerGroup> =
+            serde_json::from_str(&data).map_err(|e| format!("Failed to parse groups: {}", e))?;
 
         let mut guard = self.groups.write().await;
         for group in groups {
@@ -230,7 +230,11 @@ impl PeerGroupManager {
     }
 
     /// Удалить пира из группы
-    pub async fn remove_peer_from_group(&self, group_id: &str, peer_id: &str) -> Result<(), String> {
+    pub async fn remove_peer_from_group(
+        &self,
+        group_id: &str,
+        peer_id: &str,
+    ) -> Result<(), String> {
         let mut guard = self.groups.write().await;
 
         if let Some(group) = guard.get_mut(group_id) {
@@ -299,7 +303,11 @@ impl PeerGroupManager {
     }
 
     /// Установить цвет группы
-    pub async fn set_group_color(&self, group_id: &str, color: Option<String>) -> Result<(), String> {
+    pub async fn set_group_color(
+        &self,
+        group_id: &str,
+        color: Option<String>,
+    ) -> Result<(), String> {
         let mut guard = self.groups.write().await;
 
         if let Some(group) = guard.get_mut(group_id) {
@@ -324,7 +332,11 @@ impl PeerGroupManager {
     }
 
     /// Объединить несколько групп в одну
-    pub async fn merge_groups(&self, group_ids: &[String], new_name: &str) -> Result<PeerGroup, String> {
+    pub async fn merge_groups(
+        &self,
+        group_ids: &[String],
+        new_name: &str,
+    ) -> Result<PeerGroup, String> {
         if group_ids.is_empty() {
             return Err("No groups to merge".to_string());
         }
@@ -405,7 +417,10 @@ mod tests {
         assert!(updated.contains("peer2"));
 
         // Удаляем пира
-        manager.remove_peer_from_group(&group.id, "peer1").await.unwrap();
+        manager
+            .remove_peer_from_group(&group.id, "peer1")
+            .await
+            .unwrap();
         let updated = manager.get_group(&group.id).await.unwrap();
         assert_eq!(updated.len(), 1);
         assert!(!updated.contains("peer1"));
@@ -422,9 +437,18 @@ mod tests {
         let group1 = manager.create_group("Group 1").await;
         let group2 = manager.create_group("Group 2").await;
 
-        manager.add_peer_to_group(&group1.id, "peer1").await.unwrap();
-        manager.add_peer_to_group(&group2.id, "peer1").await.unwrap();
-        manager.add_peer_to_group(&group2.id, "peer2").await.unwrap();
+        manager
+            .add_peer_to_group(&group1.id, "peer1")
+            .await
+            .unwrap();
+        manager
+            .add_peer_to_group(&group2.id, "peer1")
+            .await
+            .unwrap();
+        manager
+            .add_peer_to_group(&group2.id, "peer2")
+            .await
+            .unwrap();
 
         let peer1_groups = manager.get_groups_for_peer("peer1").await;
         assert_eq!(peer1_groups.len(), 2);

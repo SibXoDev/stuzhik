@@ -63,6 +63,9 @@ pub enum LauncherError {
     #[error("Mod not found: {0}")]
     ModNotFound(String),
 
+    #[error("Mod already installed: {0}")]
+    ModAlreadyInstalled(String),
+
     #[error("No compatible mod version found for Minecraft {mc_version} with {loader}")]
     NoCompatibleModVersion {
         mod_name: String,
@@ -117,6 +120,9 @@ pub enum LauncherError {
 
     #[error("Not found: {0}")]
     NotFound(String),
+
+    #[error("P2P connection error: {0}")]
+    P2PConnection(String),
 }
 
 impl LauncherError {
@@ -235,6 +241,12 @@ impl LauncherError {
                     .with_hint("Проверьте название мода или попробуйте найти его на Modrinth/CurseForge вручную"),
                 Language::English => ErrorInfo::new("MOD_NOT_FOUND", format!("Mod '{}' not found", name))
                     .with_hint("Check the mod name or try searching manually on Modrinth/CurseForge"),
+            }
+            LauncherError::ModAlreadyInstalled(name) => match lang {
+                Language::Russian => ErrorInfo::new("MOD_ALREADY_INSTALLED", format!("Мод '{}' уже установлен", name))
+                    .with_hint("Этот мод уже присутствует в экземпляре. Проверьте список модов"),
+                Language::English => ErrorInfo::new("MOD_ALREADY_INSTALLED", format!("Mod '{}' is already installed", name))
+                    .with_hint("This mod is already present in the instance. Check the mod list"),
             }
             LauncherError::NoCompatibleModVersion { mod_name, mc_version, loader } => match lang {
                 Language::Russian => ErrorInfo::new("NO_COMPATIBLE_MOD_VERSION",
@@ -355,6 +367,39 @@ impl LauncherError {
                     .with_details(msg.clone()),
                 Language::English => ErrorInfo::new("NOT_FOUND", "Resource not found")
                     .with_details(msg.clone()),
+            }
+            LauncherError::P2PConnection(msg) => {
+                // Определяем тип ошибки по содержимому сообщения
+                let is_timeout = msg.contains("timeout") || msg.contains("Timeout");
+                let is_refused = msg.contains("refused") || msg.contains("Refused");
+                let is_not_found = msg.contains("not found") || msg.contains("no peer");
+
+                match lang {
+                    Language::Russian => {
+                        let (message, hint) = if is_timeout || is_not_found {
+                            ("Пир не найден", "Убедитесь, что код введён правильно и оба устройства находятся в одной сети. Также проверьте, что Stuzhik Connect включён у друга.")
+                        } else if is_refused {
+                            ("Подключение отклонено", "Пользователь отклонил запрос на подключение или его настройки приватности не разрешают подключения.")
+                        } else {
+                            ("Ошибка P2P подключения", "Проверьте, что оба устройства находятся в одной сети и файрвол не блокирует соединение.")
+                        };
+                        ErrorInfo::new("P2P_CONNECTION_ERROR", message)
+                            .with_hint(hint)
+                            .with_details(msg.clone())
+                    }
+                    Language::English => {
+                        let (message, hint) = if is_timeout || is_not_found {
+                            ("Peer not found", "Make sure the code is correct and both devices are on the same network. Also check that Stuzhik Connect is enabled on your friend's device.")
+                        } else if is_refused {
+                            ("Connection refused", "The user rejected the connection request or their privacy settings don't allow connections.")
+                        } else {
+                            ("P2P connection error", "Verify both devices are on the same network and the firewall is not blocking the connection.")
+                        };
+                        ErrorInfo::new("P2P_CONNECTION_ERROR", message)
+                            .with_hint(hint)
+                            .with_details(msg.clone())
+                    }
+                }
             }
         }
     }

@@ -1,19 +1,72 @@
 /**
- * Shared Shiki highlighter singleton for syntax highlighting
+ * Syntax highlighting using highlight.js
+ * Simple, reliable, no WASM/async issues
  */
-import { createHighlighter, type Highlighter, type BundledLanguage } from "shiki";
+import hljs from "highlight.js/lib/core";
 
-// Language mapping from file extension or language name to Shiki language
-export const LANG_MAP: Record<string, BundledLanguage> = {
+// GitHub Dark theme
+import "highlight.js/styles/github-dark.css";
+
+// Import only the languages we need
+import javascript from "highlight.js/lib/languages/javascript";
+import typescript from "highlight.js/lib/languages/typescript";
+import json from "highlight.js/lib/languages/json";
+import xml from "highlight.js/lib/languages/xml";
+import css from "highlight.js/lib/languages/css";
+import scss from "highlight.js/lib/languages/scss";
+import yaml from "highlight.js/lib/languages/yaml";
+import ini from "highlight.js/lib/languages/ini";
+import bash from "highlight.js/lib/languages/bash";
+import powershell from "highlight.js/lib/languages/powershell";
+import rust from "highlight.js/lib/languages/rust";
+import java from "highlight.js/lib/languages/java";
+import python from "highlight.js/lib/languages/python";
+import sql from "highlight.js/lib/languages/sql";
+import php from "highlight.js/lib/languages/php";
+import markdown from "highlight.js/lib/languages/markdown";
+
+// Register languages
+hljs.registerLanguage("javascript", javascript);
+hljs.registerLanguage("js", javascript);
+hljs.registerLanguage("typescript", typescript);
+hljs.registerLanguage("ts", typescript);
+hljs.registerLanguage("json", json);
+hljs.registerLanguage("xml", xml);
+hljs.registerLanguage("html", xml);
+hljs.registerLanguage("css", css);
+hljs.registerLanguage("scss", scss);
+hljs.registerLanguage("yaml", yaml);
+hljs.registerLanguage("yml", yaml);
+hljs.registerLanguage("ini", ini);
+hljs.registerLanguage("properties", ini);
+hljs.registerLanguage("toml", ini); // TOML is similar enough to INI
+hljs.registerLanguage("bash", bash);
+hljs.registerLanguage("sh", bash);
+hljs.registerLanguage("shell", bash);
+hljs.registerLanguage("zsh", bash);
+hljs.registerLanguage("powershell", powershell);
+hljs.registerLanguage("ps1", powershell);
+hljs.registerLanguage("rust", rust);
+hljs.registerLanguage("rs", rust);
+hljs.registerLanguage("java", java);
+hljs.registerLanguage("python", python);
+hljs.registerLanguage("py", python);
+hljs.registerLanguage("sql", sql);
+hljs.registerLanguage("php", php);
+hljs.registerLanguage("markdown", markdown);
+hljs.registerLanguage("md", markdown);
+
+// Language mapping from file extension to highlight.js language
+export const LANG_MAP: Record<string, string> = {
   // Web
   ts: "typescript",
   typescript: "typescript",
-  tsx: "tsx",
+  tsx: "typescript",
   js: "javascript",
   javascript: "javascript",
-  jsx: "jsx",
+  jsx: "javascript",
   json: "json",
-  json5: "json5",
+  json5: "json",
   css: "css",
   scss: "scss",
   html: "html",
@@ -29,11 +82,12 @@ export const LANG_MAP: Record<string, BundledLanguage> = {
   ini: "ini",
   properties: "ini",
   cfg: "ini",
+  xml: "xml",
 
   // Docs
   md: "markdown",
   markdown: "markdown",
-  mdx: "mdx",
+  mdx: "markdown",
 
   // Shell
   sh: "bash",
@@ -43,47 +97,37 @@ export const LANG_MAP: Record<string, BundledLanguage> = {
   ps1: "powershell",
   powershell: "powershell",
 
+  // Other
+  sql: "sql",
+  java: "java",
+  py: "python",
+  python: "python",
+  php: "php",
+
   // Minecraft specific
   mcfunction: "bash",
   zs: "javascript", // ZenScript (CraftTweaker)
 };
 
-// Supported languages to preload
-const PRELOAD_LANGUAGES: BundledLanguage[] = [
-  "typescript",
-  "tsx",
-  "javascript",
-  "rust",
-  "json",
-  "toml",
-  "yaml",
-  "markdown",
-  "css",
-  "bash",
-  "html",
-];
-
-// Singleton highlighter instance
-let highlighterInstance: Highlighter | null = null;
-let highlighterPromise: Promise<Highlighter> | null = null;
+/**
+ * Check if highlighter is ready (always true for highlight.js)
+ */
+export function isHighlighterReady(): boolean {
+  return true;
+}
 
 /**
- * Get the shared Shiki highlighter instance
+ * Get last initialization error (always null for highlight.js)
  */
-export async function getHighlighter(): Promise<Highlighter> {
-  if (highlighterInstance) return highlighterInstance;
+export function getLastError(): Error | null {
+  return null;
+}
 
-  if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({
-      themes: ["github-dark-default"],
-      langs: PRELOAD_LANGUAGES,
-    }).then((h) => {
-      highlighterInstance = h;
-      return h;
-    });
-  }
-
-  return highlighterPromise;
+/**
+ * Reset highlighter (no-op for highlight.js)
+ */
+export function resetHighlighter(): void {
+  // No-op - highlight.js is synchronous and stateless
 }
 
 /**
@@ -96,8 +140,10 @@ export function detectLanguage(filename?: string, langHint?: string): string {
     if (normalized in LANG_MAP) {
       return LANG_MAP[normalized];
     }
-    // Return as-is if it looks like a valid Shiki language
-    return normalized;
+    // Check if it's a registered language
+    if (hljs.getLanguage(normalized)) {
+      return normalized;
+    }
   }
 
   // Try filename extension
@@ -112,31 +158,29 @@ export function detectLanguage(filename?: string, langHint?: string): string {
 }
 
 /**
- * Highlight code with Shiki
+ * Highlight code synchronously (returns immediately, no async needed)
  */
 export async function highlightCode(code: string, lang: string): Promise<string> {
   try {
-    const highlighter = await getHighlighter();
-    const loadedLangs = highlighter.getLoadedLanguages() as string[];
+    let result: string;
 
-    // Load language if not already loaded
-    if (!loadedLangs.includes(lang) && lang !== "text") {
-      try {
-        await highlighter.loadLanguage(lang as BundledLanguage);
-      } catch {
-        console.warn(`Language ${lang} not available, falling back to text`);
-        lang = "text";
-      }
+    if (lang === "text" || !hljs.getLanguage(lang)) {
+      // Plain text - just escape HTML
+      result = escapeHtml(code);
+    } else {
+      // Highlight with specified language
+      result = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
     }
 
-    return highlighter.codeToHtml(code, {
-      lang: highlighter.getLoadedLanguages().includes(lang) ? lang : "text",
-      theme: "github-dark-default",
-    });
-  } catch (e) {
-    console.error("Failed to highlight code:", e);
-    // Fallback to escaped plain text
-    return `<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`;
+    // Wrap in pre/code with line formatting (hljs class for theme styling)
+    // Each .line is display: block, so no need for \n separator
+    const lines = result.split("\n").map((line) =>
+      `<span class="line">${line || " "}</span>`
+    ).join("");
+
+    return `<pre class="hljs"><code>${lines}</code></pre>`;
+  } catch {
+    return `<pre class="hljs"><code>${escapeHtml(code)}</code></pre>`;
   }
 }
 

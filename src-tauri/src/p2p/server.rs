@@ -21,15 +21,25 @@ use tokio_util::sync::CancellationToken;
 
 /// Расширения файлов, которые хорошо сжимаются
 const COMPRESSIBLE_EXTENSIONS: &[&str] = &[
-    "json", "toml", "cfg", "properties", "txt", "yaml", "yml",
-    "xml", "lang", "mcmeta", "nbt", "dat", "snbt",
+    "json",
+    "toml",
+    "cfg",
+    "properties",
+    "txt",
+    "yaml",
+    "yml",
+    "xml",
+    "lang",
+    "mcmeta",
+    "nbt",
+    "dat",
+    "snbt",
 ];
 
 use super::crypto::{self, KeyPair, SessionKey};
 use super::security::{
-    sanitize_path, validate_extension, validate_file_size,
-    validate_modpack_name, validate_peer_id, validate_transfer_size,
-    RateLimiter,
+    sanitize_path, validate_extension, validate_file_size, validate_modpack_name, validate_peer_id,
+    validate_transfer_size, RateLimiter,
 };
 use super::transfer::{FileInfo, ModpackManifest, SyncDiff, TransferManager};
 
@@ -41,7 +51,7 @@ fn get_instance_info_by_name(instance_name: &str) -> (String, String, String) {
     if let Ok(conn) = stuzhik_db::get_db_conn() {
         // instance_name это имя папки, которое совпадает с id экземпляра
         if let Ok(mut stmt) = conn.prepare(
-            "SELECT version, loader, loader_version FROM instances WHERE id = ?1 OR name = ?1"
+            "SELECT version, loader, loader_version FROM instances WHERE id = ?1 OR name = ?1",
         ) {
             if let Ok(row) = stmt.query_row([instance_name], |row| {
                 Ok((
@@ -93,17 +103,11 @@ pub enum TransferProtocol {
         signature: Option<String>,
     },
     /// Запрос манифеста модпака
-    ManifestRequest {
-        modpack_name: String,
-    },
+    ManifestRequest { modpack_name: String },
     /// Ответ с манифестом
-    ManifestResponse {
-        manifest: ModpackManifest,
-    },
+    ManifestResponse { manifest: ModpackManifest },
     /// Запрос списка файлов для скачивания
-    SyncRequest {
-        diff: SyncDiff,
-    },
+    SyncRequest { diff: SyncDiff },
     /// Подтверждение синхронизации
     SyncAck {
         approved: bool,
@@ -137,19 +141,14 @@ pub enum TransferProtocol {
         is_last: bool,
     },
     /// Подтверждение получения файла
-    FileAck {
-        path: String,
-        success: bool,
-    },
+    FileAck { path: String, success: bool },
     /// Синхронизация завершена
     SyncComplete {
         files_synced: u32,
         bytes_synced: u64,
     },
     /// Ошибка
-    Error {
-        message: String,
-    },
+    Error { message: String },
     /// Запрос дружбы
     FriendRequest {
         peer_id: String,
@@ -164,9 +163,7 @@ pub enum TransferProtocol {
         public_key: Option<String>,
     },
     /// Запрос на синхронизацию модпака с сервера (Quick Join)
-    ServerModpackRequest {
-        server_instance_id: String,
-    },
+    ServerModpackRequest { server_instance_id: String },
     /// Информация о модпаке сервера (ответ на ServerModpackRequest)
     ServerModpackInfo {
         /// Тип синхронизации: "file" (отправить .stzhk) или "instance" (отправить файлы)
@@ -347,10 +344,7 @@ pub enum TransferEvent {
         bytes_synced: u64,
     },
     /// Ошибка
-    Error {
-        session_id: String,
-        message: String,
-    },
+    Error { session_id: String, message: String },
     /// Входящий запрос на передачу
     IncomingRequest {
         session_id: String,
@@ -367,9 +361,7 @@ pub enum TransferEvent {
         public_key: String,
     },
     /// Передача отменена
-    Cancelled {
-        session_id: String,
-    },
+    Cancelled { session_id: String },
 }
 
 /// Ограничитель скорости (Token Bucket)
@@ -498,7 +490,10 @@ impl TransferServer {
         if let Some(session) = sessions.get_mut(session_id) {
             session.paused = true;
             session.status = SessionStatus::Paused;
-            self.paused_sessions.write().await.insert(session_id.to_string());
+            self.paused_sessions
+                .write()
+                .await
+                .insert(session_id.to_string());
             log::info!("Paused session {}", session_id);
             Ok(())
         } else {
@@ -546,12 +541,7 @@ impl TransferServer {
         }
 
         // Пробуем порты: основной, затем +10, +20, +30
-        let ports_to_try = [
-            self.port,
-            self.port + 10,
-            self.port + 20,
-            self.port + 30,
-        ];
+        let ports_to_try = [self.port, self.port + 10, self.port + 20, self.port + 30];
 
         let mut listener = None;
         let mut bound_port = self.port;
@@ -565,7 +555,8 @@ impl TransferServer {
                     if port != self.port {
                         log::warn!(
                             "Port {} was busy, using alternative port {}",
-                            self.port, port
+                            self.port,
+                            port
                         );
                     }
                     break;
@@ -672,9 +663,12 @@ impl TransferServer {
         let mut sessions = self.sessions.write().await;
         if let Some(session) = sessions.get_mut(session_id) {
             session.status = SessionStatus::Cancelled;
-            let _ = self.event_tx.send(TransferEvent::Cancelled {
-                session_id: session_id.to_string(),
-            }).await;
+            let _ = self
+                .event_tx
+                .send(TransferEvent::Cancelled {
+                    session_id: session_id.to_string(),
+                })
+                .await;
             log::info!("Transfer session cancelled: {}", session_id);
             Ok(())
         } else {
@@ -720,8 +714,14 @@ impl TransferServer {
             peer_ed25519_key: None,
         };
 
-        self.sessions.write().await.insert(session_id.clone(), session.clone());
-        let _ = self.event_tx.send(TransferEvent::SessionCreated { session }).await;
+        self.sessions
+            .write()
+            .await
+            .insert(session_id.clone(), session.clone());
+        let _ = self
+            .event_tx
+            .send(TransferEvent::SessionCreated { session })
+            .await;
 
         // Генерируем ключевую пару для E2E шифрования
         let our_keypair = KeyPair::generate();
@@ -810,7 +810,8 @@ impl TransferServer {
                     &self.instances_path,
                     modpack_name,
                     &session_key,
-                ).await?;
+                )
+                .await?;
 
                 // Удаляем файлы которые больше не нужны
                 for path in &diff.to_delete {
@@ -822,9 +823,10 @@ impl TransferServer {
 
                 Ok(session_id)
             }
-            TransferProtocol::SyncAck { approved: false, reason } => {
-                Err(format!("Sync rejected: {}", reason.unwrap_or_default()))
-            }
+            TransferProtocol::SyncAck {
+                approved: false,
+                reason,
+            } => Err(format!("Sync rejected: {}", reason.unwrap_or_default())),
             _ => Err("Unexpected response".to_string()),
         }
     }
@@ -874,7 +876,11 @@ impl TransferServer {
             while self.is_session_paused(session_id).await {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 // Проверяем отмену
-                if self.sessions.read().await.get(session_id)
+                if self
+                    .sessions
+                    .read()
+                    .await
+                    .get(session_id)
                     .map(|s| s.status == SessionStatus::Cancelled)
                     .unwrap_or(true)
                 {
@@ -916,7 +922,13 @@ impl TransferServer {
                     Ok(_) => {}
                     Err(e) if retry_count < MAX_RETRIES => {
                         retry_count += 1;
-                        log::warn!("Retry {}/{} for {}: {}", retry_count, MAX_RETRIES, file.path, e);
+                        log::warn!(
+                            "Retry {}/{} for {}: {}",
+                            retry_count,
+                            MAX_RETRIES,
+                            file.path,
+                            e
+                        );
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -928,7 +940,13 @@ impl TransferServer {
                     Ok(h) => h,
                     Err(e) if retry_count < MAX_RETRIES => {
                         retry_count += 1;
-                        log::warn!("Retry {}/{} for {}: {}", retry_count, MAX_RETRIES, file.path, e);
+                        log::warn!(
+                            "Retry {}/{} for {}: {}",
+                            retry_count,
+                            MAX_RETRIES,
+                            file.path,
+                            e
+                        );
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -936,9 +954,13 @@ impl TransferServer {
                 };
 
                 let (path, size, total_chunks, compressed) = match header {
-                    TransferProtocol::FileHeader { path, size, total_chunks, compressed, .. } => {
-                        (path, size, total_chunks, compressed)
-                    }
+                    TransferProtocol::FileHeader {
+                        path,
+                        size,
+                        total_chunks,
+                        compressed,
+                        ..
+                    } => (path, size, total_chunks, compressed),
                     TransferProtocol::Error { message } => {
                         log::error!("Failed to get file {}: {}", file.path, message);
                         break Err(message);
@@ -997,7 +1019,9 @@ impl TransferServer {
                         if compressed {
                             compressed_data.extend_from_slice(&decrypted);
                         } else {
-                            output.write_all(&decrypted).await
+                            output
+                                .write_all(&decrypted)
+                                .await
                                 .map_err(|e| format!("Failed to write chunk: {}", e))?;
                         }
 
@@ -1024,14 +1048,17 @@ impl TransferServer {
                                 }
                             }
 
-                            let _ = self.event_tx.send(TransferEvent::Progress {
-                                session_id: session_id.to_string(),
-                                bytes_done,
-                                bytes_total,
-                                files_done,
-                                files_total,
-                                current_file: file.path.clone(),
-                            }).await;
+                            let _ = self
+                                .event_tx
+                                .send(TransferEvent::Progress {
+                                    session_id: session_id.to_string(),
+                                    bytes_done,
+                                    bytes_total,
+                                    files_done,
+                                    files_total,
+                                    current_file: file.path.clone(),
+                                })
+                                .await;
                         }
                     }
                 }
@@ -1040,14 +1067,22 @@ impl TransferServer {
                 if compressed && !compressed_data.is_empty() {
                     let decompressed = decompress_data(&compressed_data)
                         .map_err(|e| format!("Failed to decompress {}: {}", path, e))?;
-                    output.write_all(&decompressed).await
+                    output
+                        .write_all(&decompressed)
+                        .await
                         .map_err(|e| format!("Failed to write decompressed data: {}", e))?;
-                    log::debug!("Decompressed {} from {} to {} bytes",
-                        path, compressed_data.len(), decompressed.len());
+                    log::debug!(
+                        "Decompressed {} from {} to {} bytes",
+                        path,
+                        compressed_data.len(),
+                        decompressed.len()
+                    );
                 }
 
                 // Flush буфера перед подтверждением
-                output.flush().await
+                output
+                    .flush()
+                    .await
                     .map_err(|e| format!("Failed to flush file: {}", e))?;
 
                 // Подтверждаем получение
@@ -1078,14 +1113,17 @@ impl TransferServer {
             }
 
             // Отправляем прогресс при завершении каждого файла
-            let _ = self.event_tx.send(TransferEvent::Progress {
-                session_id: session_id.to_string(),
-                bytes_done,
-                bytes_total,
-                files_done,
-                files_total,
-                current_file: file.path.clone(),
-            }).await;
+            let _ = self
+                .event_tx
+                .send(TransferEvent::Progress {
+                    session_id: session_id.to_string(),
+                    bytes_done,
+                    bytes_total,
+                    files_done,
+                    files_total,
+                    current_file: file.path.clone(),
+                })
+                .await;
         }
 
         // Завершаем
@@ -1104,8 +1142,12 @@ impl TransferServer {
                 match TransferManager::compute_file_hash_static(&file_path).await {
                     Ok(computed_hash) => {
                         if computed_hash != file.hash {
-                            log::warn!("Hash mismatch for {}: expected {}, got {}",
-                                file.path, file.hash, computed_hash);
+                            log::warn!(
+                                "Hash mismatch for {}: expected {}, got {}",
+                                file.path,
+                                file.hash,
+                                computed_hash
+                            );
                             verification_errors.push(file.path.clone());
                         }
                     }
@@ -1117,14 +1159,20 @@ impl TransferServer {
         }
 
         if !verification_errors.is_empty() {
-            log::warn!("Integrity check failed for {} files", verification_errors.len());
+            log::warn!(
+                "Integrity check failed for {} files",
+                verification_errors.len()
+            );
         }
 
-        let _ = self.event_tx.send(TransferEvent::Completed {
-            session_id: session_id.to_string(),
-            files_synced: files_done,
-            bytes_synced: bytes_done,
-        }).await;
+        let _ = self
+            .event_tx
+            .send(TransferEvent::Completed {
+                session_id: session_id.to_string(),
+                files_synced: files_done,
+                bytes_synced: bytes_done,
+            })
+            .await;
 
         Ok(())
     }
@@ -1183,7 +1231,9 @@ impl TransferServer {
                 let server = self.clone_for_broadcast();
 
                 async move {
-                    server.request_sync(addr, &peer_id, &modpack_name, &local_manifest).await
+                    server
+                        .request_sync(addr, &peer_id, &modpack_name, &local_manifest)
+                        .await
                 }
             })
             .collect();
@@ -1234,7 +1284,12 @@ async fn handle_connection(
     let hello: TransferProtocol = receive_message(&mut stream).await?;
 
     let (peer_id, peer_public_key) = match hello {
-        TransferProtocol::Hello { peer_id, public_key, ed25519_public_key: _, signature: _ } => {
+        TransferProtocol::Hello {
+            peer_id,
+            public_key,
+            ed25519_public_key: _,
+            signature: _,
+        } => {
             // SECURITY: Валидируем peer_id
             if let Err(e) = validate_peer_id(&peer_id) {
                 log::warn!("Invalid peer_id from {}: {}", addr, e);
@@ -1261,7 +1316,11 @@ async fn handle_connection(
 
     // E2E шифрование обязательно - отклоняем соединения без него
     if peer_public_key.is_empty() {
-        log::warn!("Peer {} from {} did not provide public key - rejecting connection", peer_id, addr);
+        log::warn!(
+            "Peer {} from {} did not provide public key - rejecting connection",
+            peer_id,
+            addr
+        );
         let error = TransferProtocol::Error {
             message: "E2E encryption required - public key must be provided".to_string(),
         };
@@ -1271,11 +1330,20 @@ async fn handle_connection(
 
     let session_key = match our_keypair.key_exchange(&peer_public_key) {
         Ok(key) => {
-            log::info!("E2E encryption established with peer {} from {}", peer_id, addr);
+            log::info!(
+                "E2E encryption established with peer {} from {}",
+                peer_id,
+                addr
+            );
             Some(key)
         }
         Err(e) => {
-            log::error!("Key exchange failed with peer {} from {}: {}", peer_id, addr, e);
+            log::error!(
+                "Key exchange failed with peer {} from {}: {}",
+                peer_id,
+                addr,
+                e
+            );
             let error = TransferProtocol::Error {
                 message: format!("Key exchange failed: {}", e),
             };
@@ -1291,7 +1359,11 @@ async fn handle_connection(
     loop {
         // SECURITY: Global rate limiting per peer_id
         if !rate_limiter.check(&peer_id).await {
-            log::warn!("Global rate limit exceeded for peer {} from {}", peer_id, addr);
+            log::warn!(
+                "Global rate limit exceeded for peer {} from {}",
+                peer_id,
+                addr
+            );
             let error = TransferProtocol::Error {
                 message: "Rate limit exceeded".to_string(),
             };
@@ -1308,7 +1380,12 @@ async fn handle_connection(
             TransferProtocol::ManifestRequest { modpack_name } => {
                 // SECURITY: Валидируем имя модпака
                 if let Err(e) = validate_modpack_name(&modpack_name) {
-                    log::warn!("Invalid modpack name from {}: {} - {}", addr, modpack_name, e);
+                    log::warn!(
+                        "Invalid modpack name from {}: {} - {}",
+                        addr,
+                        modpack_name,
+                        e
+                    );
                     let error = TransferProtocol::Error {
                         message: format!("Invalid modpack name: {}", e),
                     };
@@ -1320,7 +1397,12 @@ async fn handle_connection(
                 let instance_path = match sanitize_path(&modpack_name, instances_path) {
                     Ok(p) => p,
                     Err(e) => {
-                        log::warn!("Path traversal attempt from {}: {} - {}", addr, modpack_name, e);
+                        log::warn!(
+                            "Path traversal attempt from {}: {} - {}",
+                            addr,
+                            modpack_name,
+                            e
+                        );
                         let error = TransferProtocol::Error {
                             message: "Access denied".to_string(),
                         };
@@ -1347,7 +1429,9 @@ async fn handle_connection(
                     &mc_version,
                     &loader,
                     &loader_version,
-                ).await {
+                )
+                .await
+                {
                     Ok(manifest) => {
                         // SECURITY: Валидируем размер передачи
                         let total_size: u64 = manifest.files.iter().map(|f| f.size).sum();
@@ -1372,7 +1456,9 @@ async fn handle_connection(
 
             TransferProtocol::SyncRequest { diff } => {
                 // SECURITY: Валидируем размер запроса
-                if let Err(e) = validate_transfer_size(diff.total_download_size, diff.to_download.len()) {
+                if let Err(e) =
+                    validate_transfer_size(diff.total_download_size, diff.to_download.len())
+                {
                     log::warn!("Transfer size validation failed from {}: {}", addr, e);
                     let ack = TransferProtocol::SyncAck {
                         approved: false,
@@ -1384,19 +1470,28 @@ async fn handle_connection(
 
                 let session_id = uuid::Uuid::new_v4().to_string();
 
-                log::info!("Sync request from {} (files: {}, size: {} bytes)",
-                    peer_id, diff.to_download.len(), diff.total_download_size);
+                log::info!(
+                    "Sync request from {} (files: {}, size: {} bytes)",
+                    peer_id,
+                    diff.to_download.len(),
+                    diff.total_download_size
+                );
 
                 // Загружаем настройки для проверки запомненных разрешений
                 let settings = super::settings::load_connect_settings();
 
                 // Проверяем запомненные разрешения
-                let remembered = settings.remembered_permissions.iter().find(|p| {
-                    p.peer_id == peer_id && p.content_type == "modpack"
-                });
+                let remembered = settings
+                    .remembered_permissions
+                    .iter()
+                    .find(|p| p.peer_id == peer_id && p.content_type == "modpack");
 
                 let approved = if let Some(perm) = remembered {
-                    log::info!("Using remembered permission for peer {}: allowed={}", peer_id, perm.allowed);
+                    log::info!(
+                        "Using remembered permission for peer {}: allowed={}",
+                        peer_id,
+                        perm.allowed
+                    );
                     perm.allowed
                 } else {
                     // Создаём запрос на согласие и ждём ответа от пользователя
@@ -1413,19 +1508,25 @@ async fn handle_connection(
                         .await;
 
                     // Отправляем событие для UI (запрос на подтверждение)
-                    let _ = event_tx.send(TransferEvent::IncomingRequest {
-                        session_id: consent_request.request_id.clone(),
-                        peer_id: peer_id.clone(),
-                        peer_nickname: None,
-                        modpack_name: format!("{} files", diff.to_download.len()),
-                        files_count: diff.to_download.len() as u32,
-                        total_size: diff.total_download_size,
-                    }).await;
+                    let _ = event_tx
+                        .send(TransferEvent::IncomingRequest {
+                            session_id: consent_request.request_id.clone(),
+                            peer_id: peer_id.clone(),
+                            peer_nickname: None,
+                            modpack_name: format!("{} files", diff.to_download.len()),
+                            files_count: diff.to_download.len() as u32,
+                            total_size: diff.total_download_size,
+                        })
+                        .await;
 
                     // Ожидаем ответ пользователя (с таймаутом)
                     match get_consent_manager().wait_for_response(consent_rx).await {
                         Some(response) => {
-                            log::info!("User consent for {}: approved={}", peer_id, response.approved);
+                            log::info!(
+                                "User consent for {}: approved={}",
+                                peer_id,
+                                response.approved
+                            );
                             response.approved
                         }
                         None => {
@@ -1449,7 +1550,10 @@ async fn handle_connection(
                 send_message(&mut stream, &ack).await?;
             }
 
-            TransferProtocol::FileRequest { path, resume_offset } => {
+            TransferProtocol::FileRequest {
+                path,
+                resume_offset,
+            } => {
                 // SECURITY: Валидируем расширение файла
                 if let Err(e) = validate_extension(&path) {
                     log::warn!("Forbidden file extension from {}: {} - {}", addr, path, e);
@@ -1494,12 +1598,24 @@ async fn handle_connection(
                 }
 
                 // Отправляем файл с E2E шифрованием, сжатием и поддержкой resume
-                if let Err(e) = send_file(&mut stream, &file_path, &path, &mut session_key_mut, resume_offset).await {
+                if let Err(e) = send_file(
+                    &mut stream,
+                    &file_path,
+                    &path,
+                    &mut session_key_mut,
+                    resume_offset,
+                )
+                .await
+                {
                     log::error!("Failed to send file {}: {}", path, e);
                 }
             }
 
-            TransferProtocol::FriendRequest { peer_id: req_peer_id, nickname, public_key } => {
+            TransferProtocol::FriendRequest {
+                peer_id: req_peer_id,
+                nickname,
+                public_key,
+            } => {
                 // SECURITY: Валидируем данные friend request
                 if let Err(e) = validate_peer_id(&req_peer_id) {
                     log::warn!("Invalid peer_id in friend request from {}: {}", addr, e);
@@ -1519,11 +1635,13 @@ async fn handle_connection(
                     continue;
                 }
 
-                let _ = event_tx.send(TransferEvent::FriendRequest {
-                    peer_id: req_peer_id,
-                    nickname: safe_nickname,
-                    public_key,
-                }).await;
+                let _ = event_tx
+                    .send(TransferEvent::FriendRequest {
+                        peer_id: req_peer_id,
+                        nickname: safe_nickname,
+                        public_key,
+                    })
+                    .await;
             }
 
             TransferProtocol::ServerModpackRequest { server_instance_id } => {
@@ -1547,24 +1665,31 @@ async fn handle_connection(
                                                 let hash = tokio::task::spawn_blocking({
                                                     let path = path.to_path_buf();
                                                     move || {
-                                                        use sha2::{Sha256, Digest};
+                                                        use sha2::{Digest, Sha256};
                                                         let mut hasher = Sha256::new();
-                                                        if let Ok(mut file) = std::fs::File::open(&path) {
+                                                        if let Ok(mut file) =
+                                                            std::fs::File::open(&path)
+                                                        {
                                                             let mut buffer = [0u8; 8192];
                                                             loop {
                                                                 use std::io::Read;
                                                                 match file.read(&mut buffer) {
                                                                     Ok(0) => break,
-                                                                    Ok(n) => hasher.update(&buffer[..n]),
+                                                                    Ok(n) => {
+                                                                        hasher.update(&buffer[..n])
+                                                                    }
                                                                     Err(_) => break,
                                                                 }
                                                             }
                                                         }
                                                         format!("{:x}", hasher.finalize())
                                                     }
-                                                }).await.unwrap_or_default();
+                                                })
+                                                .await
+                                                .unwrap_or_default();
 
-                                                let filename = path.file_name()
+                                                let filename = path
+                                                    .file_name()
                                                     .map(|n| n.to_string_lossy().to_string());
 
                                                 // Get MC version and loader from instance
@@ -1576,25 +1701,35 @@ async fn handle_connection(
                                                             [&server_instance_id],
                                                             |row| Ok((row.get(0)?, row.get(1)?)),
                                                         ).ok();
-                                                        result.unwrap_or(("unknown".to_string(), "unknown".to_string()))
+                                                        result.unwrap_or((
+                                                            "unknown".to_string(),
+                                                            "unknown".to_string(),
+                                                        ))
                                                     } else {
-                                                        ("unknown".to_string(), "unknown".to_string())
+                                                        (
+                                                            "unknown".to_string(),
+                                                            "unknown".to_string(),
+                                                        )
                                                     }
                                                 };
 
-                                                let response = TransferProtocol::ServerModpackInfo {
-                                                    sync_type: "file".to_string(),
-                                                    modpack_filename: filename,
-                                                    modpack_size: metadata.len(),
-                                                    modpack_hash: hash,
-                                                    mc_version,
-                                                    loader,
-                                                };
+                                                let response =
+                                                    TransferProtocol::ServerModpackInfo {
+                                                        sync_type: "file".to_string(),
+                                                        modpack_filename: filename,
+                                                        modpack_size: metadata.len(),
+                                                        modpack_hash: hash,
+                                                        mc_version,
+                                                        loader,
+                                                    };
                                                 send_message(&mut stream, &response).await?;
                                             }
                                             Err(e) => {
                                                 let error = TransferProtocol::Error {
-                                                    message: format!("Failed to read modpack file: {}", e),
+                                                    message: format!(
+                                                        "Failed to read modpack file: {}",
+                                                        e
+                                                    ),
                                                 };
                                                 send_message(&mut stream, &error).await?;
                                             }
@@ -1641,7 +1776,10 @@ async fn handle_connection(
                 }
             }
 
-            TransferProtocol::ModpackFileRequest { server_instance_id, resume_offset } => {
+            TransferProtocol::ModpackFileRequest {
+                server_instance_id,
+                resume_offset,
+            } => {
                 // Get server sync config and send modpack file
                 let sync_manager = super::server_sync::get_server_sync_manager();
                 let config = sync_manager.get_config(&server_instance_id).await;
@@ -1651,7 +1789,14 @@ async fn handle_connection(
                         let path = std::path::Path::new(modpack_path);
                         if path.exists() {
                             // Send modpack file in chunks
-                            match send_modpack_file(&mut stream, path, resume_offset, &mut session_key_mut).await {
+                            match send_modpack_file(
+                                &mut stream,
+                                path,
+                                resume_offset,
+                                &mut session_key_mut,
+                            )
+                            .await
+                            {
                                 Ok(_) => {
                                     log::info!("Successfully sent modpack file to {}", addr);
                                 }
@@ -1704,8 +1849,7 @@ fn compress_data(data: &[u8]) -> Result<Vec<u8>, String> {
 
 /// Распаковать данные zstd
 fn decompress_data(data: &[u8]) -> Result<Vec<u8>, String> {
-    zstd::decode_all(std::io::Cursor::new(data))
-        .map_err(|e| format!("Decompression failed: {}", e))
+    zstd::decode_all(std::io::Cursor::new(data)).map_err(|e| format!("Decompression failed: {}", e))
 }
 
 /// Отправить файл по чанкам с E2E шифрованием, сжатием и поддержкой resume
@@ -1736,8 +1880,12 @@ async fn send_file(
             Ok(compressed_data) => {
                 // Сжимаем только если выигрыш > 10%
                 if compressed_data.len() < (file_data.len() * 9 / 10) {
-                    log::debug!("Compressed {} from {} to {} bytes",
-                        relative_path, file_data.len(), compressed_data.len());
+                    log::debug!(
+                        "Compressed {} from {} to {} bytes",
+                        relative_path,
+                        file_data.len(),
+                        compressed_data.len()
+                    );
                     (compressed_data, true)
                 } else {
                     (file_data, false)
@@ -1784,7 +1932,9 @@ async fn send_file(
         let chunk_data = match session_key {
             Some(ref mut key) => crypto::encrypt_chunk(key, chunk_bytes)
                 .map_err(|e| format!("Failed to encrypt chunk: {}", e))?,
-            None => return Err("E2E encryption required but no session key established".to_string()),
+            None => {
+                return Err("E2E encryption required but no session key established".to_string())
+            }
         };
 
         let is_last = end >= data_to_send.len();
@@ -1819,7 +1969,8 @@ async fn send_modpack_file(
         .await
         .map_err(|e| format!("Failed to open modpack file: {}", e))?;
 
-    let metadata = file.metadata()
+    let metadata = file
+        .metadata()
         .await
         .map_err(|e| format!("Failed to get metadata: {}", e))?;
 
@@ -1835,15 +1986,20 @@ async fn send_modpack_file(
     let remaining_size = file_size.saturating_sub(resume_offset);
     let total_chunks = ((remaining_size as f64) / (CHUNK_SIZE as f64)).ceil() as u32;
 
-    log::info!("Sending modpack file: {} bytes, {} chunks (offset: {})",
-        remaining_size, total_chunks, resume_offset);
+    log::info!(
+        "Sending modpack file: {} bytes, {} chunks (offset: {})",
+        remaining_size,
+        total_chunks,
+        resume_offset
+    );
 
     let mut chunk_index: u32 = 0;
     let mut buffer = vec![0u8; CHUNK_SIZE];
     let mut bytes_sent: u64 = 0;
 
     loop {
-        let bytes_read = file.read(&mut buffer)
+        let bytes_read = file
+            .read(&mut buffer)
             .await
             .map_err(|e| format!("Failed to read file: {}", e))?;
 
@@ -1857,7 +2013,9 @@ async fn send_modpack_file(
         let chunk_data = match session_key {
             Some(ref mut key) => crypto::encrypt_chunk(key, chunk_bytes)
                 .map_err(|e| format!("Failed to encrypt chunk: {}", e))?,
-            None => return Err("E2E encryption required but no session key established".to_string()),
+            None => {
+                return Err("E2E encryption required but no session key established".to_string())
+            }
         };
 
         bytes_sent += bytes_read as u64;
@@ -1885,7 +2043,10 @@ async fn send_modpack_file(
                 log::info!("Modpack file transfer completed successfully");
                 Ok(())
             } else {
-                Err(format!("Modpack transfer failed: {}", error.unwrap_or_default()))
+                Err(format!(
+                    "Modpack transfer failed: {}",
+                    error.unwrap_or_default()
+                ))
             }
         }
         _ => Err("Unexpected response after modpack transfer".to_string()),
@@ -1894,15 +2055,17 @@ async fn send_modpack_file(
 
 /// Отправить сообщение
 async fn send_message(stream: &mut TcpStream, message: &TransferProtocol) -> Result<(), String> {
-    let data = rmp_serde::to_vec(message)
-        .map_err(|e| format!("Failed to serialize message: {}", e))?;
+    let data =
+        rmp_serde::to_vec(message).map_err(|e| format!("Failed to serialize message: {}", e))?;
 
     // Отправляем длину (4 байта) + данные
     let len = data.len() as u32;
-    stream.write_all(&len.to_be_bytes())
+    stream
+        .write_all(&len.to_be_bytes())
         .await
         .map_err(|e| format!("Failed to write length: {}", e))?;
-    stream.write_all(&data)
+    stream
+        .write_all(&data)
         .await
         .map_err(|e| format!("Failed to write data: {}", e))?;
 
@@ -1913,7 +2076,8 @@ async fn send_message(stream: &mut TcpStream, message: &TransferProtocol) -> Res
 async fn receive_message(stream: &mut TcpStream) -> Result<TransferProtocol, String> {
     // Читаем длину
     let mut len_bytes = [0u8; 4];
-    stream.read_exact(&mut len_bytes)
+    stream
+        .read_exact(&mut len_bytes)
         .await
         .map_err(|e| format!("Failed to read length: {}", e))?;
 
@@ -1926,10 +2090,10 @@ async fn receive_message(stream: &mut TcpStream) -> Result<TransferProtocol, Str
 
     // Читаем данные
     let mut data = vec![0u8; len];
-    stream.read_exact(&mut data)
+    stream
+        .read_exact(&mut data)
         .await
         .map_err(|e| format!("Failed to read data: {}", e))?;
 
-    rmp_serde::from_slice(&data)
-        .map_err(|e| format!("Failed to deserialize message: {}", e))
+    rmp_serde::from_slice(&data).map_err(|e| format!("Failed to deserialize message: {}", e))
 }

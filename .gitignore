@@ -1,3 +1,8 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
 node_modules
 dist
 ~
@@ -18,3 +23,4 @@ coverage/
 # OS
 .DS_Store
 Thumbs.dbpackage-lock.json
+src/generated/source-code.ts

@@ -1,4 +1,4 @@
-import { createSignal, Show, For, createMemo, createEffect } from "solid-js";
+import { createSignal, Show, For, createMemo, createEffect, onMount, onCleanup } from "solid-js";
 import { useI18n } from "../../../shared/i18n";
 import { useResources } from "../hooks/useResources";
 import type { ResourceType, InstalledResource, ResourceSearchResult } from "../../../shared/types/common.types";
@@ -6,6 +6,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import ResourceInfoDialog from "./ResourceInfoDialog";
 import Pagination from "../../../shared/ui/Pagination";
+import { registerDropHandler, filterByExtensions } from "../../../shared/stores";
 
 interface ResourcesPanelProps {
   instanceId?: string;
@@ -29,6 +30,31 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
     instanceId: props.instanceId,
     includeGlobal: true,
   }));
+
+  // Register drag & drop handler for resource files (.zip)
+  onMount(() => {
+    const cleanup = registerDropHandler({
+      accept: (files) => {
+        // Accept only if in installed view and files contain .zip
+        if (view() !== "installed") return false;
+        const zipFiles = filterByExtensions(files, ["zip"]);
+        return zipFiles.length > 0;
+      },
+      onDrop: async (files) => {
+        const zipFiles = filterByExtensions(files, ["zip"]);
+        for (const file of zipFiles) {
+          try {
+            await resources.installLocal(file.path, installGlobal());
+          } catch (error) {
+            console.error(`Failed to install ${file.name}:`, error);
+          }
+        }
+      },
+      priority: 8, // Lower than mods (10) and modpacks (5)
+    });
+
+    onCleanup(cleanup);
+  });
 
   // Calculate total pages
   const totalPages = createMemo(() =>
@@ -149,7 +175,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
   // Handle scan
   async function handleScan() {
     const imported = await resources.scanAndImport(false);
-    if (imported.length > 0) {
+    if (import.meta.env.DEV && imported.length > 0) {
       console.log(`Imported ${imported.length} resources`);
     }
   }

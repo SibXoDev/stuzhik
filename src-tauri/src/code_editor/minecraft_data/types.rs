@@ -55,6 +55,9 @@ pub struct MinecraftBlock {
     #[serde(default)]
     pub tags: Vec<String>,
 
+    /// Путь к текстуре блока (для preview)
+    pub texture_path: Option<String>,
+
     /// Прочность блока
     pub hardness: Option<f32>,
 
@@ -88,7 +91,7 @@ pub enum TagType {
 /// Информация о моде (для context в автодополнении)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModInfo {
-    /// ID мода
+    /// ID мода (из fabric.mod.json/mods.toml)
     pub mod_id: String,
 
     /// Название мода
@@ -100,11 +103,36 @@ pub struct ModInfo {
     /// Loader (fabric, forge, neoforge, quilt)
     pub loader: String,
 
+    /// Описание мода
+    pub description: Option<String>,
+
+    /// Авторы мода
+    pub authors: Option<Vec<String>>,
+
+    /// Домашняя страница мода
+    pub homepage: Option<String>,
+
+    /// Лицензия
+    pub license: Option<String>,
+
     /// Количество предметов в моде
     pub item_count: usize,
 
     /// Количество блоков в моде
     pub block_count: usize,
+}
+
+/// Зависимость мода, извлечённая из JAR файла
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedModDependency {
+    /// ID зависимости (mod_id)
+    pub dependency_id: String,
+
+    /// Тип зависимости (required, optional, incompatible)
+    pub dependency_type: String,
+
+    /// Требуемая версия (если указана)
+    pub version_requirement: Option<String>,
 }
 
 /// Результат парсинга .jar файла мода

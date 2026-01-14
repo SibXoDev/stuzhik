@@ -249,6 +249,144 @@ pub const MIGRATIONS: &[Migration] = &[
             UPDATE mod_collections SET icon = 'default' WHERE icon = '📦';
         "#,
     },
+    Migration {
+        version: 8,
+        description: "Add dependency_name to mod_dependencies for proper display",
+        sql: r#"
+            ALTER TABLE mod_dependencies ADD COLUMN dependency_name TEXT;
+        "#,
+    },
+    Migration {
+        version: 9,
+        description: "Add mods_folder_mtime for smart sync caching",
+        sql: r#"
+            ALTER TABLE instances ADD COLUMN mods_folder_mtime INTEGER;
+        "#,
+    },
+    Migration {
+        version: 10,
+        description: "Add enrichment_hash for persistent dependency caching",
+        sql: r#"
+            ALTER TABLE instances ADD COLUMN enrichment_hash TEXT;
+        "#,
+    },
+    Migration {
+        version: 11,
+        description: "Add verification_hash for mod verification caching",
+        sql: r#"
+            ALTER TABLE instances ADD COLUMN verification_hash TEXT;
+        "#,
+    },
+    Migration {
+        version: 12,
+        description: "Add mod_id column for dependency matching",
+        sql: r#"
+            ALTER TABLE mods ADD COLUMN mod_id TEXT;
+        "#,
+    },
+    Migration {
+        version: 13,
+        description: "Add verified_file_hash for incremental mod verification",
+        sql: r#"
+            ALTER TABLE mods ADD COLUMN verified_file_hash TEXT;
+        "#,
+    },
+    Migration {
+        version: 14,
+        description: "Add enriched_file_hash for incremental dependency enrichment",
+        sql: r#"
+            ALTER TABLE mods ADD COLUMN enriched_file_hash TEXT;
+        "#,
+    },
+    Migration {
+        version: 15,
+        description: "Reset mod caches to fix corrupted data from aggressive matching",
+        sql: r#"
+            -- Reset all mod verification/enrichment caches to force re-fetch
+            -- This is needed because previous version had:
+            -- 1. Aggressive partial matching that found WRONG mods (e.g., "catalogue" -> "The Mandela Catalogue")
+            -- 2. Fallback using version.name instead of project.title (e.g., "1.6.9 Forge" instead of "Advancement Plaques")
+            -- 3. Saving slug as source_id instead of project_id
+
+            -- Clear verification cache for all mods
+            UPDATE mods SET verified_file_hash = NULL;
+
+            -- Clear enrichment cache for all mods
+            UPDATE mods SET enriched_file_hash = NULL;
+
+            -- Fix mods with corrupted names (names that look like versions)
+            -- Pattern: name starts with version number or brackets
+            UPDATE mods SET
+                name = slug,
+                source = 'local',
+                source_id = NULL,
+                icon_url = NULL
+            WHERE name GLOB '[0-9]*'
+               OR name GLOB '\[*'
+               OR name GLOB 'v[0-9]*'
+               OR name GLOB 'forge-*'
+               OR name LIKE '%+%'
+               OR (LENGTH(name) < 10 AND name GLOB '*[0-9].[0-9]*');
+
+            -- Fix mods with obviously wrong names (contains ":" which is not typical for mod names)
+            -- e.g., "The Mandela Catalogue: Alternates" when mod is actually "Catalogue"
+            UPDATE mods SET
+                source = 'local',
+                source_id = NULL,
+                icon_url = NULL,
+                verified_file_hash = NULL,
+                enriched_file_hash = NULL
+            WHERE name LIKE '%:%' AND name NOT LIKE '%Minecraft%';
+
+            -- Fix source_id that looks like slug instead of project_id
+            -- Project IDs are 8 alphanumeric chars, slugs have dashes/underscores
+            UPDATE mods SET
+                source = 'local',
+                source_id = NULL
+            WHERE source = 'modrinth'
+              AND source_id IS NOT NULL
+              AND (source_id LIKE '%-%' OR source_id LIKE '%\_%' ESCAPE '\');
+
+            -- Clear instance-level caches
+            UPDATE instances SET
+                mods_folder_mtime = NULL,
+                enrichment_hash = NULL,
+                verification_hash = NULL;
+        "#,
+    },
+    Migration {
+        version: 16,
+        description: "Add mod update tracking columns",
+        sql: r#"
+            -- Add columns for tracking available updates
+            ALTER TABLE mods ADD COLUMN latest_version TEXT;
+            ALTER TABLE mods ADD COLUMN latest_version_id TEXT;
+            ALTER TABLE mods ADD COLUMN update_available INTEGER DEFAULT 0;
+            ALTER TABLE mods ADD COLUMN update_checked_at TEXT;
+
+            -- Index for quick filtering of mods with updates
+            CREATE INDEX IF NOT EXISTS idx_mods_update_available ON mods(instance_id, update_available);
+        "#,
+    },
+    Migration {
+        version: 17,
+        description: "Add performance indexes for mods and dependencies",
+        sql: r#"
+            -- Index for incremental verification cache lookups
+            CREATE INDEX IF NOT EXISTS idx_mods_verified_hash ON mods(verified_file_hash);
+            CREATE INDEX IF NOT EXISTS idx_mods_enriched_hash ON mods(enriched_file_hash);
+
+            -- Index for dependency resolution
+            CREATE INDEX IF NOT EXISTS idx_mod_deps_slug ON mod_dependencies(dependency_slug);
+            CREATE INDEX IF NOT EXISTS idx_mod_deps_mod_id ON mod_dependencies(mod_id);
+
+            -- Index for filtering by source
+            CREATE INDEX IF NOT EXISTS idx_mods_source ON mods(instance_id, source);
+
+            -- Index for file_hash lookups (used in sync)
+            CREATE INDEX IF NOT EXISTS idx_mods_file_hash ON mods(file_hash);
+        "#,
+    },
 ];
 
 /// Initialize migrations table
@@ -288,9 +426,109 @@ fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Resu
     Ok(columns.contains(&column.to_string()))
 }
 
+/// Repair schema inconsistencies (columns that should exist but don't)
+/// This runs ALWAYS, regardless of migration version, to fix broken databases
+fn repair_schema(conn: &Connection) -> rusqlite::Result<()> {
+    log::info!("Checking schema integrity...");
+
+    // Check mod_dependencies.dependency_name (v8)
+    if !column_exists(conn, "mod_dependencies", "dependency_name")? {
+        log::warn!("Missing column mod_dependencies.dependency_name - repairing...");
+        conn.execute(
+            "ALTER TABLE mod_dependencies ADD COLUMN dependency_name TEXT",
+            [],
+        )?;
+        log::info!("Repaired: added mod_dependencies.dependency_name");
+    }
+
+    // Check instances.mods_folder_mtime (v9)
+    if !column_exists(conn, "instances", "mods_folder_mtime")? {
+        log::warn!("Missing column instances.mods_folder_mtime - repairing...");
+        conn.execute(
+            "ALTER TABLE instances ADD COLUMN mods_folder_mtime INTEGER",
+            [],
+        )?;
+        log::info!("Repaired: added instances.mods_folder_mtime");
+    }
+
+    // Check instances.enrichment_hash (v10)
+    if !column_exists(conn, "instances", "enrichment_hash")? {
+        log::warn!("Missing column instances.enrichment_hash - repairing...");
+        conn.execute("ALTER TABLE instances ADD COLUMN enrichment_hash TEXT", [])?;
+        log::info!("Repaired: added instances.enrichment_hash");
+    }
+
+    // Check instances.verification_hash (v11)
+    if !column_exists(conn, "instances", "verification_hash")? {
+        log::warn!("Missing column instances.verification_hash - repairing...");
+        conn.execute(
+            "ALTER TABLE instances ADD COLUMN verification_hash TEXT",
+            [],
+        )?;
+        log::info!("Repaired: added instances.verification_hash");
+    }
+
+    // Check mods.mod_id (v12)
+    if !column_exists(conn, "mods", "mod_id")? {
+        log::warn!("Missing column mods.mod_id - repairing...");
+        conn.execute("ALTER TABLE mods ADD COLUMN mod_id TEXT", [])?;
+        log::info!("Repaired: added mods.mod_id");
+    }
+
+    // Check mods.verified_file_hash (v13) - for incremental verification
+    if !column_exists(conn, "mods", "verified_file_hash")? {
+        log::warn!("Missing column mods.verified_file_hash - repairing...");
+        conn.execute("ALTER TABLE mods ADD COLUMN verified_file_hash TEXT", [])?;
+        log::info!("Repaired: added mods.verified_file_hash");
+    }
+
+    // Check mods.enriched_file_hash (v14) - for incremental dependency enrichment
+    if !column_exists(conn, "mods", "enriched_file_hash")? {
+        log::warn!("Missing column mods.enriched_file_hash - repairing...");
+        conn.execute("ALTER TABLE mods ADD COLUMN enriched_file_hash TEXT", [])?;
+        log::info!("Repaired: added mods.enriched_file_hash");
+    }
+
+    // Check mods.latest_version (v16) - for update tracking
+    if !column_exists(conn, "mods", "latest_version")? {
+        log::warn!("Missing column mods.latest_version - repairing...");
+        conn.execute("ALTER TABLE mods ADD COLUMN latest_version TEXT", [])?;
+        log::info!("Repaired: added mods.latest_version");
+    }
+
+    // Check mods.latest_version_id (v16)
+    if !column_exists(conn, "mods", "latest_version_id")? {
+        log::warn!("Missing column mods.latest_version_id - repairing...");
+        conn.execute("ALTER TABLE mods ADD COLUMN latest_version_id TEXT", [])?;
+        log::info!("Repaired: added mods.latest_version_id");
+    }
+
+    // Check mods.update_available (v16)
+    if !column_exists(conn, "mods", "update_available")? {
+        log::warn!("Missing column mods.update_available - repairing...");
+        conn.execute(
+            "ALTER TABLE mods ADD COLUMN update_available INTEGER DEFAULT 0",
+            [],
+        )?;
+        log::info!("Repaired: added mods.update_available");
+    }
+
+    // Check mods.update_checked_at (v16)
+    if !column_exists(conn, "mods", "update_checked_at")? {
+        log::warn!("Missing column mods.update_checked_at - repairing...");
+        conn.execute("ALTER TABLE mods ADD COLUMN update_checked_at TEXT", [])?;
+        log::info!("Repaired: added mods.update_checked_at");
+    }
+
+    Ok(())
+}
+
 /// Run all pending migrations
 pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     init_migrations_table(conn)?;
+
+    // Always run repair first to fix broken databases
+    repair_schema(conn)?;
 
     let current_version = get_current_version(conn)?;
     log::info!("Current schema version: {}", current_version);
@@ -324,6 +562,73 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
                     [],
                 )?;
             }
+        } else if migration.version == 8 {
+            // Special handling for v8 - check if dependency_name column exists
+            // (might already exist from base schema or failed migration)
+            if !column_exists(conn, "mod_dependencies", "dependency_name")? {
+                conn.execute(
+                    "ALTER TABLE mod_dependencies ADD COLUMN dependency_name TEXT",
+                    [],
+                )?;
+            }
+        } else if migration.version == 9 {
+            // Special handling for v9 - check if mods_folder_mtime column exists
+            if !column_exists(conn, "instances", "mods_folder_mtime")? {
+                conn.execute(
+                    "ALTER TABLE instances ADD COLUMN mods_folder_mtime INTEGER",
+                    [],
+                )?;
+            }
+        } else if migration.version == 10 {
+            // Special handling for v10 - check if enrichment_hash column exists
+            if !column_exists(conn, "instances", "enrichment_hash")? {
+                conn.execute("ALTER TABLE instances ADD COLUMN enrichment_hash TEXT", [])?;
+            }
+        } else if migration.version == 11 {
+            // Special handling for v11 - check if verification_hash column exists
+            if !column_exists(conn, "instances", "verification_hash")? {
+                conn.execute(
+                    "ALTER TABLE instances ADD COLUMN verification_hash TEXT",
+                    [],
+                )?;
+            }
+        } else if migration.version == 12 {
+            // Special handling for v12 - check if mod_id column exists
+            if !column_exists(conn, "mods", "mod_id")? {
+                conn.execute("ALTER TABLE mods ADD COLUMN mod_id TEXT", [])?;
+            }
+        } else if migration.version == 13 {
+            // Special handling for v13 - check if verified_file_hash column exists
+            if !column_exists(conn, "mods", "verified_file_hash")? {
+                conn.execute("ALTER TABLE mods ADD COLUMN verified_file_hash TEXT", [])?;
+            }
+        } else if migration.version == 14 {
+            // Special handling for v14 - check if enriched_file_hash column exists
+            if !column_exists(conn, "mods", "enriched_file_hash")? {
+                conn.execute("ALTER TABLE mods ADD COLUMN enriched_file_hash TEXT", [])?;
+            }
+        } else if migration.version == 16 {
+            // Special handling for v16 - add update tracking columns if they don't exist
+            if !column_exists(conn, "mods", "latest_version")? {
+                conn.execute("ALTER TABLE mods ADD COLUMN latest_version TEXT", [])?;
+            }
+            if !column_exists(conn, "mods", "latest_version_id")? {
+                conn.execute("ALTER TABLE mods ADD COLUMN latest_version_id TEXT", [])?;
+            }
+            if !column_exists(conn, "mods", "update_available")? {
+                conn.execute(
+                    "ALTER TABLE mods ADD COLUMN update_available INTEGER DEFAULT 0",
+                    [],
+                )?;
+            }
+            if !column_exists(conn, "mods", "update_checked_at")? {
+                conn.execute("ALTER TABLE mods ADD COLUMN update_checked_at TEXT", [])?;
+            }
+            // Create index (IF NOT EXISTS handles idempotency)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mods_update_available ON mods(instance_id, update_available)",
+                [],
+            )?;
         } else {
             // Normal migration - just execute SQL
             conn.execute_batch(migration.sql)?;

@@ -199,13 +199,15 @@ impl TransferQueue {
     /// Удалить завершённые/отменённые передачи из очереди
     pub async fn cleanup(&self) {
         let mut queue = self.queue.write().await;
-        queue.retain(|t| {
-            t.status == QueueStatus::Pending || t.status == QueueStatus::Active
-        });
+        queue.retain(|t| t.status == QueueStatus::Pending || t.status == QueueStatus::Active);
     }
 
     /// Изменить приоритет передачи
-    pub async fn set_priority(&self, queue_id: &str, priority: TransferPriority) -> Result<(), String> {
+    pub async fn set_priority(
+        &self,
+        queue_id: &str,
+        priority: TransferPriority,
+    ) -> Result<(), String> {
         let mut queue = self.queue.write().await;
 
         // Находим и удаляем передачу
@@ -363,9 +365,15 @@ mod tests {
         let queue = TransferQueue::new();
 
         // Добавляем с разными приоритетами
-        queue.add("peer1", None, "modpack1", TransferPriority::Low).await;
-        queue.add("peer2", None, "modpack2", TransferPriority::High).await;
-        queue.add("peer3", None, "modpack3", TransferPriority::Normal).await;
+        queue
+            .add("peer1", None, "modpack1", TransferPriority::Low)
+            .await;
+        queue
+            .add("peer2", None, "modpack2", TransferPriority::High)
+            .await;
+        queue
+            .add("peer3", None, "modpack3", TransferPriority::Normal)
+            .await;
 
         let all = queue.get_all().await;
 
@@ -380,9 +388,15 @@ mod tests {
         let queue = TransferQueue::new();
         queue.set_max_concurrent(2).await;
 
-        queue.add("peer1", None, "mp1", TransferPriority::Normal).await;
-        queue.add("peer2", None, "mp2", TransferPriority::Normal).await;
-        queue.add("peer3", None, "mp3", TransferPriority::Normal).await;
+        queue
+            .add("peer1", None, "mp1", TransferPriority::Normal)
+            .await;
+        queue
+            .add("peer2", None, "mp2", TransferPriority::Normal)
+            .await;
+        queue
+            .add("peer3", None, "mp3", TransferPriority::Normal)
+            .await;
 
         // Должны получить только 2
         let t1 = queue.get_next().await;

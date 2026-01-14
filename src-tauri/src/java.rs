@@ -597,7 +597,12 @@ impl JavaManager {
             paths.push(PathBuf::from("/opt/jdk"));
             // SDKMAN
             if let Ok(home) = std::env::var("HOME") {
-                paths.push(PathBuf::from(&home).join(".sdkman").join("candidates").join("java"));
+                paths.push(
+                    PathBuf::from(&home)
+                        .join(".sdkman")
+                        .join("candidates")
+                        .join("java"),
+                );
                 paths.push(PathBuf::from(&home).join(".jdks"));
             }
         }
@@ -615,7 +620,12 @@ impl JavaManager {
             paths.push(PathBuf::from("/usr/local/opt/openjdk"));
             // SDKMAN
             if let Ok(home) = std::env::var("HOME") {
-                paths.push(PathBuf::from(&home).join(".sdkman").join("candidates").join("java"));
+                paths.push(
+                    PathBuf::from(&home)
+                        .join(".sdkman")
+                        .join("candidates")
+                        .join("java"),
+                );
                 paths.push(PathBuf::from(&home).join(".jdks"));
             }
         }
@@ -624,7 +634,10 @@ impl JavaManager {
     }
 
     /// Получает информацию о конкретной Java
-    async fn get_java_info(java_path: &Path, added_paths: &HashSet<String>) -> Option<SystemJavaInfo> {
+    async fn get_java_info(
+        java_path: &Path,
+        added_paths: &HashSet<String>,
+    ) -> Option<SystemJavaInfo> {
         let path_str = java_path.to_string_lossy().to_string();
 
         // Получаем версию
@@ -738,10 +751,7 @@ impl JavaManager {
         }
 
         // Проверяем что это java executable
-        let file_name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
         let expected_name = if cfg!(windows) { "java.exe" } else { "java" };
         if file_name != expected_name {
@@ -758,10 +768,9 @@ impl JavaManager {
                 "Не удалось определить версию Java. Проверьте что путь указывает на корректный java executable.".to_string()
             ))?;
 
-        let major_version = Self::parse_major_version(&version)
-            .ok_or_else(|| LauncherError::InvalidConfig(
-                format!("Не удалось распарсить версию Java: {}", version)
-            ))?;
+        let major_version = Self::parse_major_version(&version).ok_or_else(|| {
+            LauncherError::InvalidConfig(format!("Не удалось распарсить версию Java: {}", version))
+        })?;
 
         let vendor = Self::detect_vendor(&version);
 
@@ -799,16 +808,13 @@ impl JavaManager {
             )));
         }
 
-        let version = Self::get_java_version_full(&path)
-            .await
-            .ok_or_else(|| LauncherError::InvalidConfig(
-                "Не удалось определить версию Java".to_string()
-            ))?;
+        let version = Self::get_java_version_full(&path).await.ok_or_else(|| {
+            LauncherError::InvalidConfig("Не удалось определить версию Java".to_string())
+        })?;
 
-        let major_version = Self::parse_major_version(&version)
-            .ok_or_else(|| LauncherError::InvalidConfig(
-                format!("Не удалось распарсить версию: {}", version)
-            ))?;
+        let major_version = Self::parse_major_version(&version).ok_or_else(|| {
+            LauncherError::InvalidConfig(format!("Не удалось распарсить версию: {}", version))
+        })?;
 
         let vendor = Self::detect_vendor(&version);
 
@@ -831,7 +837,8 @@ impl JavaManager {
     /// Получает список установленных major версий Java
     pub fn get_installed_major_versions() -> Result<Vec<u32>> {
         let conn = get_db_conn()?;
-        let mut stmt = conn.prepare("SELECT DISTINCT version FROM java_installations ORDER BY version")?;
+        let mut stmt =
+            conn.prepare("SELECT DISTINCT version FROM java_installations ORDER BY version")?;
         let versions: Vec<u32> = stmt
             .query_map([], |row| {
                 let v: String = row.get(0)?;
@@ -847,7 +854,7 @@ impl JavaManager {
     pub fn get_java_for_version(major_version: u32) -> Result<Vec<JavaInstallationInfo>> {
         let conn = get_db_conn()?;
         let mut stmt = conn.prepare(
-            "SELECT path, vendor, is_auto_installed FROM java_installations WHERE version = ?1"
+            "SELECT path, vendor, is_auto_installed FROM java_installations WHERE version = ?1",
         )?;
 
         // Получаем активную Java для этой версии
@@ -890,11 +897,10 @@ impl JavaManager {
     pub fn get_active_java_sync(major_version: u32) -> Option<String> {
         let conn = get_db_conn().ok()?;
         let key = format!("active_java_{}", major_version);
-        conn.query_row(
-            "SELECT value FROM settings WHERE key = ?1",
-            [&key],
-            |row| row.get(0),
-        ).ok()
+        conn.query_row("SELECT value FROM settings WHERE key = ?1", [&key], |row| {
+            row.get(0)
+        })
+        .ok()
     }
 
     /// Получает активную Java для major версии (или первую доступную)
@@ -933,23 +939,31 @@ impl JavaManager {
     }
 
     /// Проверяет совместимость Java по пути с версией Minecraft
-    pub async fn check_java_compatibility_for_path(java_path: &str, minecraft_version: &str) -> JavaCompatibility {
+    pub async fn check_java_compatibility_for_path(
+        java_path: &str,
+        minecraft_version: &str,
+    ) -> JavaCompatibility {
         let path = Path::new(java_path);
 
         // Получаем версию Java
         let version = match Self::get_java_version_full(path).await {
             Some(v) => v,
-            None => return JavaCompatibility::Incompatible(
-                "Не удалось определить версию Java по указанному пути.".to_string()
-            ),
+            None => {
+                return JavaCompatibility::Incompatible(
+                    "Не удалось определить версию Java по указанному пути.".to_string(),
+                )
+            }
         };
 
         // Парсим major версию
         let major_version = match Self::parse_major_version(&version) {
             Some(v) => v,
-            None => return JavaCompatibility::Incompatible(
-                format!("Не удалось распарсить версию Java: {}", version)
-            ),
+            None => {
+                return JavaCompatibility::Incompatible(format!(
+                    "Не удалось распарсить версию Java: {}",
+                    version
+                ))
+            }
         };
 
         Self::check_java_compatibility(major_version, minecraft_version)

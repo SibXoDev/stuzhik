@@ -12,9 +12,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use std::time::Instant;
-use tokio::sync::RwLock;
+use sysinfo::{Pid, ProcessRefreshKind, RefreshKind, System};
 use tauri::{AppHandle, Emitter};
-use sysinfo::{Pid, System, ProcessRefreshKind, RefreshKind};
+use tokio::sync::RwLock;
 
 /// TPS data point
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -133,7 +133,7 @@ impl MetricsCollector {
             tps_history: Vec::with_capacity(60),
             last_metrics: None,
             system: System::new_with_specifics(
-                RefreshKind::nothing().with_processes(ProcessRefreshKind::everything())
+                RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
             ),
         }
     }
@@ -214,7 +214,8 @@ static COLLECTORS: LazyLock<RwLock<HashMap<String, Arc<RwLock<MetricsCollector>>
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// App handle for emitting events
-static METRICS_APP_HANDLE: LazyLock<RwLock<Option<AppHandle>>> = LazyLock::new(|| RwLock::new(None));
+static METRICS_APP_HANDLE: LazyLock<RwLock<Option<AppHandle>>> =
+    LazyLock::new(|| RwLock::new(None));
 
 /// Initialize metrics module
 pub fn init(app: &AppHandle) {
@@ -268,7 +269,9 @@ pub fn parse_debug_output(output: &str) -> Option<(u32, u32)> {
             }
         }
 
-        if (lower.contains("tile entities") || lower.contains("block entities")) && tile_entities.is_none() {
+        if (lower.contains("tile entities") || lower.contains("block entities"))
+            && tile_entities.is_none()
+        {
             for word in line.split_whitespace() {
                 if let Ok(n) = word.trim_matches(|c: char| !c.is_numeric()).parse::<u32>() {
                     tile_entities = Some(n);
@@ -296,7 +299,10 @@ pub fn parse_spark_tps(output: &str) -> Option<TpsData> {
         .collect();
 
     for part in clean.split(',') {
-        let num_str: String = part.chars().filter(|c| c.is_numeric() || *c == '.').collect();
+        let num_str: String = part
+            .chars()
+            .filter(|c| c.is_numeric() || *c == '.')
+            .collect();
         if let Ok(tps) = num_str.parse::<f64>() {
             if (0.0..=20.0).contains(&tps) {
                 tps_values.push(tps);
@@ -407,7 +413,11 @@ pub async fn start_metrics_collection(instance_id: String, pid: u32) -> Result<(
     let mut collector = collector.write().await;
 
     collector.set_pid(pid);
-    log::info!("Started metrics collection for instance {} with pid {}", instance_id, pid);
+    log::info!(
+        "Started metrics collection for instance {} with pid {}",
+        instance_id,
+        pid
+    );
 
     Ok(())
 }

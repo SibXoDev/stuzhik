@@ -25,7 +25,10 @@
     "showMore": "Показать больше",
     "showLess": "Показать меньше",
     "reset": "Сбросить",
-    "documentation": "Документация"
+    "documentation": "Документация",
+    "browse": "Обзор",
+    "loader": "Загрузчик",
+    "mods": "Моды"
   },
   "titleBar": {
     "devConsole": "Консоль разработчика",
@@ -225,6 +228,86 @@
         "optimization": "Оптимизация",
         "commonDependency": "Часто используется"
       }
+    },
+    "dependencyGraph": {
+      "title": "Граф зависимостей",
+      "loading": "Загрузка графа...",
+      "fetchingDeps": "Получение зависимостей с Modrinth...",
+      "calculatingLayout": "Расчёт расположения...",
+      "loadingData": "Загрузка данных графа...",
+      "filters": {
+        "libs": "Библиотеки",
+        "disabled": "Выключенные",
+        "issues": "Проблемы",
+        "solo": "Одиночные"
+      },
+      "legend": {
+        "modrinth": "Modrinth",
+        "curseforge": "CurseForge",
+        "library": "Библиотека",
+        "disabled": "Выключен"
+      },
+      "panel": {
+        "source": "Источник",
+        "status": "Статус",
+        "enabled": "Включён",
+        "disabled": "Выключен",
+        "dependencies": "Зависимости",
+        "dependents": "Зависят от него",
+        "library": "Библиотека",
+        "analyzeRemoval": "Анализ удаления",
+        "noDependencies": "Нет зависимостей",
+        "requiredBy": "Требуется для",
+        "dependsOn": "Зависит от",
+        "incompatibleWith": "Несовместим с"
+      },
+      "removal": {
+        "title": "Анализ удаления",
+        "safe": "Этот мод можно безопасно удалить без влияния на другие моды.",
+        "unsafe": "Удаление этого мода может вызвать проблемы с другими модами.",
+        "willBreak": "Сломает",
+        "modsCount": "модов",
+        "mayHaveIssues": "Возможные проблемы",
+        "close": "Закрыть"
+      },
+      "tooltips": {
+        "refresh": "Обновить зависимости с Modrinth",
+        "fitToScreen": "Вписать в экран",
+        "resetView": "Сбросить вид",
+        "search": "Поиск (Ctrl+F)"
+      },
+      "search": {
+        "placeholder": "Поиск модов...",
+        "noResults": "Моды не найдены",
+        "prev": "Предыдущий (Shift+Enter)",
+        "next": "Следующий (Enter)"
+      }
+    },
+    "verification": {
+      "verify": "Проверить подлинность",
+      "verifying": "Проверка...",
+      "verified": "Проверен",
+      "unverified": "Не проверен",
+      "tampered": "Изменён",
+      "status": {
+        "modrinth": "Подтверждён Modrinth",
+        "curseforge": "Подтверждён CurseForge",
+        "unknown": "Источник неизвестен",
+        "local": "Локальный мод"
+      },
+      "results": {
+        "title": "Результаты проверки",
+        "allVerified": "Все моды проверены и подлинны",
+        "someUnverified": "Некоторые моды не найдены в официальных источниках",
+        "verifiedCount": "Проверено",
+        "unverifiedCount": "Не найдено",
+        "close": "Закрыть"
+      },
+      "tooltip": {
+        "verified": "Хеш файла совпадает с официальным источником",
+        "unverified": "Мод не найден в Modrinth или CurseForge",
+        "local": "Локальный мод без верификации"
+      }
     }
   },
   "modpacks": {
@@ -233,7 +316,81 @@
     "import": "Импорт",
     "export": "Экспорт",
     "search": "Поиск модпаков...",
-    "install": "Установить модпак"
+    "install": "Установить модпак",
+    "launcherImport": {
+      "title": "Импорт из лаунчера",
+      "autoDetect": "Автоопределение",
+      "fromFolder": "Из папки",
+      "detectedLaunchers": "Обнаруженные лаунчеры",
+      "noLaunchers": "Лаунчеры не обнаружены в системе",
+      "noLaunchersFound": "Лаунчеры не найдены в системе",
+      "detecting": "Поиск установленных лаунчеров...",
+      "selectLauncher": "Выберите лаунчер для просмотра экземпляров",
+      "instances": "экземпляров",
+      "instancesIn": "Экземпляры в",
+      "noInstances": "Экземпляры не найдены",
+      "loadingInstances": "Загрузка экземпляров...",
+      "selectInstance": "Выберите экземпляр для импорта",
+      "instanceDetails": "Детали экземпляра",
+      "minecraftVersion": "Minecraft",
+      "loader": "Загрузчик",
+      "modsCount": "Модов",
+      "size": "Размер",
+      "lastPlayed": "Последний запуск",
+      "confidence": "Уверенность определения",
+      "import": "Импортировать",
+      "importing": "Импорт...",
+      "refresh": "Обновить",
+      "instanceName": "Имя экземпляра",
+      "enterName": "Введите имя экземпляра",
+      "includeWorlds": "Включить миры и сохранения",
+      "folderPath": "Путь к папке .minecraft",
+      "analyzing": "Анализ папки...",
+      "folderAnalyzed": "Папка успешно проанализирована",
+      "suspiciousFiles": "Обнаружены подозрительные файлы",
+      "startImport": "Начать импорт",
+      "importComplete": "Импорт успешно завершён",
+      "filesCopied": "Скопировано файлов",
+      "modsImported": "Импортировано модов",
+      "totalSize": "Общий размер",
+      "phaseCreating": "Создание экземпляра...",
+      "phaseScanning": "Сканирование файлов...",
+      "phaseCopying": "Копирование файлов...",
+      "phaseSaving": "Сохранение экземпляра...",
+      "phaseSyncing": "Синхронизация базы модов...",
+      "progress": {
+        "preparing": "Подготовка к импорту...",
+        "copying": "Копирование файлов...",
+        "installing": "Установка модов...",
+        "finalizing": "Завершение...",
+        "file": "Файл",
+        "of": "из"
+      },
+      "success": "Успешно импортировано",
+      "error": "Ошибка импорта",
+      "folderMode": {
+        "title": "Импорт из папки .minecraft",
+        "description": "Выберите любую папку .minecraft или директорию установки Minecraft",
+        "selectFolder": "Выбрать папку",
+        "analyzing": "Анализ папки...",
+        "analysis": "Анализ папки",
+        "detectedVersion": "Определённая версия",
+        "detectedLoader": "Определённый загрузчик",
+        "filesCount": "Файлов для импорта",
+        "suspiciousFiles": "Подозрительные файлы",
+        "suspiciousWarning": "Следующие файлы могут быть нежелательными (реклама, телеметрия). Они будут исключены из импорта:",
+        "noMinecraft": "Это не похоже на папку Minecraft"
+      },
+      "launchers": {
+        "multimc": "MultiMC",
+        "prism": "Prism Launcher",
+        "curseforge_app": "CurseForge App",
+        "modrinth": "Modrinth App",
+        "atlauncher": "ATLauncher",
+        "gdlauncher": "GDLauncher",
+        "generic": "Обычный Minecraft"
+      }
+    }
   },
   "settings": {
     "title": "Настройки",
@@ -263,6 +420,11 @@
       "title": "Язык / Language",
       "select": "Выберите язык / Select language",
       "changesApply": "Изменения применяются сразу / Changes apply immediately"
+    },
+    "developer": {
+      "title": "Режим разработчика",
+      "enable": "Включить режим разработчика",
+      "description": "Показывает кнопки Console и Source Code в TitleBar. Горячие клавиши (Ctrl+Shift+D/U/T) работают в обоих режимах."
     },
     "user": {
       "title": "Пользователь",
@@ -1425,6 +1587,86 @@
       "minutes": "мин"
     }
   },
+  "editor": {
+    "projects": "Проекты",
+    "refresh": "Обновить",
+    "searchFiles": "Поиск файлов...",
+    "failedToLoad": "Не удалось загрузить проекты",
+    "retry": "Повторить",
+    "empty": "Пусто",
+    "createFile": "Создать файл",
+    "selectFile": "Выберите файл для редактирования",
+    "selectFileHint": "Используйте дерево проектов слева для навигации. Нажмите + рядом с категорией для создания файла из шаблона.",
+    "saveShortcut": "Ctrl+S - сохранить",
+    "fullscreenShortcut": "F11 - полный экран",
+    "recipeBuilder": "Конструктор рецептов",
+    "recipes": "Рецепты",
+    "metadataEditor": "Редактор метаданных",
+    "metadata": "Метаданные",
+    "copied": "Скопировано",
+    "copiedMessage": "Код рецепта скопирован - откройте файл для вставки",
+    "copyError": "Ошибка копирования",
+    "copyErrorMessage": "Не удалось скопировать в буфер обмена",
+    "recipeInserted": "Рецепт добавлен",
+    "recipeInsertedMessage": "Код рецепта добавлен в файл",
+    "recipeBuilderTitle": "Конструктор рецептов",
+    "recipeBuilderDescription": "Создавайте рецепты для KubeJS, CraftTweaker или датапаков",
+    "recipeBuilderHint": "Перетащите или кликните для выбора предметов",
+    "recipeName": "Название рецепта",
+    "recipeNamePlaceholder": "my_custom_recipe",
+    "searchItems": "Поиск предметов",
+    "searchItemsPlaceholder": "minecraft:diamond...",
+    "enterItemId": "Введите ID предмета",
+    "searchExample": "Например: diamond, iron_ingot",
+    "noItemsFound": "Предметы не найдены",
+    "rebuildCacheHint": "Попробуйте пересобрать кэш в настройках",
+    "selected": "Выбрано",
+    "clickToPlace": "Кликните по слоту для размещения",
+    "shaped": "Формовка",
+    "shapeless": "Бесформенный",
+    "smelting": "Плавка",
+    "blasting": "Доменная",
+    "smoking": "Копчение",
+    "ingredients": "Ингредиенты",
+    "clickToAdd": "кликните чтобы добавить",
+    "input": "Вход",
+    "output": "Выход",
+    "clearAll": "Очистить всё",
+    "generatedCode": "Сгенерированный код",
+    "configureRecipe": "Настройте рецепт для генерации кода...",
+    "insertCode": "Вставить код",
+    "loadingItems": "Загрузка предметов...",
+    "rebuildingCache": "Индексация предметов...",
+    "rebuildingCacheHint": "Парсинг JAR файлов модов",
+    "noItemsInCache": "Кэш предметов пуст",
+    "noItemsHint": "Установите Minecraft и моды для экземпляра",
+    "dragToPlace": "Кликните или перетащите",
+    "dragItemHere": "Перетащите предмет сюда",
+    "clickToPlace": "Кликните чтобы разместить",
+    "cacheRebuilt": "Кэш обновлён",
+    "items": "предметов",
+    "mods": "модов",
+    "clickToRemove": "клик для удаления",
+    "filterByMod": "Фильтр по моду",
+    "allMods": "Все моды",
+    "rebuildCache": "Обновить кэш предметов",
+    "visualTools": "Инструменты",
+    "visualToolsDescription": "Визуальные инструменты для создания контента модпака",
+    "recipeBuilderDesc": "Создание рецептов для KubeJS, CraftTweaker, датапаков",
+    "metadataEditorDesc": "Редактирование pack.mcmeta и метаданных модов",
+    "externalEditorTip": "Для редактирования файлов используйте внешний редактор (VS Code, Notepad++). Откройте папку экземпляра через кнопку «Открыть папку» на вкладке «Файлы»."
+  },
+  "console": {
+    "title": "Консоль",
+    "running": "Запущен",
+    "notRunning": "Не запущен",
+    "lines": "строк",
+    "search": "Поиск...",
+    "copy": "Копировать логи",
+    "readOnly": "Только чтение. Логи сохраняются в logs/latest-stdout.log",
+    "startToSee": "Запустите игру чтобы увидеть вывод консоли",
+    "noResults": "Нет совпадений"
+  },
   "docs": {
     "title": "Документация",
     "changelog": "История изменений",
@@ -1727,9 +1969,9 @@
         "overview": {
           "title": "Обзор",
           "intro": "Профессиональный редактор для модпакеров — редактирование конфигов, датапаков, KubeJS скриптов с IntelliSense:",
-          "monaco": {
-            "title": "Monaco Editor",
-            "desc": "Движок VSCode с подсветкой синтаксиса"
+          "highlighting": {
+            "title": "Подсветка синтаксиса",
+            "desc": "Подсветка для JS, JSON, TOML, YAML и других"
           },
           "intellisense": {
             "title": "IntelliSense",
@@ -2027,6 +2269,70 @@
         "tipTitle": "Важно",
         "tipText": "В release-сборке F12 не работает. Используйте Ctrl+Shift+D для консоли разработчика"
       }
+    }
+  },
+  "ui": {
+    "placeholders": {
+      "search": "Поиск...",
+      "searchVersions": "Поиск версий...",
+      "searchMods": "Поиск по названию, mod ID, версии или источнику...",
+      "searchModpacks": "Поиск модпаков...",
+      "enterName": "Введите название",
+      "enterNewName": "Введите новое имя...",
+      "enterCopyName": "Введите имя копии...",
+      "myModpack": "Мой модпак",
+      "yourName": "Ваше имя",
+      "description": "Описание...",
+      "profileDescription": "Описание профиля...",
+      "modpackName": "Название модпака",
+      "yourNameOrNick": "Ваше имя или ник",
+      "shortDescription": "Краткое описание модпака (опционально)",
+      "enterPlayerNick": "Введите никнейм игрока...",
+      "templateName": "Название шаблона...",
+      "cloudStorageUrl": "https://disk.yandex.ru/d/... или https://drive.google.com/...",
+      "searchFiles": "Поиск файлов...",
+      "filterByExtension": "Фильтр по расширению...",
+      "enterPath": "Введите путь...",
+      "globalSearch": "Глобальный поиск...",
+      "regexSearch": "Regex поиск...",
+      "searchByFiles": "Поиск по файлам...",
+      "versionNumber": "1.0.0",
+      "modpackDescriptionLong": "Описание вашего модпака...",
+      "searchModsOn": "Поиск модов на {source}..."
+    },
+    "tooltips": {
+      "copy": "Копировать",
+      "close": "Закрыть",
+      "closeAll": "Закрыть все",
+      "unsaved": "Не сохранено",
+      "clear": "Очистить",
+      "filters": "Фильтры",
+      "syncMods": "Синхронизировать папку модов с базой данных",
+      "addLocalMod": "Добавить локальный мод (.jar файл)",
+      "deleteProject": "Удалить проект",
+      "deleteMod": "Удалить мод",
+      "deleteProfile": "Удалить профиль",
+      "compare": "Сравнить два модпака",
+      "createBackup": "Создать резервную копию",
+      "importProfile": "Импортировать профиль из файла",
+      "exportProfile": "Экспортировать профиль",
+      "searchAllFolders": "Искать во всех папках",
+      "useRegex": "Использовать регулярные выражения",
+      "goUp": "Вернуться на уровень выше",
+      "openInExplorer": "Открыть в проводнике",
+      "downloadZip": "Скачать ZIP",
+      "copyGitClone": "Копировать git clone",
+      "retry": "Повторить",
+      "fullscreen": "Полноэкранный режим (F11 или Ctrl+Shift+F)",
+      "exitFullscreen": "Выйти из полноэкранного режима (Esc)",
+      "sourceCode": "Исходный код",
+      "createManifest": "Создать манифест для отслеживания изменений",
+      "previous": "Предыдущая",
+      "next": "Следующая",
+      "deselect": "Снять выделение",
+      "modConfigs": "Конфиги модов из папки config/",
+      "rootConfigs": "Конфиги из корня экземпляра",
+      "hasQuickPresets": "Есть быстрые шаблоны"
     }
   }
 }

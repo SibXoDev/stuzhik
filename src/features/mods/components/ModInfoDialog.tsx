@@ -10,6 +10,7 @@ import { ProjectInfoDialog } from "../../../shared/components/ProjectInfoDialog"
 
 export interface ModInfoDialogProps {
   mod: Mod;
+  instanceId: string;
   onClose: () => void;
 }
 
@@ -25,7 +26,7 @@ function toProjectInfo(mod: Mod, wiki: WikiContent | null): ProjectInfo {
       title: mod.name,
       description: mod.description || "",
       body: wiki.body,
-      author: mod.author || undefined,
+      author: wiki.author || mod.author || undefined,
       icon_url: mod.icon_url || undefined,
       downloads: wiki.downloads,
       followers: wiki.followers,
@@ -88,6 +89,22 @@ function toProjectInfo(mod: Mod, wiki: WikiContent | null): ProjectInfo {
 function ModInfoDialog(props: ModInfoDialogProps) {
   const [wiki, setWiki] = createSignal<WikiContent | null>(null);
   const [loadingWiki, setLoadingWiki] = createSignal(true);
+  const [filePath, setFilePath] = createSignal<string | null>(null);
+
+  // Fetch file path for "Open in Explorer" feature
+  const fetchFilePath = async () => {
+    if (props.mod.file_name && props.instanceId) {
+      try {
+        const path = await invoke<string>("get_mod_file_path", {
+          instanceId: props.instanceId,
+          fileName: props.mod.file_name,
+        });
+        setFilePath(path);
+      } catch (e) {
+        console.error("Failed to get mod file path:", e);
+      }
+    }
+  };
 
   // Fetch wiki content on mount (only for non-local mods)
   const fetchWiki = async () => {
@@ -117,8 +134,9 @@ function ModInfoDialog(props: ModInfoDialogProps) {
     }
   };
 
-  // Fetch wiki when dialog opens
+  // Fetch wiki and file path when dialog opens
   fetchWiki();
+  fetchFilePath();
 
   // Convert to ProjectInfo
   const projectInfo = createMemo(() => toProjectInfo(props.mod, wiki()));
@@ -140,6 +158,7 @@ function ModInfoDialog(props: ModInfoDialogProps) {
         <ProjectInfoDialog
           project={projectInfo()}
           onClose={props.onClose}
+          filePath={filePath() || undefined}
         />
       </Show>
     </>

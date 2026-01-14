@@ -41,11 +41,7 @@ pub async fn check_eula(server_dir: impl AsRef<Path>) -> ServerResult<EulaStatus
     let accepted = content
         .lines()
         .filter(|line| !line.trim().starts_with('#'))
-        .any(|line| {
-            line.to_lowercase()
-                .replace(' ', "")
-                .contains("eula=true")
-        });
+        .any(|line| line.to_lowercase().replace(' ', "").contains("eula=true"));
 
     Ok(EulaStatus {
         exists: true,

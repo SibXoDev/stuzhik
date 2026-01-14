@@ -82,10 +82,7 @@ impl ConfigManager {
                 .unwrap_or("")
                 .to_string();
 
-            let extension = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("");
+            let extension = path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
             if let Some(config_type) = ConfigType::from_extension(extension) {
                 let metadata = tokio::fs::metadata(&path).await.map_err(|e| {
@@ -139,9 +136,9 @@ impl ConfigManager {
             ))
         })?;
 
-        let canonical_file = file_path.canonicalize().map_err(|e| {
-            LauncherError::Io(std::io::Error::new(e.kind(), "File not found"))
-        })?;
+        let canonical_file = file_path
+            .canonicalize()
+            .map_err(|e| LauncherError::Io(std::io::Error::new(e.kind(), "File not found")))?;
 
         if !canonical_file.starts_with(&canonical_base) {
             return Err(LauncherError::InvalidConfig(
@@ -156,10 +153,7 @@ impl ConfigManager {
             ))
         })?;
 
-        let extension = file_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let extension = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         let config_type = ConfigType::from_extension(extension).unwrap_or(ConfigType::Txt);
 
@@ -201,15 +195,11 @@ impl ConfigManager {
             // Если файл не существует, проверяем родительскую директорию
             let parent = file_path
                 .parent()
-                .ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "Invalid path",
-                    )
-                })?;
-            parent
-                .canonicalize()
-                .map(|p| p.join(file_path.file_name().unwrap()))
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Invalid path"))?;
+            let file_name = file_path
+                .file_name()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid file name"))?;
+            parent.canonicalize().map(|p| p.join(file_name))
         })?;
 
         if !canonical_file.starts_with(&canonical_base) {
@@ -241,12 +231,14 @@ impl ConfigManager {
         let backup_name = format!("{}.backup_{}", relative_path, timestamp);
         let backup_path = base_dir.join(instance_id).join(&backup_name);
 
-        tokio::fs::copy(&file_path, &backup_path).await.map_err(|e| {
-            LauncherError::Io(std::io::Error::new(
-                e.kind(),
-                format!("Failed to create backup: {}", e),
-            ))
-        })?;
+        tokio::fs::copy(&file_path, &backup_path)
+            .await
+            .map_err(|e| {
+                LauncherError::Io(std::io::Error::new(
+                    e.kind(),
+                    format!("Failed to create backup: {}", e),
+                ))
+            })?;
 
         Ok(backup_name)
     }

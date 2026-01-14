@@ -1,5 +1,7 @@
-import { Component, createSignal, createEffect, Show } from "solid-js";
+import { Component, createSignal, createEffect, Show, onCleanup } from "solid-js";
 import { highlightCode, detectLanguage, escapeHtml } from "../utils/highlighter";
+import { useSafeTimers } from "../hooks";
+import { useI18n } from "../i18n";
 
 interface CodeViewerProps {
   code: string;
@@ -14,41 +16,71 @@ interface CodeViewerProps {
 }
 
 const CodeViewer: Component<CodeViewerProps> = (props) => {
+  const { t } = useI18n();
   const [html, setHtml] = createSignal("");
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [copied, setCopied] = createSignal(false);
+  const { setTimeout: safeTimeout } = useSafeTimers();
 
-  createEffect(async () => {
+  // NOTE: Using sync wrapper to avoid SolidJS async effect issues
+  createEffect(() => {
     const code = props.code;
     if (!code) {
       setHtml("");
       setLoading(false);
+      setError(null);
       return;
     }
+
+    // Track request to handle race conditions
+    const requestId = Date.now();
+    (window as any).__lastCodeViewerRequest = requestId;
 
     setLoading(true);
     setError(null);
 
-    try {
-      const lang = detectLanguage(props.filename, props.language);
-      const result = await highlightCode(code, lang);
-      setHtml(result);
-    } catch (e) {
-      console.error("Failed to highlight code:", e);
-      setError((e as Error).message);
-      // Fallback to plain text
-      setHtml(`<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`);
-    } finally {
-      setLoading(false);
-    }
+    const lang = detectLanguage(props.filename, props.language);
+
+    // Safety timeout - ensure loading state is cleared even if highlighter hangs
+    const safetyTimeout = setTimeout(() => {
+      if ((window as any).__lastCodeViewerRequest === requestId) {
+        console.warn("[CodeViewer] Safety timeout - highlighter might be stuck");
+        setError("Timeout");
+        setHtml(`<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`);
+        setLoading(false);
+      }
+    }, 15000);
+
+    // Cleanup timeout on effect re-run or unmount
+    onCleanup(() => clearTimeout(safetyTimeout));
+
+    highlightCode(code, lang)
+      .then((result) => {
+        clearTimeout(safetyTimeout);
+        if ((window as any).__lastCodeViewerRequest === requestId) {
+          setHtml(result);
+          setLoading(false);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        clearTimeout(safetyTimeout);
+        if ((window as any).__lastCodeViewerRequest === requestId) {
+          console.error("Failed to highlight code:", e);
+          setError((e as Error).message);
+          // Fallback to plain text
+          setHtml(`<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`);
+          setLoading(false);
+        }
+      });
   });
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(props.code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      safeTimeout(() => setCopied(false), 2000);
     } catch (e) {
       console.error("Failed to copy:", e);
     }
@@ -70,10 +102,10 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
   }
 
   return (
-    <div class={`code-viewer rounded-lg overflow-hidden bg-[#0d1117] ${props.class || ""}`}>
+    <div class={`code-viewer rounded-lg overflow-hidden bg-[#0d1117] flex flex-col ${props.class || ""}`}>
       {/* Header */}
       <Show when={showHeader()}>
-        <div class="flex items-center justify-between px-3 py-2 bg-gray-900/50 border-b border-gray-800">
+        <div class="flex items-center justify-between px-3 py-2 bg-gray-900/50 border-b border-gray-800 flex-shrink-0">
           <div class="flex items-center gap-2 text-sm text-gray-400">
             <i class={`w-4 h-4 ${getFileIcon(props.filename || "")}`} />
             <span class="font-mono">{props.filename}</span>
@@ -81,7 +113,7 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
           <button
             class="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
             onClick={handleCopy}
-            title="Копировать"
+            title={t().ui?.tooltips?.copy ?? "Copy"}
           >
             <Show when={copied()} fallback={<i class="i-hugeicons-copy-01 w-4 h-4" />}>
               <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
@@ -90,10 +122,10 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
         </div>
       </Show>
 
-      {/* Code content */}
+      {/* Code content - flex-1 with min-h-0 for proper scroll in flex container */}
       <div
-        class="overflow-auto"
-        style={{ "max-height": props.maxHeight || "none" }}
+        class="overflow-auto flex-1 min-h-0"
+        style={{ "max-height": props.maxHeight === "100%" ? undefined : props.maxHeight || "none" }}
       >
         <Show when={loading()}>
           <div class="flex-center p-4">

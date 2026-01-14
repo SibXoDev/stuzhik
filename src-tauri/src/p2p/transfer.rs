@@ -72,7 +72,10 @@ pub enum TransferStatus {
     /// Применение изменений
     Applying { progress: f32 },
     /// Завершено
-    Completed { files_synced: usize, bytes_synced: u64 },
+    Completed {
+        files_synced: usize,
+        bytes_synced: u64,
+    },
     /// Ошибка
     Error { message: String },
 }
@@ -292,9 +295,7 @@ pub enum TransferMessage {
     ManifestRequest { modpack_name: String },
 
     /// Ответ с манифестом
-    ManifestResponse {
-        manifest: ModpackManifest,
-    },
+    ManifestResponse { manifest: ModpackManifest },
 
     /// Запрос файла
     FileRequest { path: String, offset: u64 },

@@ -3,8 +3,8 @@
 //! Handles whitelist, operators (ops), and banned players.
 //! Minecraft stores these in JSON files: whitelist.json, ops.json, banned-players.json, banned-ips.json
 
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use tokio::fs;
 
 use super::{ServerError, ServerResult};
@@ -77,7 +77,10 @@ pub async fn load_whitelist(server_dir: impl AsRef<Path>) -> ServerResult<Vec<Wh
 }
 
 /// Save whitelist to server directory
-pub async fn save_whitelist(server_dir: impl AsRef<Path>, whitelist: &[WhitelistEntry]) -> ServerResult<()> {
+pub async fn save_whitelist(
+    server_dir: impl AsRef<Path>,
+    whitelist: &[WhitelistEntry],
+) -> ServerResult<()> {
     let path = server_dir.as_ref().join("whitelist.json");
     let content = serde_json::to_string_pretty(whitelist)?;
     fs::write(&path, content).await?;
@@ -123,7 +126,10 @@ pub async fn load_banned_players(server_dir: impl AsRef<Path>) -> ServerResult<V
 }
 
 /// Save banned players to server directory
-pub async fn save_banned_players(server_dir: impl AsRef<Path>, banned: &[BannedPlayer]) -> ServerResult<()> {
+pub async fn save_banned_players(
+    server_dir: impl AsRef<Path>,
+    banned: &[BannedPlayer],
+) -> ServerResult<()> {
     let path = server_dir.as_ref().join("banned-players.json");
     let content = serde_json::to_string_pretty(banned)?;
     fs::write(&path, content).await?;
@@ -146,7 +152,10 @@ pub async fn load_banned_ips(server_dir: impl AsRef<Path>) -> ServerResult<Vec<B
 }
 
 /// Save banned IPs to server directory
-pub async fn save_banned_ips(server_dir: impl AsRef<Path>, banned: &[BannedIp]) -> ServerResult<()> {
+pub async fn save_banned_ips(
+    server_dir: impl AsRef<Path>,
+    banned: &[BannedIp],
+) -> ServerResult<()> {
     let path = server_dir.as_ref().join("banned-ips.json");
     let content = serde_json::to_string_pretty(banned)?;
     fs::write(&path, content).await?;
@@ -175,7 +184,10 @@ pub async fn add_to_whitelist(
     let mut whitelist = load_whitelist(server_dir).await?;
 
     // Check if already whitelisted
-    if whitelist.iter().any(|e| e.uuid == uuid || e.name.eq_ignore_ascii_case(name)) {
+    if whitelist
+        .iter()
+        .any(|e| e.uuid == uuid || e.name.eq_ignore_ascii_case(name))
+    {
         return Ok(());
     }
 
@@ -190,10 +202,7 @@ pub async fn add_to_whitelist(
 }
 
 /// Remove player from whitelist
-pub async fn remove_from_whitelist(
-    server_dir: impl AsRef<Path>,
-    name: &str,
-) -> ServerResult<()> {
+pub async fn remove_from_whitelist(server_dir: impl AsRef<Path>, name: &str) -> ServerResult<()> {
     let server_dir = server_dir.as_ref();
     let mut whitelist = load_whitelist(server_dir).await?;
 
@@ -269,7 +278,9 @@ pub async fn ban_player(
     banned.push(BannedPlayer {
         uuid: uuid.to_string(),
         name: name.to_string(),
-        created: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S %z").to_string(),
+        created: chrono::Utc::now()
+            .format("%Y-%m-%d %H:%M:%S %z")
+            .to_string(),
         source: source.to_string(),
         expires: "forever".to_string(),
         reason: reason.to_string(),
@@ -311,7 +322,9 @@ pub async fn ban_ip(
 
     banned.push(BannedIp {
         ip: ip.to_string(),
-        created: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S %z").to_string(),
+        created: chrono::Utc::now()
+            .format("%Y-%m-%d %H:%M:%S %z")
+            .to_string(),
         source: source.to_string(),
         expires: "forever".to_string(),
         reason: reason.to_string(),
@@ -368,7 +381,9 @@ pub async fn lookup_uuid(username: &str) -> ServerResult<Option<String>> {
         name: String,
     }
 
-    let profile: MojangProfile = response.json().await
+    let profile: MojangProfile = response
+        .json()
+        .await
         .map_err(|e| ServerError::Network(e.to_string()))?;
 
     // Convert to standard UUID format (with dashes)
@@ -419,9 +434,7 @@ pub async fn get_player_management(instance_id: String) -> Result<PlayerManageme
     let instances_dir = crate::paths::instances_dir();
     let server_dir = instances_dir.join(&instance_id);
 
-    load_all(&server_dir)
-        .await
-        .map_err(|e| e.to_string())
+    load_all(&server_dir).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -521,14 +534,10 @@ pub async fn ip_unban(instance_id: String, ip: String) -> Result<(), String> {
     let instances_dir = crate::paths::instances_dir();
     let server_dir = instances_dir.join(&instance_id);
 
-    unban_ip(&server_dir, &ip)
-        .await
-        .map_err(|e| e.to_string())
+    unban_ip(&server_dir, &ip).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn lookup_player_uuid(username: String) -> Result<Option<String>, String> {
-    lookup_uuid(&username)
-        .await
-        .map_err(|e| e.to_string())
+    lookup_uuid(&username).await.map_err(|e| e.to_string())
 }

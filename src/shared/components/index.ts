@@ -33,7 +33,6 @@ export { LiveCrashIndicator } from './LiveCrashIndicator';
 export { default as QuickPlay } from './QuickPlay';
 export { ToastProvider, addToast, removeToast } from './Toast';
 export { DragDropOverlay } from './DragDropOverlay';
-export { MonacoEditor } from './MonacoEditor';
 export { default as CodeViewer } from './CodeViewer';
 
 // Dev tools

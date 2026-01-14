@@ -9,6 +9,8 @@ interface DotGridProps {
   proximity?: number;
   waveIntensity?: number;
   waveSpeed?: number;
+  /** Preview mode - reduces framerate to ~24fps for better performance in settings */
+  previewMode?: boolean;
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -57,11 +59,10 @@ const DotGrid = (props: DotGridProps) => {
     }
 
     let dots: Dot[] = [];
-    let mouse = { x: -1000, y: -1000 };
+    const mouse = { x: -1000, y: -1000 };
     let width = 0;
     let height = 0;
     let dpr = 1;
-    let canvasRect = { left: 0, top: 0 };
 
     const buildGrid = () => {
       const parent = canvasRef!.parentElement;
@@ -77,9 +78,6 @@ const DotGrid = (props: DotGridProps) => {
       canvasRef!.height = height * dpr;
       canvasRef!.style.width = width + "px";
       canvasRef!.style.height = height + "px";
-
-      // Update canvas rect for mouse calculations
-      canvasRect = canvasRef!.getBoundingClientRect();
 
       const cell = dotSize + gap;
       const cols = Math.floor((width + gap) / cell);
@@ -101,10 +99,12 @@ const DotGrid = (props: DotGridProps) => {
       }
     };
 
-    // Global mouse tracking (works even when canvas is behind other elements)
+    // Global mouse tracking - recalculate rect each time to handle scroll
     const handleMouseMove = (e: MouseEvent) => {
-      mouse.x = e.clientX - canvasRect.left;
-      mouse.y = e.clientY - canvasRect.top;
+      if (!canvasRef) return;
+      const rect = canvasRef.getBoundingClientRect();
+      mouse.x = e.clientX - rect.left;
+      mouse.y = e.clientY - rect.top;
     };
 
     const handleMouseLeave = () => {
@@ -140,8 +140,18 @@ const DotGrid = (props: DotGridProps) => {
     buildGrid();
 
     const startTime = performance.now();
+    // Preview mode: throttle to ~24fps (42ms interval) for better performance
+    const frameInterval = props.previewMode ? 42 : 0;
+    let lastFrameTime = 0;
 
-    const render = () => {
+    const render = (currentTime: number) => {
+      // Throttle frames in preview mode
+      if (frameInterval > 0 && currentTime - lastFrameTime < frameInterval) {
+        frameId = requestAnimationFrame(render);
+        return;
+      }
+      lastFrameTime = currentTime;
+
       if (!ctx || width <= 0 || height <= 0) {
         frameId = requestAnimationFrame(render);
         return;
@@ -188,7 +198,7 @@ const DotGrid = (props: DotGridProps) => {
       frameId = requestAnimationFrame(render);
     };
 
-    render();
+    frameId = requestAnimationFrame(render);
 
     onCleanup(() => {
       cancelAnimationFrame(frameId);

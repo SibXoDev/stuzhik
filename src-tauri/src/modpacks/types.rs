@@ -27,7 +27,8 @@ pub struct ModpackSearchResponse {
 
 // ========== Modrinth Modpack Types ==========
 
-#[derive(Debug, Deserialize)]
+/// Modrinth Modpack Index (for both import and export)
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ModrinthModpackIndex {
     #[serde(rename = "formatVersion")]
     pub format_version: u32,
@@ -35,41 +36,48 @@ pub struct ModrinthModpackIndex {
     #[serde(rename = "versionId")]
     pub version_id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
     pub files: Vec<ModrinthModpackFile>,
     pub dependencies: ModrinthModpackDependencies,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModrinthModpackFile {
     pub path: String,
     pub hashes: ModrinthModpackHashes,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub env: Option<ModrinthModpackEnv>,
     pub downloads: Vec<String>,
     #[serde(rename = "fileSize")]
     pub file_size: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModrinthModpackHashes {
     pub sha1: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sha512: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModrinthModpackEnv {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub client: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub server: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ModrinthModpackDependencies {
     pub minecraft: String,
-    #[serde(rename = "fabric-loader")]
+    #[serde(rename = "fabric-loader", skip_serializing_if = "Option::is_none")]
     pub fabric_loader: Option<String>,
-    #[serde(rename = "quilt-loader")]
+    #[serde(rename = "quilt-loader", skip_serializing_if = "Option::is_none")]
     pub quilt_loader: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub forge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub neoforge: Option<String>,
 }
 
@@ -102,7 +110,7 @@ pub struct CurseForgeModLoader {
     pub primary: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CurseForgeManifestFile {
     #[serde(rename = "projectID")]
     pub project_id: u64,
@@ -550,4 +558,108 @@ pub struct InstanceChanges {
     pub configs_removed: Vec<String>,
     /// Есть ли изменения
     pub has_changes: bool,
+}
+
+// ========== Preview модпака перед импортом ==========
+
+/// Формат модпака
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ModpackFormat {
+    Modrinth,   // .mrpack
+    CurseForge, // .zip с manifest.json
+    Stzhk,      // .stzhk
+    Unknown,
+}
+
+/// Категория файла в модпаке
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportFileCategory {
+    Mod,
+    Config,
+    ResourcePack,
+    ShaderPack,
+    Script,
+    World,
+    Other,
+}
+
+/// Информация о моде в preview
+#[derive(Debug, Clone, Serialize)]
+pub struct ImportModInfo {
+    /// Путь в архиве
+    pub path: String,
+    /// Имя файла
+    pub filename: String,
+    /// Название мода (если известно)
+    pub name: Option<String>,
+    /// Размер файла
+    pub size: u64,
+    /// URL для скачивания (если есть)
+    pub download_url: Option<String>,
+    /// Требуется для клиента/сервера
+    pub side: Option<String>,
+    /// Включён по умолчанию
+    pub enabled: bool,
+}
+
+/// Информация о override файле в preview
+#[derive(Debug, Clone, Serialize)]
+pub struct ImportOverrideInfo {
+    /// Путь в архиве
+    pub archive_path: String,
+    /// Относительный путь назначения
+    pub dest_path: String,
+    /// Размер файла
+    pub size: u64,
+    /// Категория файла
+    pub category: ImportFileCategory,
+    /// Включён по умолчанию
+    pub enabled: bool,
+}
+
+/// Полный preview модпака
+#[derive(Debug, Clone, Serialize)]
+pub struct ModpackPreview {
+    /// Формат модпака
+    pub format: ModpackFormat,
+    /// Название модпака
+    pub name: String,
+    /// Версия модпака
+    pub version: Option<String>,
+    /// Автор
+    pub author: Option<String>,
+    /// Описание
+    pub description: Option<String>,
+    /// Версия Minecraft
+    pub minecraft_version: String,
+    /// Загрузчик (fabric, forge, etc.)
+    pub loader: Option<String>,
+    /// Версия загрузчика
+    pub loader_version: Option<String>,
+    /// Список модов
+    pub mods: Vec<ImportModInfo>,
+    /// Список override файлов
+    pub overrides: Vec<ImportOverrideInfo>,
+    /// Общий размер модов (байт)
+    pub mods_size: u64,
+    /// Общий размер overrides (байт)
+    pub overrides_size: u64,
+    /// Общий размер архива (байт)
+    pub archive_size: u64,
+}
+
+/// Опции импорта (что включить/исключить)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportOptions {
+    /// Название экземпляра
+    pub instance_name: String,
+    /// Исключённые моды (по path)
+    #[serde(default)]
+    pub excluded_mods: Vec<String>,
+    /// Исключённые override файлы (по archive_path)
+    #[serde(default)]
+    pub excluded_overrides: Vec<String>,
 }

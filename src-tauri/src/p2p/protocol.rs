@@ -170,8 +170,8 @@ pub fn serialize_message(msg: &Message) -> Result<Vec<u8>, String> {
     buffer.push(PROTOCOL_VERSION);
 
     // MessagePack payload
-    let payload = rmp_serde::to_vec(msg)
-        .map_err(|e| format!("Failed to serialize message: {}", e))?;
+    let payload =
+        rmp_serde::to_vec(msg).map_err(|e| format!("Failed to serialize message: {}", e))?;
 
     // Payload length (2 bytes, big endian)
     let len = payload.len() as u16;
@@ -214,8 +214,7 @@ pub fn deserialize_message(data: &[u8]) -> Result<Message, String> {
 
     // Десериализуем payload
     let payload = &data[7..7 + len];
-    rmp_serde::from_slice(payload)
-        .map_err(|e| format!("Failed to deserialize message: {}", e))
+    rmp_serde::from_slice(payload).map_err(|e| format!("Failed to deserialize message: {}", e))
 }
 
 /// Генерация уникального ID пира

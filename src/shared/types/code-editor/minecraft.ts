@@ -18,6 +18,7 @@ export interface MinecraftBlock {
   name: string;
   mod_id: string;
   tags: string[];
+  texture_path: string | null;
   hardness: number | null;
   blast_resistance: number | null;
   requires_tool: boolean | null;
@@ -29,7 +30,7 @@ export interface MinecraftTag {
   values: string[];
 }
 
-export interface ModInfo {
+export interface MinecraftModInfo {
   mod_id: string;
   name: string;
   version: string;
@@ -53,4 +54,13 @@ export interface RebuildStats {
   total_items: number;
   total_blocks: number;
   total_tags: number;
+}
+
+/** Унифицированный тип для предметов и блоков (Recipe Builder) */
+export interface MinecraftEntry {
+  id: string;
+  name: string;
+  mod_id: string;
+  texture_path: string | null;
+  entry_type: "item" | "block";
 }

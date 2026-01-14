@@ -13,8 +13,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::Write;
 use std::sync::{Arc, LazyLock};
-use tokio::sync::RwLock;
 use tauri::{AppHandle, Emitter};
+use tokio::sync::RwLock;
 
 use super::rcon::RCON_CONNECTIONS;
 use super::ServerResult;
@@ -151,7 +151,12 @@ fn parse_log_metadata(line: &str) -> (Option<String>, Option<String>) {
 
     // Parse brackets
     for (i, bracket) in brackets.iter().enumerate() {
-        if bracket.contains('/') && (bracket.contains("INFO") || bracket.contains("WARN") || bracket.contains("ERROR") || bracket.contains("DEBUG")) {
+        if bracket.contains('/')
+            && (bracket.contains("INFO")
+                || bracket.contains("WARN")
+                || bracket.contains("ERROR")
+                || bracket.contains("DEBUG"))
+        {
             if let Some(slash_pos) = bracket.find('/') {
                 thread = Some(bracket[..slash_pos].to_string());
             }
@@ -292,9 +297,9 @@ impl ServerConsole {
     /// Send a command to the server via stdin
     pub fn send_command(&mut self, command: &str) -> ServerResult<()> {
         if let Some(ref sender) = self.command_sender {
-            sender.send(command.to_string()).map_err(|_| {
-                super::ServerError::NotRunning(self.instance_id.clone())
-            })?;
+            sender
+                .send(command.to_string())
+                .map_err(|_| super::ServerError::NotRunning(self.instance_id.clone()))?;
 
             // Add to history
             let cmd = command.to_string();
@@ -392,7 +397,10 @@ pub async fn add_log_and_emit(instance_id: &str, line: &str) {
 
     // Check for server ready pattern - try to auto-connect RCON
     if is_server_ready_line(line) {
-        log::info!("Server {} appears ready, attempting RCON auto-connect", instance_id);
+        log::info!(
+            "Server {} appears ready, attempting RCON auto-connect",
+            instance_id
+        );
 
         // Spawn async task to try RCON connection (with delay for server to fully start)
         let instance_id_clone = instance_id.to_string();
@@ -486,7 +494,10 @@ pub struct CommandResult {
 }
 
 #[tauri::command]
-pub async fn send_server_command(instance_id: String, command: String) -> Result<CommandResult, String> {
+pub async fn send_server_command(
+    instance_id: String,
+    command: String,
+) -> Result<CommandResult, String> {
     // Try RCON first if connected (provides response)
     {
         let connections = RCON_CONNECTIONS.read().await;

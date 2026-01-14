@@ -2,6 +2,7 @@ import { createSignal, createEffect, For, Show, onMount, createMemo } from "soli
 import { invoke } from "@tauri-apps/api/core";
 import type { MinecraftVersion } from "../types";
 import Dropdown from "../ui/Dropdown";
+import { useI18n } from "../i18n";
 
 interface Props {
   value: string;
@@ -17,6 +18,7 @@ interface LoaderCompatibility {
 }
 
 function VersionSelector(props: Props) {
+  const { t } = useI18n();
   const [versions, setVersions] = createSignal<MinecraftVersion[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
@@ -200,7 +202,7 @@ function VersionSelector(props: Props) {
           <div>
             <input
               type="text"
-              placeholder="Поиск версий..."
+              placeholder={t().ui?.placeholders?.searchVersions ?? "Search versions..."}
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
               class="w-full pl-9"

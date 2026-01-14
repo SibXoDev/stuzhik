@@ -3,6 +3,7 @@
 pub mod editor;
 pub mod install;
 pub mod patch;
+pub mod preview;
 pub mod search;
 pub mod types;
 

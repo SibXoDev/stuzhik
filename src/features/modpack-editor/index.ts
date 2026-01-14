@@ -1,5 +1,4 @@
 // Modpack Editor components
-// Integrated into InstanceDetail as tabs: configs, files, profiles
-export { ConfigEditorPanel } from "./components/ConfigEditorPanel";
-export { FileBrowserPanel } from "./components/FileBrowserPanel";
+// Integrated into InstanceDetail
 export { ModProfilesPanel } from "./components/ModProfilesPanel";
+export { FileBrowserPanel } from "./components/FileBrowserPanel";

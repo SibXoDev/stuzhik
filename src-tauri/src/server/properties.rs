@@ -210,7 +210,9 @@ impl ServerProperties {
 
     /// Get MOTD
     pub fn motd(&self) -> String {
-        self.get("motd").cloned().unwrap_or_else(|| "A Minecraft Server".to_string())
+        self.get("motd")
+            .cloned()
+            .unwrap_or_else(|| "A Minecraft Server".to_string())
     }
 
     /// Get max players
@@ -304,9 +306,18 @@ impl From<&ServerProperties> for ServerPropertiesUI {
             whitelist_enabled: props.whitelist_enabled(),
             enforce_whitelist: props.get_bool("enforce-whitelist").unwrap_or(false),
 
-            level_name: props.get("level-name").cloned().unwrap_or_else(|| "world".to_string()),
-            gamemode: props.get("gamemode").cloned().unwrap_or_else(|| "survival".to_string()),
-            difficulty: props.get("difficulty").cloned().unwrap_or_else(|| "normal".to_string()),
+            level_name: props
+                .get("level-name")
+                .cloned()
+                .unwrap_or_else(|| "world".to_string()),
+            gamemode: props
+                .get("gamemode")
+                .cloned()
+                .unwrap_or_else(|| "survival".to_string()),
+            difficulty: props
+                .get("difficulty")
+                .cloned()
+                .unwrap_or_else(|| "normal".to_string()),
             hardcore: props.get_bool("hardcore").unwrap_or(false),
             pvp: props.get_bool("pvp").unwrap_or(true),
 

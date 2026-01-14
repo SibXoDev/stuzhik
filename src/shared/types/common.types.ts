@@ -82,6 +82,30 @@ export interface Mod {
 
   installed_at: string;
   updated_at: string;
+
+  // Update tracking
+  latest_version?: string | null;
+  latest_version_id?: string | null;
+  update_available?: boolean;
+  update_checked_at?: string | null;
+}
+
+export interface UpdateCheckResult {
+  total_checked: number;
+  updates_available: number;
+  skipped: number;
+  errors: number;
+  mods_with_updates: ModUpdateInfo[];
+}
+
+export interface ModUpdateInfo {
+  mod_id: number;
+  slug: string;
+  name: string;
+  current_version: string;
+  latest_version: string;
+  latest_version_id: string;
+  source: ModSource;
 }
 
 export interface ModDependency {
@@ -161,6 +185,8 @@ export interface Settings {
   // Use store_auth_token / get_auth_token commands instead
   language: 'ru' | 'en';
   selected_gpu: string | null;
+  // Developer mode - shows Console & Source Code in TitleBar
+  developer_mode: boolean;
   // Backup settings
   backup_enabled: boolean;
   backup_max_count: number;
@@ -274,6 +300,50 @@ export interface ModConflict {
   details: string;
   required_slug?: string;
   required_version?: string;
+}
+
+// ========== Pre-Launch Check ==========
+
+/** Результат проверки зависимостей перед запуском */
+export interface PreLaunchCheckResult {
+  /** Можно ли безопасно запускать экземпляр */
+  can_launch: boolean;
+  /** Отсутствующие обязательные зависимости */
+  missing_dependencies: MissingDependency[];
+  /** Предупреждения (необязательные зависимости, версии) */
+  warnings: DependencyWarning[];
+  /** Общее количество проблем */
+  total_issues: number;
+}
+
+/** Отсутствующая зависимость */
+export interface MissingDependency {
+  /** Slug мода который требует зависимость */
+  required_by_slug: string;
+  /** Имя мода который требует зависимость */
+  required_by_name: string;
+  /** Slug/ID отсутствующей зависимости */
+  dependency_slug: string;
+  /** Человекочитаемое имя зависимости */
+  dependency_name: string;
+  /** Источник для установки (modrinth/curseforge) */
+  source?: string;
+  /** Project ID для автоматической установки */
+  project_id?: string;
+  /** Требуемая версия (если известна) */
+  version_requirement?: string;
+}
+
+/** Предупреждение о зависимости (не блокирует запуск) */
+export interface DependencyWarning {
+  /** Тип предупреждения */
+  warning_type: "optional_missing" | "version_mismatch" | "disabled_dependency";
+  /** Описание проблемы */
+  message: string;
+  /** Связанный мод */
+  mod_slug?: string;
+  /** Связанная зависимость */
+  dependency_slug?: string;
 }
 
 // ========== Conflict Predictor ==========
@@ -1583,6 +1653,8 @@ export interface GalleryImage {
 export interface WikiContent {
   mod_name: string;
   slug: string;
+  /** Автор мода */
+  author?: string | null;
   /** Полное описание (markdown для Modrinth, HTML для CurseForge) */
   body: string;
   content_format: ContentFormat;
@@ -1854,4 +1926,200 @@ export interface InstanceChanges {
   configs_removed: string[];
   /** Есть ли какие-либо изменения */
   has_changes: boolean;
+}
+
+// ========== Detailed Modpack Import Preview ==========
+
+/** Формат модпака */
+export type ModpackFormat = "modrinth" | "curseforge" | "stzhk" | "unknown";
+
+/** Категория файла при импорте */
+export type ImportFileCategory =
+  | "mod"
+  | "config"
+  | "resource_pack"
+  | "shader_pack"
+  | "script"
+  | "world"
+  | "other";
+
+/** Информация о моде в модпаке для предпросмотра */
+export interface ImportModInfo {
+  /** Путь к файлу в архиве */
+  path: string;
+  /** Имя файла */
+  filename: string;
+  /** Название мода (если известно) */
+  name?: string | null;
+  /** Размер файла в байтах */
+  size: number;
+  /** URL для скачивания (если есть) */
+  download_url?: string | null;
+  /** Сторона мода (client/server/both) */
+  side?: string | null;
+  /** Включён для импорта */
+  enabled: boolean;
+}
+
+/** Информация о файле в overrides для предпросмотра */
+export interface ImportOverrideInfo {
+  /** Путь в архиве */
+  archive_path: string;
+  /** Целевой путь в экземпляре */
+  dest_path: string;
+  /** Размер файла в байтах */
+  size: number;
+  /** Категория файла */
+  category: ImportFileCategory;
+  /** Включён для импорта */
+  enabled: boolean;
+}
+
+/** Детальный предпросмотр модпака перед импортом */
+export interface ModpackDetailedPreview {
+  /** Формат модпака */
+  format: ModpackFormat;
+  /** Название модпака */
+  name: string;
+  /** Версия модпака */
+  version?: string | null;
+  /** Автор */
+  author?: string | null;
+  /** Описание */
+  description?: string | null;
+  /** Версия Minecraft */
+  minecraft_version: string;
+  /** Загрузчик (fabric, forge, etc.) */
+  loader?: string | null;
+  /** Версия загрузчика */
+  loader_version?: string | null;
+  /** Список модов */
+  mods: ImportModInfo[];
+  /** Список файлов из overrides */
+  overrides: ImportOverrideInfo[];
+  /** Общий размер модов */
+  mods_size: number;
+  /** Общий размер файлов overrides */
+  overrides_size: number;
+  /** Размер архива */
+  archive_size: number;
+}
+
+/** Опции для селективного импорта */
+export interface ImportOptions {
+  /** Название экземпляра */
+  instance_name: string;
+  /** Исключённые моды (пути) */
+  excluded_mods: string[];
+  /** Исключённые файлы overrides (пути) */
+  excluded_overrides: string[];
+}
+
+// ========== Launcher Import Types ==========
+
+/** Типы поддерживаемых лаунчеров */
+export type LauncherType = "multimc" | "prism" | "curseforge_app" | "atlauncher" | "gdlauncher" | "modrinth";
+
+/** Обнаруженный лаунчер */
+export interface DetectedLauncher {
+  /** Тип лаунчера */
+  launcher_type: LauncherType;
+  /** Корневая директория лаунчера */
+  root_path: string;
+  /** Путь к папке экземпляров */
+  instances_path: string;
+  /** Количество найденных экземпляров */
+  instance_count: number;
+  /** Отображаемое имя */
+  display_name: string;
+}
+
+/** Экземпляр из другого лаунчера */
+export interface LauncherInstance {
+  /** Название экземпляра */
+  name: string;
+  /** Путь к директории */
+  path: string;
+  /** Версия Minecraft */
+  minecraft_version: string;
+  /** Мод загрузчик */
+  loader: string;
+  /** Версия загрузчика */
+  loader_version?: string | null;
+  /** Тип (client/server) */
+  instance_type: string;
+  /** Количество модов */
+  mods_count: number;
+  /** Общий размер в байтах */
+  total_size: number;
+  /** Дата последнего запуска */
+  last_played?: string | null;
+  /** Путь к иконке */
+  icon_path?: string | null;
+  /** Java аргументы */
+  java_args?: string | null;
+  /** Мин. память */
+  memory_min?: number | null;
+  /** Макс. память */
+  memory_max?: number | null;
+  /** Исходный лаунчер */
+  source_launcher: LauncherType;
+  /** Заметки */
+  notes?: string | null;
+  /** Уверенность детекции (0-100) */
+  confidence: number;
+}
+
+/** Прогресс импорта из лаунчера */
+export interface LauncherImportProgress {
+  /** Фаза импорта */
+  phase: string;
+  /** Текущий индекс */
+  current: number;
+  /** Всего элементов */
+  total: number;
+  /** Текущий файл */
+  current_file?: string | null;
+  /** Скопировано байт */
+  bytes_copied: number;
+  /** Всего байт */
+  total_bytes: number;
+}
+
+/** Результат импорта из лаунчера */
+export interface LauncherImportResult {
+  /** ID нового экземпляра */
+  instance_id: string;
+  /** Оригинальное название */
+  original_name: string;
+  /** Скопировано файлов */
+  files_copied: number;
+  /** Общий размер */
+  total_size: number;
+  /** Импортировано модов */
+  mods_imported: number;
+  /** Предупреждения */
+  warnings: string[];
+}
+
+/** Анализ .minecraft папки */
+export interface MinecraftFolderAnalysis {
+  /** Версия Minecraft */
+  minecraft_version?: string | null;
+  /** Загрузчик */
+  loader: string;
+  /** Версия загрузчика */
+  loader_version?: string | null;
+  /** Количество модов */
+  mods_count: number;
+  /** Размер безопасных файлов */
+  safe_size: number;
+  /** Размер пропускаемых файлов */
+  skipped_size: number;
+  /** Подозрительные файлы */
+  suspicious_files: string[];
+  /** Уверенность детекции */
+  confidence: number;
+  /** Доказательства детекции */
+  evidence: string[];
 }

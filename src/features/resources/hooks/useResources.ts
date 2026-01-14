@@ -1,5 +1,13 @@
 import { createSignal, onMount } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  createAsyncState,
+  runAsync,
+  runAsyncSilent,
+  extractErrorMessage,
+  removeItemById,
+  updateItemById,
+} from "../../../shared/hooks/useAsyncUtils";
 import type {
   ResourceType,
   InstalledResource,
@@ -16,34 +24,26 @@ export interface UseResourcesOptions {
   includeGlobal?: boolean;
 }
 
+const LOG_PREFIX = "[Resources]";
+
 export function useResources(options: () => UseResourcesOptions) {
   const [resources, setResources] = createSignal<InstalledResource[]>([]);
   const [searchResults, setSearchResults] = createSignal<ResourceSearchResult[]>([]);
   const [searchTotal, setSearchTotal] = createSignal(0);
-  const [loading, setLoading] = createSignal(false);
+  const { loading, setLoading, error, setError } = createAsyncState();
   const [searchLoading, setSearchLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
 
   // Load installed resources
   async function loadResources() {
     const opts = options();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await invoke<InstalledResource[]>("list_resources", {
+    await runAsync(
+      () => invoke<InstalledResource[]>("list_resources", {
         resourceType: opts.resourceType,
         instanceId: opts.instanceId ?? null,
         includeGlobal: opts.includeGlobal ?? true,
-      });
-      setResources(result);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to load resources:", e);
-    } finally {
-      setLoading(false);
-    }
+      }),
+      { setLoading, setError, logPrefix: LOG_PREFIX, onSuccess: setResources }
+    );
   }
 
   // Search resources on Modrinth
@@ -52,7 +52,7 @@ export function useResources(options: () => UseResourcesOptions) {
     minecraftVersion?: string,
     limit = 20,
     offset = 0
-  ) {
+  ): Promise<ResourceSearchResult[]> {
     const opts = options();
     setSearchLoading(true);
     setError(null);
@@ -69,9 +69,11 @@ export function useResources(options: () => UseResourcesOptions) {
       setSearchTotal(response.total);
       return response.results;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = extractErrorMessage(e);
       setError(msg);
-      console.error("Failed to search resources:", e);
+      if (import.meta.env.DEV) {
+        console.error(`${LOG_PREFIX} Failed to search resources:`, e);
+      }
       setSearchTotal(0);
       return [];
     } finally {
@@ -84,131 +86,97 @@ export function useResources(options: () => UseResourcesOptions) {
     slug: string,
     isGlobal: boolean,
     minecraftVersion?: string
-  ) {
+  ): Promise<InstalledResource | null> {
     const opts = options();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await invoke<InstalledResource>("install_resource_from_modrinth", {
+    const result = await runAsync(
+      () => invoke<InstalledResource>("install_resource_from_modrinth", {
         resourceType: opts.resourceType,
         instanceId: isGlobal ? null : opts.instanceId,
         isGlobal,
         slug,
         minecraftVersion: minecraftVersion ?? null,
-      });
+      }),
+      { setLoading, setError, logPrefix: LOG_PREFIX }
+    );
 
-      // Reload list
+    if (result) {
       await loadResources();
-      return result;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to install resource:", e);
-      throw e;
-    } finally {
-      setLoading(false);
     }
+    return result;
   }
 
   // Install resource from local file
-  async function installLocal(sourcePath: string, isGlobal: boolean) {
+  async function installLocal(
+    sourcePath: string,
+    isGlobal: boolean
+  ): Promise<InstalledResource | null> {
     const opts = options();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const result = await invoke<InstalledResource>("install_resource_local", {
+    const result = await runAsync(
+      () => invoke<InstalledResource>("install_resource_local", {
         resourceType: opts.resourceType,
         instanceId: isGlobal ? null : opts.instanceId,
         isGlobal,
         sourcePath,
-      });
+      }),
+      { setLoading, setError, logPrefix: LOG_PREFIX }
+    );
 
-      // Reload list
+    if (result) {
       await loadResources();
-      return result;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to install local resource:", e);
-      throw e;
-    } finally {
-      setLoading(false);
     }
+    return result;
   }
 
   // Toggle resource enabled/disabled
   async function toggleResource(resourceId: number, enabled: boolean) {
     const opts = options();
-    setError(null);
-
-    try {
-      await invoke("toggle_resource", {
+    await runAsyncSilent(
+      () => invoke("toggle_resource", {
         resourceType: opts.resourceType,
         resourceId,
         enabled,
-      });
-
-      // Update local state
-      setResources((prev) =>
-        prev.map((r) =>
-          r.id === resourceId ? { ...r, enabled } : r
-        )
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to toggle resource:", e);
-      throw e;
-    }
+      }),
+      {
+        setError,
+        logPrefix: LOG_PREFIX,
+        onSuccess: () => updateItemById(setResources, resourceId, { enabled }),
+      }
+    );
   }
 
   // Remove resource
   async function removeResource(resourceId: number) {
     const opts = options();
-    setError(null);
-
-    try {
-      await invoke("remove_resource", {
+    await runAsyncSilent(
+      () => invoke("remove_resource", {
         resourceType: opts.resourceType,
         resourceId,
-      });
-
-      // Update local state
-      setResources((prev) => prev.filter((r) => r.id !== resourceId));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to remove resource:", e);
-      throw e;
-    }
+      }),
+      {
+        setError,
+        logPrefix: LOG_PREFIX,
+        onSuccess: () => removeItemById(setResources, resourceId),
+      }
+    );
   }
 
   // Scan directory for untracked resources
-  async function scanAndImport(isGlobal: boolean) {
+  async function scanAndImport(isGlobal: boolean): Promise<InstalledResource[]> {
     const opts = options();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const imported = await invoke<InstalledResource[]>("scan_resources", {
+    const result = await runAsync(
+      () => invoke<InstalledResource[]>("scan_resources", {
         resourceType: opts.resourceType,
         instanceId: isGlobal ? null : opts.instanceId,
         isGlobal,
-      });
+      }),
+      { setLoading, setError, logPrefix: LOG_PREFIX }
+    );
 
-      // Reload list
+    if (result) {
       await loadResources();
-      return imported;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to scan resources:", e);
-      return [];
-    } finally {
-      setLoading(false);
+      return result;
     }
+    return [];
   }
 
   // Check if resource is installed

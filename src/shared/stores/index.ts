@@ -29,3 +29,10 @@ export {
   filterByExtensions,
 } from "./dragDrop";
 export type { DroppedFile, DropHandler } from "./dragDrop";
+
+export {
+  registerSearchHandler,
+  unregisterSearchHandler,
+  triggerSearch,
+  hasSearchHandlers,
+} from "./searchFocus";

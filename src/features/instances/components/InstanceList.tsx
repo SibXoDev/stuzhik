@@ -12,6 +12,8 @@ import { LoaderIcon } from "../../../shared/components/LoaderSelector";
 import InstanceDetail, { type Tab } from "./InstanceDetail";
 import { Tooltip } from "../../../shared/ui/Tooltip";
 import { useSafeTimers } from "../../../shared/hooks";
+import { useDragDrop, registerDropHandler, type DroppedFile } from "../../../shared/stores/dragDrop";
+import { addToast } from "../../../shared/components/Toast";
 
 interface Props {
   instances: Instance[];
@@ -23,6 +25,7 @@ interface Props {
   onCreateClick?: () => void;
   onModpackClick?: () => void;
   onImportServer?: () => void;
+  onImportLauncher?: () => void;
   onRefresh?: () => void;
   onDetailViewChange?: (viewing: boolean) => void;
 }
@@ -30,6 +33,7 @@ interface Props {
 const InstanceList: Component<Props> = (props) => {
   const { t } = useI18n();
   const { setTimeout: safeTimeout } = useSafeTimers();
+  const { isDragging, draggedFiles, dragPosition, isInDetailView, setIsInDetailView } = useDragDrop();
   const [detailInstance, setDetailInstance] = createSignal<Instance | null>(null);
   const [detailInitialTab, setDetailInitialTab] = createSignal<Tab>("mods");
   const [showGameSettings, setShowGameSettings] = createSignal(false);
@@ -43,9 +47,152 @@ const InstanceList: Component<Props> = (props) => {
   const [showStzhkExport, setShowStzhkExport] = createSignal(false);
   const [stzhkExportInstance, setStzhkExportInstance] = createSignal<Instance | null>(null);
 
-  // Notify parent when detail view changes
+  // Drag & drop: track which instance is being hovered for mod drops
+  const [dragHoveredInstance, setDragHoveredInstance] = createSignal<string | null>(null);
+  // Store last hovered instance for drop handler (survives reactivity clearing)
+  let lastHoveredInstanceId: string | null = null;
+
+  // Check if dragged files are all .jar mods
+  const isDraggingMods = createMemo(() => {
+    const files = draggedFiles();
+    return isDragging() && files.length > 0 && files.every(f => f.extension === "jar");
+  });
+
+  // Check if instance can accept mods (has a mod loader, not vanilla)
+  const canAcceptMods = (instance: Instance): boolean => {
+    const loader = instance.loader?.toLowerCase();
+    // Only instances with mod loaders can accept mods
+    return !!loader && loader !== "vanilla" && loader !== "";
+  };
+
+  // Batch install result type
+  interface BatchModInstallResult {
+    file_name: string;
+    success: boolean;
+    mod_name: string | null;
+    error: string | null;
+    source: string;
+    verified: boolean;
+  }
+
+  // Install mods to a specific instance (batch API for efficiency)
+  const installModsToInstance = async (instanceId: string, files: DroppedFile[]) => {
+    const jarFiles = files.filter(f => f.extension === "jar");
+    if (jarFiles.length === 0) return;
+
+    const instance = props.instances.find(i => i.id === instanceId);
+    if (!instance) return;
+
+    // Check if instance can accept mods
+    if (!canAcceptMods(instance)) {
+      addToast({
+        type: "error",
+        title: "Невозможно установить мод",
+        message: `${instance.name} не поддерживает моды (нужен Fabric, Forge или другой загрузчик)`,
+        duration: 5000,
+      });
+      return;
+    }
+
+    // Use batch install API for efficiency (1 request for N mods)
+    try {
+      const filePaths = jarFiles.map(f => f.path);
+      const results = await invoke<BatchModInstallResult[]>("install_mods_local_batch", {
+        instanceId,
+        filePaths,
+      });
+
+      // Count successes and failures
+      const successes = results.filter(r => r.success);
+      const failures = results.filter(r => !r.success);
+      const verified = results.filter(r => r.verified);
+
+      // Show summary toast
+      if (successes.length > 0) {
+        const verifiedMsg = verified.length > 0 ? ` (${verified.length} верифицировано)` : "";
+        addToast({
+          type: "success",
+          title: `Установлено ${successes.length} модов${verifiedMsg}`,
+          message: `→ ${instance.name}`,
+          duration: 3000,
+        });
+      }
+
+      // Show individual errors
+      for (const failure of failures) {
+        const errorMsg = failure.error || "Неизвестная ошибка";
+        addToast({
+          type: errorMsg.includes("уже установлен") ? "warning" : "error",
+          title: errorMsg.includes("уже установлен") ? "Мод уже установлен" : "Ошибка установки",
+          message: `${failure.file_name}: ${errorMsg}`,
+          duration: errorMsg.includes("уже установлен") ? 3000 : 5000,
+        });
+      }
+    } catch (e: unknown) {
+      if (import.meta.env.DEV) {
+        console.error("Failed to batch install mods:", e);
+      }
+      const errorMessage = e instanceof Error
+        ? e.message
+        : (e && typeof e === "object" && "details" in e)
+          ? String((e as { details: unknown }).details)
+          : "Неизвестная ошибка";
+      addToast({
+        type: "error",
+        title: "Ошибка пакетной установки",
+        message: errorMessage,
+        duration: 5000,
+      });
+    }
+  };
+
+  // Map to track instance card bounding boxes for drag detection
+  const instanceCardRefs = new Map<string, HTMLDivElement>();
+
+  // Register instance cards for drop detection
+  const registerInstanceCard = (id: string, el: HTMLDivElement) => {
+    instanceCardRefs.set(id, el);
+  };
+
+  // Find instance card at position (only if actually visible - not covered by other UI)
+  const findInstanceAtPosition = (x: number, y: number): string | null => {
+    // Use elementFromPoint to find what's actually visible at cursor position
+    const elementAtPoint = document.elementFromPoint(x, y);
+    if (!elementAtPoint) return null;
+
+    // Check if this element or any of its parents is a registered instance card
+    for (const [id, cardEl] of instanceCardRefs) {
+      if (cardEl.contains(elementAtPoint)) {
+        return id;
+      }
+    }
+    return null;
+  };
+
+  // Update hovered instance based on drag position from store
+  createEffect(() => {
+    const dragging = isDraggingMods();
+    const position = dragPosition();
+
+    if (!dragging) {
+      setDragHoveredInstance(null);
+      // Don't clear lastHoveredInstanceId - we need it for drop handler
+      return;
+    }
+
+    if (position) {
+      const instanceId = findInstanceAtPosition(position.x, position.y);
+      setDragHoveredInstance(instanceId);
+      // Store for drop handler - also clear when not over any instance
+      lastHoveredInstanceId = instanceId;
+    }
+  });
+
+  // Notify parent when detail view changes and update drag-drop context
   createEffect(on(detailInstance, (instance) => {
-    props.onDetailViewChange?.(instance !== null);
+    const isInDetail = instance !== null;
+    props.onDetailViewChange?.(isInDetail);
+    setIsInDetailView(isInDetail);
   }));
 
   // Sync detailInstance with props.instances when status changes
@@ -56,13 +203,38 @@ const InstanceList: Component<Props> = (props) => {
     if (current && instances.length > 0) {
       const updated = instances.find(i => i.id === current.id);
       if (updated && updated.status !== current.status) {
-        console.log(`Syncing detailInstance status: ${current.status} -> ${updated.status}`);
         setDetailInstance({ ...updated });
       }
     }
   });
 
-  // Listen for auto-open log analyzer event (from crash detection)
+  // Register drop handler for mods on instance cards (only in list view, not detail view)
+  onMount(() => {
+    const cleanupDropHandler = registerDropHandler({
+      accept: (files) => {
+        // Only accept .jar files when NOT in detail view and hovering an instance
+        if (isInDetailView()) return false;
+        if (!lastHoveredInstanceId) return false;
+        return files.some(f => f.extension === "jar");
+      },
+      onDrop: async (files) => {
+        const instanceId = lastHoveredInstanceId;
+        if (!instanceId) return;
+
+        const jarFiles = files.filter(f => f.extension === "jar");
+        await installModsToInstance(instanceId, jarFiles);
+
+        // Clear state
+        lastHoveredInstanceId = null;
+        setDragHoveredInstance(null);
+      },
+      priority: 15, // Higher than ModsList (10) to catch drops on instance cards
+    });
+
+    onCleanup(cleanupDropHandler);
+  });
+
+  // Event listener for log analyzer
   let unlistenOpenLogAnalyzer: UnlistenFn | undefined;
 
   onMount(async () => {
@@ -357,15 +529,26 @@ const InstanceList: Component<Props> = (props) => {
                   {t().modpacks.install}
                 </button>
               </div>
-              <Show when={props.onImportServer}>
-                <button
-                  class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
-                  onClick={() => props.onImportServer?.()}
-                >
-                  <i class="i-hugeicons-upload-02 w-3 h-3" />
-                  Импортировать существующий сервер
-                </button>
-              </Show>
+              <div class="flex items-center gap-4">
+                <Show when={props.onImportLauncher}>
+                  <button
+                    class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+                    onClick={() => props.onImportLauncher?.()}
+                  >
+                    <i class="i-hugeicons-folder-sync w-3 h-3" />
+                    {t().launchers?.importFromLauncher ?? "Импорт из лаунчера"}
+                  </button>
+                </Show>
+                <Show when={props.onImportServer}>
+                  <button
+                    class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+                    onClick={() => props.onImportServer?.()}
+                  >
+                    <i class="i-hugeicons-upload-02 w-3 h-3" />
+                    {t().launchers?.importServer ?? "Импорт сервера"}
+                  </button>
+                </Show>
+              </div>
             </div>
           </div>
         </Show>
@@ -376,25 +559,80 @@ const InstanceList: Component<Props> = (props) => {
             <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider">
               {t().instances.title} · {props.instances.length}
             </h3>
-            <Show when={props.onImportServer}>
-              <button
-                class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
-                onClick={() => props.onImportServer?.()}
-              >
-                <i class="i-hugeicons-upload-02 w-3 h-3" />
-                Импорт сервера
-              </button>
-            </Show>
+            <div class="flex items-center gap-3">
+              <Show when={props.onImportLauncher}>
+                <button
+                  class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+                  onClick={() => props.onImportLauncher?.()}
+                >
+                  <i class="i-hugeicons-folder-sync w-3 h-3" />
+                  {t().launchers?.importFromLauncher ?? "Импорт"}
+                </button>
+              </Show>
+              <Show when={props.onImportServer}>
+                <button
+                  class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+                  onClick={() => props.onImportServer?.()}
+                >
+                  <i class="i-hugeicons-upload-02 w-3 h-3" />
+                  {t().launchers?.importServer ?? "Сервер"}
+                </button>
+              </Show>
+            </div>
           </div>
         </Show>
 
         <div class="grid grid-cols-1 gap-3">
           <For each={sortedInstances()}>
-            {(instance) => (
+            {(instance) => {
+              const acceptsMods = canAcceptMods(instance);
+              const isHovered = () => dragHoveredInstance() === instance.id;
+
+              // Determine card classes based on drag state and loader support
+              const cardClasses = () => {
+                if (!isDraggingMods()) {
+                  return "card-hover";
+                }
+
+                if (acceptsMods) {
+                  if (isHovered()) {
+                    // Active drop target - solid blue border
+                    return "bg-[var(--color-bg-card)] rounded-xl p-4 border border-blue-500";
+                  }
+                  // Valid drop target - dashed blue border
+                  return "bg-[var(--color-bg-card)] rounded-xl p-4 border border-dashed border-blue-500/50";
+                }
+
+                // Invalid drop target (vanilla) - dashed gray border
+                return "bg-[var(--color-bg-card)] rounded-xl p-4 border border-dashed border-gray-600/50 opacity-50";
+              };
+
+              return (
               <div
-                class="group card-hover cursor-pointer"
+                ref={(el) => registerInstanceCard(instance.id, el)}
+                class={`group cursor-pointer transition-all duration-150 ${cardClasses()}`}
                 onClick={() => openInstanceDetail(instance)}
               >
+                {/* Drop zone indicator overlay for valid targets */}
+                <Show when={isDraggingMods() && isHovered() && acceptsMods}>
+                  <div class="absolute inset-0 flex items-center justify-center bg-blue-500/10 rounded-xl pointer-events-none z-10">
+                    <div class="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-full text-white text-sm font-medium shadow-lg animate-pulse">
+                      <i class="i-hugeicons-download-02 w-4 h-4" />
+                      <span>Отпустите для установки</span>
+                    </div>
+                  </div>
+                </Show>
+
+                {/* Drop zone indicator overlay for invalid targets */}
+                <Show when={isDraggingMods() && isHovered() && !acceptsMods}>
+                  <div class="absolute inset-0 flex items-center justify-center bg-red-500/10 rounded-xl pointer-events-none z-10">
+                    <div class="flex items-center gap-2 px-4 py-2 bg-red-600/80 rounded-full text-white text-sm font-medium shadow-lg">
+                      <i class="i-hugeicons-cancel-01 w-4 h-4" />
+                      <span>Нужен загрузчик модов</span>
+                    </div>
+                  </div>
+                </Show>
+
                 <div class="flex items-center gap-4">
                   {/* Loader Icon */}
                   <div class="w-12 h-12 rounded-2xl bg-black/30 flex-center flex-shrink-0 border border-gray-700/50">
@@ -545,7 +783,8 @@ const InstanceList: Component<Props> = (props) => {
                   </div>
                 </div>
               </div>
-            )}
+              );
+            }}
           </For>
         </div>
         </div>

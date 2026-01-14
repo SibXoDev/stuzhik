@@ -107,6 +107,7 @@ async fn install_instance_async(instance: &Instance, app_handle: tauri::AppHandl
             instance.loader_version.as_deref(),
             is_server,
             &download_manager,
+            &cancel_token,
         )
         .await?;
 
@@ -282,14 +283,11 @@ pub(super) async fn install_instance_async_cancellable(
             instance.loader_version.as_deref(),
             is_server,
             &download_manager,
+            cancel_token,
         )
         .await?;
 
-        // Проверка отмены после loader
-        if cancel_token.is_cancelled() {
-            return Err(LauncherError::OperationCancelled);
-        }
-
+        // Проверка отмены после loader (не нужна - уже проверяется в install_loader)
         log::info!("Loader installed");
     }
 
@@ -562,6 +560,7 @@ async fn repair_instance_async(instance: &Instance, app_handle: tauri::AppHandle
                 instance.loader_version.as_deref(),
                 is_server,
                 &download_manager,
+                &cancel_token,
             )
             .await?;
             log::info!("Loader repaired");

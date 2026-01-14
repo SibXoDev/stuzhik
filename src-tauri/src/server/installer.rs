@@ -106,18 +106,18 @@ pub async fn install_server(
         ServerLoader::Fabric => {
             let loader_ver = match loader_version {
                 Some(v) => v.to_string(),
-                None => get_latest_fabric_loader(mc_version)
-                    .await?
-                    .ok_or_else(|| ServerError::NotFound(format!("No Fabric loader for MC {}", mc_version)))?,
+                None => get_latest_fabric_loader(mc_version).await?.ok_or_else(|| {
+                    ServerError::NotFound(format!("No Fabric loader for MC {}", mc_version))
+                })?,
             };
             install_fabric(server_dir, mc_version, &loader_ver, java_path).await
         }
         ServerLoader::Forge => {
             let loader_ver = match loader_version {
                 Some(v) => v.to_string(),
-                None => get_latest_forge_version(mc_version)
-                    .await?
-                    .ok_or_else(|| ServerError::NotFound(format!("No Forge for MC {}", mc_version)))?,
+                None => get_latest_forge_version(mc_version).await?.ok_or_else(|| {
+                    ServerError::NotFound(format!("No Forge for MC {}", mc_version))
+                })?,
             };
             install_forge(server_dir, mc_version, &loader_ver, java_path).await
         }
@@ -126,16 +126,18 @@ pub async fn install_server(
                 Some(v) => v.to_string(),
                 None => get_latest_neoforge_version(mc_version)
                     .await?
-                    .ok_or_else(|| ServerError::NotFound(format!("No NeoForge for MC {}", mc_version)))?,
+                    .ok_or_else(|| {
+                        ServerError::NotFound(format!("No NeoForge for MC {}", mc_version))
+                    })?,
             };
             install_neoforge(server_dir, mc_version, &loader_ver, java_path).await
         }
         ServerLoader::Quilt => {
             let loader_ver = match loader_version {
                 Some(v) => v.to_string(),
-                None => get_latest_quilt_loader(mc_version)
-                    .await?
-                    .ok_or_else(|| ServerError::NotFound(format!("No Quilt loader for MC {}", mc_version)))?,
+                None => get_latest_quilt_loader(mc_version).await?.ok_or_else(|| {
+                    ServerError::NotFound(format!("No Quilt loader for MC {}", mc_version))
+                })?,
             };
             install_quilt(server_dir, mc_version, &loader_ver, java_path).await
         }
@@ -237,7 +239,11 @@ async fn install_fabric(
     loader_version: &str,
     java_path: &Path,
 ) -> ServerResult<InstallResult> {
-    log::info!("Installing Fabric server: MC {} loader {}", mc_version, loader_version);
+    log::info!(
+        "Installing Fabric server: MC {} loader {}",
+        mc_version,
+        loader_version
+    );
 
     // Get latest installer version
     let installer_url = "https://meta.fabricmc.net/v2/versions/installer";
@@ -282,7 +288,8 @@ async fn install_fabric(
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let status = cmd.status()
+    let status = cmd
+        .status()
         .await
         .map_err(|e| ServerError::Process(e.to_string()))?;
 
@@ -319,7 +326,11 @@ async fn install_fabric(
         loader_version: Some(loader_version.to_string()),
         java_args: vec![
             "-jar".into(),
-            server_jar.file_name().unwrap().to_string_lossy().to_string(),
+            server_jar
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
             "nogui".into(),
         ],
     })
@@ -362,7 +373,11 @@ async fn install_forge(
     forge_version: &str,
     java_path: &Path,
 ) -> ServerResult<InstallResult> {
-    log::info!("Installing Forge server: MC {} forge {}", mc_version, forge_version);
+    log::info!(
+        "Installing Forge server: MC {} forge {}",
+        mc_version,
+        forge_version
+    );
 
     // Forge version format: 1.20.1-47.2.0
     let full_version = format!("{}-{}", mc_version, forge_version);
@@ -385,7 +400,8 @@ async fn install_forge(
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let status = cmd.status()
+    let status = cmd
+        .status()
         .await
         .map_err(|e| ServerError::Process(e.to_string()))?;
 
@@ -406,12 +422,21 @@ async fn install_forge(
 
     let (server_jar, java_args) = if run_sh.exists() || run_bat.exists() {
         // Modern Forge - use the args from run script
-        let args_file = format!("@libraries/net/minecraftforge/forge/{}/unix_args.txt", full_version);
-        let args_path = server_dir.join("libraries/net/minecraftforge/forge").join(&full_version).join("unix_args.txt");
+        let args_file = format!(
+            "@libraries/net/minecraftforge/forge/{}/unix_args.txt",
+            full_version
+        );
+        let args_path = server_dir
+            .join("libraries/net/minecraftforge/forge")
+            .join(&full_version)
+            .join("unix_args.txt");
 
         if !args_path.exists() {
             // Try win_args.txt as fallback
-            let win_args = server_dir.join("libraries/net/minecraftforge/forge").join(&full_version).join("win_args.txt");
+            let win_args = server_dir
+                .join("libraries/net/minecraftforge/forge")
+                .join(&full_version)
+                .join("win_args.txt");
             if !win_args.exists() {
                 return Err(ServerError::Config(format!(
                     "Forge installed but args file not found at {:?}",
@@ -449,7 +474,10 @@ async fn install_forge(
             if let Ok(mut entries) = fs::read_dir(server_dir).await {
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     let name = entry.file_name().to_string_lossy().to_string();
-                    if name.starts_with("forge") && name.ends_with(".jar") && !name.contains("installer") {
+                    if name.starts_with("forge")
+                        && name.ends_with(".jar")
+                        && !name.contains("installer")
+                    {
                         found_jar = Some(entry.path());
                         break;
                     }
@@ -459,7 +487,8 @@ async fn install_forge(
 
         match found_jar {
             Some(jar_path) => {
-                let jar_name = jar_path.file_name()
+                let jar_name = jar_path
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("forge-server.jar")
                     .to_string();
@@ -467,7 +496,8 @@ async fn install_forge(
             }
             None => {
                 return Err(ServerError::Config(
-                    "Forge server jar not found after installation. Check the installer log.".into()
+                    "Forge server jar not found after installation. Check the installer log."
+                        .into(),
                 ));
             }
         }
@@ -540,7 +570,11 @@ async fn install_neoforge(
     neoforge_version: &str,
     java_path: &Path,
 ) -> ServerResult<InstallResult> {
-    log::info!("Installing NeoForge server: MC {} neoforge {}", mc_version, neoforge_version);
+    log::info!(
+        "Installing NeoForge server: MC {} neoforge {}",
+        mc_version,
+        neoforge_version
+    );
 
     // Download installer
     let installer_jar = server_dir.join("neoforge-installer.jar");
@@ -560,7 +594,8 @@ async fn install_neoforge(
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let status = cmd.status()
+    let status = cmd
+        .status()
         .await
         .map_err(|e| ServerError::Process(e.to_string()))?;
 
@@ -594,10 +629,7 @@ async fn install_neoforge(
 // ============================================================================
 
 async fn get_latest_quilt_loader(mc_version: &str) -> ServerResult<Option<String>> {
-    let url = format!(
-        "https://meta.quiltmc.org/v3/versions/loader/{}",
-        mc_version
-    );
+    let url = format!("https://meta.quiltmc.org/v3/versions/loader/{}", mc_version);
 
     let response = reqwest::get(&url)
         .await
@@ -624,7 +656,11 @@ async fn install_quilt(
     loader_version: &str,
     java_path: &Path,
 ) -> ServerResult<InstallResult> {
-    log::info!("Installing Quilt server: MC {} loader {}", mc_version, loader_version);
+    log::info!(
+        "Installing Quilt server: MC {} loader {}",
+        mc_version,
+        loader_version
+    );
 
     // Get latest installer version
     let installer_url = "https://meta.quiltmc.org/v3/versions/installer";
@@ -666,7 +702,8 @@ async fn install_quilt(
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
 
-    let status = cmd.status()
+    let status = cmd
+        .status()
         .await
         .map_err(|e| ServerError::Process(e.to_string()))?;
 
@@ -689,7 +726,11 @@ async fn install_quilt(
         loader_version: Some(loader_version.to_string()),
         java_args: vec![
             "-jar".into(),
-            server_jar.file_name().unwrap().to_string_lossy().to_string(),
+            server_jar
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string(),
             "nogui".into(),
         ],
     })
@@ -751,10 +792,7 @@ pub async fn get_available_loader_versions(
                 .collect())
         }
         ServerLoader::Quilt => {
-            let url = format!(
-                "https://meta.quiltmc.org/v3/versions/loader/{}",
-                mc_version
-            );
+            let url = format!("https://meta.quiltmc.org/v3/versions/loader/{}", mc_version);
             let versions: Vec<serde_json::Value> = reqwest::get(&url)
                 .await
                 .map_err(|e| ServerError::Network(e.to_string()))?

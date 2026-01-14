@@ -133,6 +133,8 @@ interface AuroraProps {
   amplitude?: number;
   blend?: number;
   speed?: number;
+  /** Preview mode - reduces framerate to ~24fps for better performance in settings */
+  previewMode?: boolean;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -272,8 +274,18 @@ const Aurora = (props: AuroraProps) => {
 
     const start = performance.now();
     const speed = props.speed ?? 1.0;
+    // Preview mode: throttle to ~24fps (42ms interval) for better performance
+    const frameInterval = props.previewMode ? 42 : 0;
+    let lastFrameTime = 0;
 
-    const render = () => {
+    const render = (currentTime: number) => {
+      // Throttle frames in preview mode
+      if (frameInterval > 0 && currentTime - lastFrameTime < frameInterval) {
+        frameId = requestAnimationFrame(render);
+        return;
+      }
+      lastFrameTime = currentTime;
+
       const time = ((performance.now() - start) / 1000) * speed * 0.1;
 
       gl.uniform1f(uTime, time);
@@ -286,7 +298,7 @@ const Aurora = (props: AuroraProps) => {
       frameId = requestAnimationFrame(render);
     };
 
-    render();
+    frameId = requestAnimationFrame(render);
 
     onCleanup(() => {
       cancelAnimationFrame(frameId);

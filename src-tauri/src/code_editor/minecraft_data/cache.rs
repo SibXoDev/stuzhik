@@ -8,6 +8,17 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// Санитизирует строку для использования в пути файловой системы
+fn sanitize_for_path(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect()
+}
+
 pub struct MinecraftDataCache {
     instance_id: String,
     conn: Arc<Mutex<Connection>>,
@@ -77,6 +88,7 @@ impl MinecraftDataCache {
                 name TEXT NOT NULL,
                 mod_id TEXT NOT NULL,
                 tags TEXT,
+                texture_path TEXT,
                 hardness REAL,
                 blast_resistance REAL,
                 requires_tool INTEGER,
@@ -84,6 +96,9 @@ impl MinecraftDataCache {
             )",
             [],
         )?;
+
+        // Миграция: добавляем texture_path если не существует (для старых БД)
+        let _ = conn.execute("ALTER TABLE blocks ADD COLUMN texture_path TEXT", []);
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_blocks_mod_id ON blocks(mod_id)",
@@ -99,7 +114,7 @@ impl MinecraftDataCache {
             "CREATE TABLE IF NOT EXISTS tags (
                 id TEXT PRIMARY KEY,
                 tag_type TEXT NOT NULL,
-                values TEXT NOT NULL,
+                tag_values TEXT NOT NULL,
                 last_updated INTEGER NOT NULL
             )",
             [],
@@ -143,7 +158,7 @@ impl MinecraftDataCache {
         // Проверяем что директория существует
         if !tokio::fs::try_exists(&mods_dir).await.unwrap_or(false) {
             return Err(crate::error::LauncherError::InvalidConfig(
-                "Mods directory does not exist".to_string()
+                "Mods directory does not exist".to_string(),
             ));
         }
 
@@ -179,9 +194,17 @@ impl MinecraftDataCache {
             conn.execute("DELETE FROM mods", [])?;
         }
 
-        // Парсим каждый мод
+        // Очищаем старый кэш текстур
+        let safe_instance_id = sanitize_for_path(&self.instance_id);
+        let textures_dir = cache_dir().join("textures").join(&safe_instance_id);
+        if tokio::fs::try_exists(&textures_dir).await.unwrap_or(false) {
+            let _ = tokio::fs::remove_dir_all(&textures_dir).await;
+        }
+
+        // Парсим каждый мод с извлечением текстур
+        let instance_id = self.instance_id.clone();
         for jar_path in jar_files {
-            match JarParser::parse_mod_jar(&jar_path) {
+            match JarParser::parse_mod_jar_with_textures(&jar_path, Some(&instance_id)) {
                 Ok(mod_data) => {
                     if !mod_data.is_empty() {
                         self.save_mod_data(&mod_data).await?;
@@ -257,13 +280,14 @@ impl MinecraftDataCache {
         // Сохраняем блоки
         for block in &mod_data.blocks {
             tx.execute(
-                "INSERT OR REPLACE INTO blocks (id, name, mod_id, tags, hardness, blast_resistance, requires_tool, last_updated)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO blocks (id, name, mod_id, tags, texture_path, hardness, blast_resistance, requires_tool, last_updated)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 params![
                     block.id,
                     block.name,
                     block.mod_id,
                     serde_json::to_string(&block.tags).unwrap_or_default(),
+                    block.texture_path,
                     block.hardness,
                     block.blast_resistance,
                     block.requires_tool.map(|b| if b { 1 } else { 0 }),
@@ -275,7 +299,7 @@ impl MinecraftDataCache {
         // Сохраняем теги
         for tag in &mod_data.tags {
             tx.execute(
-                "INSERT OR REPLACE INTO tags (id, tag_type, values, last_updated)
+                "INSERT OR REPLACE INTO tags (id, tag_type, tag_values, last_updated)
                  VALUES (?, ?, ?, ?)",
                 params![
                     tag.id,
@@ -295,10 +319,29 @@ impl MinecraftDataCache {
     }
 
     /// Поиск предметов (для автодополнения)
-    pub async fn search_items(&self, query: &str, limit: usize) -> Result<Vec<MinecraftItem>> {
+    pub async fn search_items(
+        &self,
+        query: &str,
+        mod_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<MinecraftItem>> {
         let conn = self.conn.lock().await;
 
-        let mut stmt = conn.prepare(
+        // Строим запрос в зависимости от наличия фильтра по mod_id
+        let sql = if mod_id.is_some() {
+            "SELECT id, name, mod_id, tags, texture_path, stack_size, rarity, description
+             FROM items
+             WHERE (id LIKE ?1 OR name LIKE ?1) AND mod_id = ?5
+             ORDER BY
+                CASE
+                    WHEN id = ?2 THEN 0
+                    WHEN id LIKE ?3 THEN 1
+                    WHEN name LIKE ?3 THEN 2
+                    ELSE 3
+                END,
+                name
+             LIMIT ?4"
+        } else {
             "SELECT id, name, mod_id, tags, texture_path, stack_size, rarity, description
              FROM items
              WHERE id LIKE ?1 OR name LIKE ?1
@@ -310,27 +353,49 @@ impl MinecraftDataCache {
                     ELSE 3
                 END,
                 name
-             LIMIT ?4",
-        )?;
+             LIMIT ?4"
+        };
+
+        let mut stmt = conn.prepare(sql)?;
 
         let pattern = format!("%{}%", query);
         let exact_pattern = format!("{}%", query);
 
-        let items = stmt
-            .query_map(params![pattern, query, exact_pattern, limit], |row| {
-                Ok(MinecraftItem {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    mod_id: row.get(2)?,
-                    tags: serde_json::from_str(&row.get::<_, String>(3)?)
-                        .unwrap_or_default(),
-                    texture_path: row.get(4)?,
-                    stack_size: row.get(5)?,
-                    rarity: row.get(6)?,
-                    description: row.get(7)?,
-                })
-            })?
-            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let items = if let Some(mid) = mod_id {
+            stmt.query_map(
+                params![pattern, query, exact_pattern, limit as i64, mid],
+                |row| {
+                    Ok(MinecraftItem {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        mod_id: row.get(2)?,
+                        tags: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
+                        texture_path: row.get(4)?,
+                        stack_size: row.get(5)?,
+                        rarity: row.get(6)?,
+                        description: row.get(7)?,
+                    })
+                },
+            )?
+            .collect::<std::result::Result<Vec<_>, _>>()?
+        } else {
+            stmt.query_map(
+                params![pattern, query, exact_pattern, limit as i64],
+                |row| {
+                    Ok(MinecraftItem {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        mod_id: row.get(2)?,
+                        tags: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
+                        texture_path: row.get(4)?,
+                        stack_size: row.get(5)?,
+                        rarity: row.get(6)?,
+                        description: row.get(7)?,
+                    })
+                },
+            )?
+            .collect::<std::result::Result<Vec<_>, _>>()?
+        };
 
         Ok(items)
     }
@@ -340,7 +405,7 @@ impl MinecraftDataCache {
         let conn = self.conn.lock().await;
 
         let mut stmt = conn.prepare(
-            "SELECT id, name, mod_id, tags, hardness, blast_resistance, requires_tool
+            "SELECT id, name, mod_id, tags, texture_path, hardness, blast_resistance, requires_tool
              FROM blocks
              WHERE id LIKE ?1 OR name LIKE ?1
              ORDER BY name
@@ -350,21 +415,76 @@ impl MinecraftDataCache {
         let pattern = format!("%{}%", query);
 
         let blocks = stmt
-            .query_map(params![pattern, limit], |row| {
+            .query_map(params![pattern, limit as i64], |row| {
                 Ok(MinecraftBlock {
                     id: row.get(0)?,
                     name: row.get(1)?,
                     mod_id: row.get(2)?,
-                    tags: serde_json::from_str(&row.get::<_, String>(3)?)
-                        .unwrap_or_default(),
-                    hardness: row.get(4)?,
-                    blast_resistance: row.get(5)?,
-                    requires_tool: row
-                        .get::<_, Option<i32>>(6)?
-                        .map(|v| v != 0),
+                    tags: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
+                    texture_path: row.get(4)?,
+                    hardness: row.get(5)?,
+                    blast_resistance: row.get(6)?,
+                    requires_tool: row.get::<_, Option<i32>>(7)?.map(|v| v != 0),
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
+
+        Ok(blocks)
+    }
+
+    /// Поиск блоков с фильтром по mod_id
+    pub async fn search_blocks_filtered(
+        &self,
+        query: &str,
+        mod_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<MinecraftBlock>> {
+        let conn = self.conn.lock().await;
+        let pattern = format!("%{}%", query);
+
+        let blocks = if let Some(mod_id) = mod_id {
+            let mut stmt = conn.prepare(
+                "SELECT id, name, mod_id, tags, texture_path, hardness, blast_resistance, requires_tool
+                 FROM blocks
+                 WHERE mod_id = ?1 AND (id LIKE ?2 OR name LIKE ?2)
+                 ORDER BY name
+                 LIMIT ?3"
+            )?;
+            let rows = stmt.query_map(params![mod_id, &pattern, limit as i64], |row| {
+                Ok(MinecraftBlock {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    mod_id: row.get(2)?,
+                    tags: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
+                    texture_path: row.get(4)?,
+                    hardness: row.get(5)?,
+                    blast_resistance: row.get(6)?,
+                    requires_tool: row.get::<_, Option<i32>>(7)?.map(|v| v != 0),
+                })
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        } else {
+            let mut stmt = conn.prepare(
+                "SELECT id, name, mod_id, tags, texture_path, hardness, blast_resistance, requires_tool
+                 FROM blocks
+                 WHERE id LIKE ?1 OR name LIKE ?1
+                 ORDER BY name
+                 LIMIT ?2"
+            )?;
+            let rows = stmt.query_map(params![&pattern, limit as i64], |row| {
+                Ok(MinecraftBlock {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    mod_id: row.get(2)?,
+                    tags: serde_json::from_str(&row.get::<_, String>(3)?).unwrap_or_default(),
+                    texture_path: row.get(4)?,
+                    hardness: row.get(5)?,
+                    blast_resistance: row.get(6)?,
+                    requires_tool: row.get::<_, Option<i32>>(7)?.map(|v| v != 0),
+                })
+            })?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()?
+        };
 
         Ok(blocks)
     }
@@ -378,7 +498,7 @@ impl MinecraftDataCache {
     ) -> Result<Vec<MinecraftTag>> {
         let conn = self.conn.lock().await;
 
-        let mut sql = "SELECT id, tag_type, values FROM tags WHERE id LIKE ?1".to_string();
+        let mut sql = "SELECT id, tag_type, tag_values FROM tags WHERE id LIKE ?1".to_string();
 
         if tag_type.is_some() {
             sql.push_str(" AND tag_type = ?2");
@@ -396,7 +516,7 @@ impl MinecraftDataCache {
                 TagType::Block => "block",
             };
 
-            stmt.query_map(params![pattern, type_str, limit], |row| {
+            stmt.query_map(params![pattern, type_str, limit as i64], |row| {
                 Ok(MinecraftTag {
                     id: row.get(0)?,
                     tag_type: match row.get::<_, String>(1)?.as_str() {
@@ -404,13 +524,12 @@ impl MinecraftDataCache {
                         "block" => TagType::Block,
                         _ => TagType::Item,
                     },
-                    values: serde_json::from_str(&row.get::<_, String>(2)?)
-                        .unwrap_or_default(),
+                    values: serde_json::from_str(&row.get::<_, String>(2)?).unwrap_or_default(),
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?
         } else {
-            stmt.query_map(params![pattern, limit], |row| {
+            stmt.query_map(params![pattern, limit as i64], |row| {
                 Ok(MinecraftTag {
                     id: row.get(0)?,
                     tag_type: match row.get::<_, String>(1)?.as_str() {
@@ -418,8 +537,7 @@ impl MinecraftDataCache {
                         "block" => TagType::Block,
                         _ => TagType::Item,
                     },
-                    values: serde_json::from_str(&row.get::<_, String>(2)?)
-                        .unwrap_or_default(),
+                    values: serde_json::from_str(&row.get::<_, String>(2)?).unwrap_or_default(),
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?
@@ -445,6 +563,10 @@ impl MinecraftDataCache {
                     name: row.get(1)?,
                     version: row.get(2)?,
                     loader: row.get(3)?,
+                    description: None,
+                    authors: None,
+                    homepage: None,
+                    license: None,
                     item_count: row.get::<_, i64>(4)? as usize,
                     block_count: row.get::<_, i64>(5)? as usize,
                 })
@@ -458,7 +580,8 @@ impl MinecraftDataCache {
     pub async fn get_stats(&self) -> Result<CacheStats> {
         let conn = self.conn.lock().await;
 
-        let total_items: i64 = conn.query_row("SELECT COUNT(*) FROM items", [], |row| row.get(0))?;
+        let total_items: i64 =
+            conn.query_row("SELECT COUNT(*) FROM items", [], |row| row.get(0))?;
         let total_blocks: i64 =
             conn.query_row("SELECT COUNT(*) FROM blocks", [], |row| row.get(0))?;
         let total_tags: i64 = conn.query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))?;

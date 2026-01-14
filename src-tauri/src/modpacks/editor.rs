@@ -1404,4 +1404,73 @@ impl ModpackManager {
             other_only_in_second,
         })
     }
+
+    /// Read file content from a modpack archive
+    /// Returns the file content as a string (for text files) or None for binary files
+    pub async fn read_file_from_archive(
+        archive_path: &std::path::Path,
+        file_path: &str,
+    ) -> Result<Option<String>> {
+        let archive_path = archive_path.to_path_buf();
+        let file_path = file_path.to_string();
+
+        tokio::task::spawn_blocking(move || {
+            Self::read_file_from_archive_sync(&archive_path, &file_path)
+        })
+        .await
+        .map_err(|e| LauncherError::Join(e.to_string()))?
+    }
+
+    /// Sync version of read_file_from_archive
+    fn read_file_from_archive_sync(
+        archive_path: &std::path::Path,
+        file_path: &str,
+    ) -> Result<Option<String>> {
+        // List of binary file extensions that we shouldn't try to read as text
+        const BINARY_EXTENSIONS: &[&str] = &[
+            "jar", "zip", "gz", "tar", "rar", "7z", "bz2", "xz", "png", "jpg", "jpeg", "gif",
+            "bmp", "ico", "webp", "svg", "mp3", "wav", "ogg", "flac", "aac", "mp4", "avi", "mkv",
+            "webm", "mov", "ttf", "otf", "woff", "woff2", "pdf", "doc", "docx", "xls", "xlsx",
+            "class", "so", "dll", "exe", "bin", "dat", "nbt", "mca",
+            "mcr", // Minecraft binary formats
+        ];
+
+        // Check if file is binary based on extension
+        let ext = file_path.rsplit('.').next().unwrap_or("").to_lowercase();
+
+        if BINARY_EXTENSIONS.contains(&ext.as_str()) {
+            return Ok(None);
+        }
+
+        let file = std::fs::File::open(archive_path)?;
+        let mut archive = zip::ZipArchive::new(file)?;
+
+        // Try to find the file in the archive
+        // The file might be in overrides/ or directly at the path
+        let possible_paths = [
+            file_path.to_string(),
+            format!("overrides/{}", file_path),
+            format!("client-overrides/{}", file_path),
+            format!("server-overrides/{}", file_path),
+        ];
+
+        for path in &possible_paths {
+            if let Ok(mut entry) = archive.by_name(path) {
+                // Limit file size to prevent loading huge files
+                const MAX_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
+                if entry.size() > MAX_SIZE {
+                    return Ok(None);
+                }
+
+                let mut content = String::new();
+                match entry.read_to_string(&mut content) {
+                    Ok(_) => return Ok(Some(content)),
+                    Err(_) => return Ok(None), // File is not valid UTF-8, treat as binary
+                }
+            }
+        }
+
+        // File not found - return None for graceful handling
+        Ok(None)
+    }
 }

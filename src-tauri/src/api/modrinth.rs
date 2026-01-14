@@ -1,14 +1,42 @@
+use std::future::Future;
 use std::sync::Arc;
 
 use super::cache::{modrinth_cache, modrinth_limiter, CacheTTL};
 use crate::downloader::fetch_json;
 use crate::error::{LauncherError, Result};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 const MODRINTH_API_BASE: &str = "https://api.modrinth.com/v2";
 
+/// Helper function to execute a cached API request with rate limiting.
+/// This consolidates the common pattern of cache + limiter + fetch.
+///
+/// # Arguments
+/// * `cache_key` - Unique key for caching this request
+/// * `ttl` - Cache time-to-live
+/// * `fetcher` - Async function that performs the actual API call
+///
+/// # Example
+/// ```ignore
+/// cached_api_call("project:my-mod", CacheTTL::Long, || async {
+///     fetch_json(&format!("{}/project/my-mod", MODRINTH_API_BASE)).await
+/// }).await
+/// ```
+async fn cached_api_call<T, F, Fut>(cache_key: &str, ttl: CacheTTL, fetcher: F) -> Result<T>
+where
+    T: Serialize + DeserializeOwned + Clone + Send + 'static,
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<T>>,
+{
+    let cache = modrinth_cache();
+    let limiter = modrinth_limiter();
+    cache.get_or_fetch_throttled(cache_key, ttl, limiter, fetcher).await
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ModrinthProject {
+    pub id: String,
     pub slug: String,
     pub title: String,
     pub description: String,
@@ -130,16 +158,11 @@ impl ModrinthClient {
 
     /// Поиск проекта по slug (с кешированием и rate limiting)
     pub async fn get_project(slug: &str) -> Result<ModrinthProject> {
-        let cache = modrinth_cache();
-        let limiter = modrinth_limiter();
-        let cache_key = format!("project:{}", slug);
-
-        cache
-            .get_or_fetch_throttled(&cache_key, CacheTTL::Long, limiter, || async {
-                let url = format!("{}/project/{}", MODRINTH_API_BASE, slug);
-                fetch_json(&url).await
-            })
-            .await
+        let slug = slug.to_string();
+        cached_api_call(&format!("project:{}", slug), CacheTTL::Long, || async move {
+            fetch_json(&format!("{}/project/{}", MODRINTH_API_BASE, slug)).await
+        })
+        .await
     }
 
     /// Получение версий проекта (с кешированием и rate limiting)
@@ -180,16 +203,11 @@ impl ModrinthClient {
 
     /// Получение конкретной версии (с кешированием и rate limiting)
     pub async fn get_version(version_id: &str) -> Result<ModrinthVersion> {
-        let cache = modrinth_cache();
-        let limiter = modrinth_limiter();
-        let cache_key = format!("version:{}", version_id);
-
-        cache
-            .get_or_fetch_throttled(&cache_key, CacheTTL::Long, limiter, || async {
-                let url = format!("{}/version/{}", MODRINTH_API_BASE, version_id);
-                fetch_json(&url).await
-            })
-            .await
+        let version_id = version_id.to_string();
+        cached_api_call(&format!("version:{}", version_id), CacheTTL::Long, || async move {
+            fetch_json(&format!("{}/version/{}", MODRINTH_API_BASE, version_id)).await
+        })
+        .await
     }
 
     /// Поиск модов (с кешированием и rate limiting)
@@ -364,6 +382,90 @@ impl ModrinthClient {
             .json()
             .await
             .map_err(|e| LauncherError::ApiError(format!("Failed to parse hash response: {}", e)))
+    }
+
+    /// Batch get projects by IDs
+    /// Returns a list of projects with their names and slugs
+    pub async fn get_projects(project_ids: &[String]) -> Result<Vec<ModrinthProject>> {
+        if project_ids.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let ids_json = serde_json::to_string(project_ids)
+            .map_err(|e| LauncherError::ApiError(format!("Failed to serialize IDs: {}", e)))?;
+
+        let url = format!(
+            "{}?ids={}",
+            format!("{}/projects", MODRINTH_API_BASE),
+            ids_json
+        );
+
+        let client = reqwest::Client::builder()
+            .user_agent(crate::USER_AGENT)
+            .timeout(std::time::Duration::from_secs(15))
+            .build()?;
+
+        let response = client.get(&url).send().await?;
+
+        if !response.status().is_success() {
+            return Err(LauncherError::ApiError(format!(
+                "Modrinth projects lookup failed: {}",
+                response.status()
+            )));
+        }
+
+        response.json().await.map_err(|e| {
+            LauncherError::ApiError(format!("Failed to parse projects response: {}", e))
+        })
+    }
+
+    /// Batch check for updates using file hashes
+    /// POST /v2/version_files/update
+    /// Returns a map of hash -> latest version for that mod
+    /// This is the fastest way to check updates for many mods at once
+    pub async fn check_updates_batch(
+        hashes: &[String],
+        algorithm: &str,
+        loaders: &[String],
+        game_versions: &[String],
+    ) -> Result<std::collections::HashMap<String, ModrinthVersion>> {
+        if hashes.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let url = format!("{}/version_files/update", MODRINTH_API_BASE);
+
+        let client = reqwest::Client::builder()
+            .user_agent(crate::USER_AGENT)
+            .timeout(std::time::Duration::from_secs(30))
+            .build()?;
+
+        let body = serde_json::json!({
+            "hashes": hashes,
+            "algorithm": algorithm,
+            "loaders": loaders,
+            "game_versions": game_versions
+        });
+
+        log::info!(
+            "Modrinth batch update check: {} hashes, loaders={:?}, versions={:?}",
+            hashes.len(),
+            loaders,
+            game_versions
+        );
+
+        let response = client.post(&url).json(&body).send().await?;
+
+        if !response.status().is_success() {
+            return Err(LauncherError::ApiError(format!(
+                "Modrinth batch update check failed: {}",
+                response.status()
+            )));
+        }
+
+        response.json().await.map_err(|e| {
+            LauncherError::ApiError(format!("Failed to parse batch update response: {}", e))
+        })
     }
 }
 

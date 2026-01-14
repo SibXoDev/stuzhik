@@ -100,7 +100,11 @@ pub async fn start_instance(
     }
 
     log::info!("Starting instance: {} ({})", instance.name, instance.id);
-    log::info!("Instance loader: {:?}, version: {}", instance.loader, instance.version);
+    log::info!(
+        "Instance loader: {:?}, version: {}",
+        instance.loader,
+        instance.version
+    );
     log::info!("Instance dir: {}", instance.dir);
 
     let download_manager = DownloadManager::new(app_handle.clone())?;
@@ -247,7 +251,8 @@ pub async fn start_instance(
     let stderr = child.stderr.take();
     let stdin = child.stdin.take();
 
-    // For servers: register stdin with the console so commands can be sent
+    // Register stdin for servers so commands can be sent
+    // Clients don't need stdin - they use command-line arguments
     if !is_client {
         if let Some(stdin) = stdin {
             let instance_id_for_stdin = instance_id.clone();
@@ -256,6 +261,14 @@ pub async fn start_instance(
             });
         }
     }
+
+    // Initialize console for both servers AND clients (for log streaming)
+    // Clients get read-only console (no command sending)
+    let instance_id_for_console = instance_id.clone();
+    tauri::async_runtime::spawn(async move {
+        // Just ensure console exists - logs will be added via add_log_and_emit
+        let _ = server_console::get_console(&instance_id_for_console).await;
+    });
 
     {
         let mut map = state.lock().unwrap_or_else(|e| e.into_inner());
@@ -270,19 +283,15 @@ pub async fn start_instance(
     // Channel to collect stdout lines for crash analysis
     let (stdout_tx, stdout_rx) = std::sync::mpsc::channel::<String>();
 
-    // For servers: spawn async task to handle console log streaming
-    let server_log_tx = if !is_client {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-        let instance_id_for_logs = instance_id.clone();
-        tauri::async_runtime::spawn(async move {
-            while let Some(line) = rx.recv().await {
-                server_console::add_log_and_emit(&instance_id_for_logs, &line).await;
-            }
-        });
-        Some(tx)
-    } else {
-        None
-    };
+    // Spawn async task to handle console log streaming (for BOTH servers and clients)
+    // This enables real-time log viewing in the UI for all instances
+    let (console_log_tx, mut console_log_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let instance_id_for_logs = instance_id.clone();
+    tauri::async_runtime::spawn(async move {
+        while let Some(line) = console_log_rx.recv().await {
+            server_console::add_log_and_emit(&instance_id_for_logs, &line).await;
+        }
+    });
 
     if let Some(stdout) = stdout {
         let instance_id_log = instance_id.clone();
@@ -290,7 +299,7 @@ pub async fn start_instance(
         let app_handle_stdout = app_handle.clone();
         let tx = stdout_tx.clone();
         let is_client_stdout = is_client;
-        let server_tx = server_log_tx.clone();
+        let console_tx = console_log_tx.clone();
 
         thread::spawn(move || {
             use std::io::Write;
@@ -310,10 +319,9 @@ pub async fn start_instance(
                         let _ = writeln!(file, "{}", line);
                     }
 
-                    // For servers: send to async console handler
-                    if let Some(ref tx) = server_tx {
-                        let _ = tx.send(line.clone());
-                    }
+                    // Send to console handler (for real-time UI display)
+                    // Works for BOTH servers and clients
+                    let _ = console_tx.send(line.clone());
 
                     // Send to collector for crash analysis (only for clients)
                     if is_client_stdout {
@@ -375,7 +383,7 @@ pub async fn start_instance(
     if let Some(stderr) = stderr {
         let instance_id_log = instance_id.clone();
         let log_path = stderr_log_path.clone();
-        let server_tx = server_log_tx.clone();
+        let console_tx = console_log_tx.clone();
         thread::spawn(move || {
             use std::io::Write;
             let mut log_file = std::fs::File::create(&log_path).ok();
@@ -388,10 +396,9 @@ pub async fn start_instance(
                         let _ = writeln!(file, "{}", line);
                     }
 
-                    // For servers: send to async console handler
-                    if let Some(ref tx) = server_tx {
-                        let _ = tx.send(format!("[STDERR] {}", line));
-                    }
+                    // Send to console handler (for real-time UI display)
+                    // Works for BOTH servers and clients
+                    let _ = console_tx.send(format!("[STDERR] {}", line));
                 }
             }
         });
@@ -418,7 +425,10 @@ pub async fn start_instance(
                 drop(map);
                 (child.wait(), is_last)
             } else {
-                log::warn!("Child not found in map for instance {}, aborting monitor", instance_id);
+                log::warn!(
+                    "Child not found in map for instance {}, aborting monitor",
+                    instance_id
+                );
                 return;
             }
         };
@@ -491,7 +501,9 @@ pub async fn start_instance(
                     "SELECT auto_restart FROM instances WHERE id = ?1",
                     params![&instance_id],
                     |row| row.get::<_, i32>(0),
-                ).unwrap_or(0) == 1
+                )
+                .unwrap_or(0)
+                    == 1
             } else {
                 false
             }
@@ -532,7 +544,10 @@ pub async fn start_instance(
 
         // Auto-restart server if enabled
         if should_auto_restart {
-            log::info!("Auto-restart enabled for server {}, restarting in 5 seconds...", instance_id);
+            log::info!(
+                "Auto-restart enabled for server {}, restarting in 5 seconds...",
+                instance_id
+            );
 
             // Emit event to notify UI
             let _ = app_handle_monitor.emit(
@@ -661,14 +676,15 @@ fn check_server_eula(instance_path: &PathBuf) -> Result<()> {
         }
         // EULA file exists but not accepted
         return Err(LauncherError::InvalidConfig(
-            "EULA не принята. Откройте настройки сервера и примите EULA для запуска.".to_string()
+            "EULA не принята. Откройте настройки сервера и примите EULA для запуска.".to_string(),
         ));
     }
 
     // EULA file doesn't exist - first run
     // Return error asking user to accept EULA first
     Err(LauncherError::InvalidConfig(
-        "Для запуска сервера необходимо принять EULA. Откройте настройки сервера (вкладка EULA).".to_string()
+        "Для запуска сервера необходимо принять EULA. Откройте настройки сервера (вкладка EULA)."
+            .to_string(),
     ))
 }
 
@@ -704,7 +720,11 @@ fn check_server_run_script(
     if libraries_path.exists() {
         log::info!("Looking for argfiles in libraries folder...");
 
-        let argfile_name = if cfg!(windows) { "win_args.txt" } else { "unix_args.txt" };
+        let argfile_name = if cfg!(windows) {
+            "win_args.txt"
+        } else {
+            "unix_args.txt"
+        };
 
         // Search recursively for argfiles
         fn find_argfiles(dir: &std::path::Path, target: &str, results: &mut Vec<PathBuf>) {
@@ -725,7 +745,8 @@ fn check_server_run_script(
 
         if !found_argfiles.is_empty() {
             // Sort by path length descending (deeper = more specific = newer version)
-            found_argfiles.sort_by(|a, b| b.to_string_lossy().len().cmp(&a.to_string_lossy().len()));
+            found_argfiles
+                .sort_by(|a, b| b.to_string_lossy().len().cmp(&a.to_string_lossy().len()));
 
             let argfile = &found_argfiles[0];
             log::info!("Found argfile: {:?}", argfile);
@@ -951,17 +972,16 @@ async fn spawn_instance_process(instance: &Instance, java_path: &PathBuf) -> Res
 }
 
 /// Fallback: spawn server using JAR file (for older Forge, Fabric, Quilt, Vanilla)
-fn spawn_server_jar(
-    cmd: &mut Command,
-    instance: &Instance,
-    instance_path: &PathBuf,
-) -> Result<()> {
+fn spawn_server_jar(cmd: &mut Command, instance: &Instance, instance_path: &PathBuf) -> Result<()> {
     log::info!("spawn_server_jar: Checking EULA...");
     // Check EULA - must be explicitly accepted before server can start
     check_server_eula(instance_path)?;
     log::info!("spawn_server_jar: EULA check passed");
 
-    log::info!("spawn_server_jar: Finding JAR for loader {:?}", instance.loader);
+    log::info!(
+        "spawn_server_jar: Finding JAR for loader {:?}",
+        instance.loader
+    );
 
     // Find any server JAR file - be flexible about naming
     let find_server_jar = || -> Option<String> {
@@ -982,7 +1002,8 @@ fn spawn_server_jar(
             })
             .collect();
 
-        log::info!("Found {} potential server JARs: {:?}",
+        log::info!(
+            "Found {} potential server JARs: {:?}",
             entries.len(),
             entries.iter().map(|e| e.file_name()).collect::<Vec<_>>()
         );
@@ -1817,13 +1838,21 @@ pub fn stop_instance(id: String, state: State<'_, ChildMap>) -> Result<()> {
             .ok();
 
         if let Some(pid) = pid {
-            log::info!("Instance {} not in ChildMap, attempting to kill orphaned process with PID {}", id, pid);
+            log::info!(
+                "Instance {} not in ChildMap, attempting to kill orphaned process with PID {}",
+                id,
+                pid
+            );
 
             // Try to kill the process by PID
             let killed = kill_process_by_pid(pid as u32);
 
             if killed {
-                log::info!("Successfully killed orphaned process {} for instance {}", pid, id);
+                log::info!(
+                    "Successfully killed orphaned process {} for instance {}",
+                    pid,
+                    id
+                );
             } else {
                 log::warn!("Failed to kill process {} (may already be dead)", pid);
             }
@@ -1871,7 +1900,11 @@ fn kill_process_by_pid(pid: u32) -> bool {
 
 /// Force kill a server (SIGKILL) - for when graceful stop doesn't work
 #[tauri::command]
-pub fn force_kill_server(id: String, state: State<'_, ChildMap>, app_handle: tauri::AppHandle) -> Result<()> {
+pub fn force_kill_server(
+    id: String,
+    state: State<'_, ChildMap>,
+    app_handle: tauri::AppHandle,
+) -> Result<()> {
     log::warn!("Force killing server {}", id);
 
     let mut map = state.lock().unwrap_or_else(|e| e.into_inner());
@@ -1967,7 +2000,10 @@ pub fn force_kill_server(id: String, state: State<'_, ChildMap>, app_handle: tau
 
 /// Graceful stop server via RCON or stdin "stop" command
 #[tauri::command]
-pub async fn graceful_stop_server(id: String, app_handle: tauri::AppHandle) -> std::result::Result<(), String> {
+pub async fn graceful_stop_server(
+    id: String,
+    app_handle: tauri::AppHandle,
+) -> std::result::Result<(), String> {
     log::info!("Attempting graceful stop for server {}", id);
 
     // Try to send "stop" command
@@ -1995,7 +2031,9 @@ pub async fn graceful_stop_server(id: String, app_handle: tauri::AppHandle) -> s
 
                 Ok(())
             } else {
-                Err(result.error.unwrap_or_else(|| "Failed to send stop command".to_string()))
+                Err(result
+                    .error
+                    .unwrap_or_else(|| "Failed to send stop command".to_string()))
             }
         }
         Err(e) => Err(e),
@@ -2029,9 +2067,7 @@ pub fn cleanup_orphaned_processes() {
     };
 
     let orphans: Vec<(String, String, i64)> = stmt
-        .query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .ok()
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
@@ -2073,7 +2109,10 @@ pub fn cleanup_orphaned_processes() {
     ).unwrap_or(0);
 
     if reset_count > 0 {
-        log::info!("Reset {} instances stuck in stopping/starting status", reset_count);
+        log::info!(
+            "Reset {} instances stuck in stopping/starting status",
+            reset_count
+        );
     }
 }
 

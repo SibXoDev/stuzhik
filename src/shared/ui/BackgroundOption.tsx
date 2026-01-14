@@ -12,7 +12,7 @@ export function BackgroundOption(props: BackgroundOptionProps) {
   return (
     <button
       type="button"
-      class={`relative group overflow-hidden rounded-2xl border-2 transition-fast aspect-[4/3] ${
+      class={`relative group overflow-hidden rounded-xl border-2 transition-fast aspect-video ${
         props.active
           ? "border-blue-500 bg-blue-500/10"
           : "border-gray-700 hover:border-gray-500"

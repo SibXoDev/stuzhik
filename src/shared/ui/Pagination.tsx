@@ -1,5 +1,6 @@
 import { For, Show } from "solid-js";
 import type { Component } from "solid-js";
+import { useI18n } from "../i18n";
 
 interface PaginationProps {
   currentPage: number;
@@ -14,6 +15,7 @@ interface PaginationProps {
  * Shows: First | ... | pages around current | ... | Last
  */
 const Pagination: Component<PaginationProps> = (props) => {
+  const { t } = useI18n();
   const maxButtons = () => props.maxButtons || 7;
 
   // Generate array of page numbers to display
@@ -78,7 +80,7 @@ const Pagination: Component<PaginationProps> = (props) => {
           class="btn-ghost px-2 py-1.5 min-w-8"
           onClick={() => props.onPageChange(props.currentPage - 1)}
           disabled={props.currentPage === 0}
-          title="Предыдущая"
+          title={t().ui?.tooltips?.previous ?? "Previous"}
         >
           <i class="i-hugeicons-arrow-left-01 w-4 h-4" />
         </button>
@@ -110,7 +112,7 @@ const Pagination: Component<PaginationProps> = (props) => {
           class="btn-ghost px-2 py-1.5 min-w-8"
           onClick={() => props.onPageChange(props.currentPage + 1)}
           disabled={props.currentPage >= props.totalPages - 1}
-          title="Следующая"
+          title={t().ui?.tooltips?.next ?? "Next"}
         >
           <i class="i-hugeicons-arrow-right-01 w-4 h-4" />
         </button>

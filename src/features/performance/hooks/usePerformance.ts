@@ -156,12 +156,12 @@ export function usePerformance(
     setError(null);
     setLoading(true);
     try {
-      console.log("[PERF] Starting monitoring for:", id);
+      if (import.meta.env.DEV) console.log("[PERF] Starting monitoring for:", id);
       await invoke("start_performance_monitoring", {
         instanceId: id,
         intervalMs,
       });
-      console.log("[PERF] Monitoring started successfully");
+      if (import.meta.env.DEV) console.log("[PERF] Monitoring started successfully");
       setMonitoring(true);
       setSnapshots([]);
       setRealtimeBottlenecks([]);
@@ -216,11 +216,11 @@ export function usePerformance(
     setError(null);
 
     try {
-      console.log("[PERF] Getting report for:", id);
+      if (import.meta.env.DEV) console.log("[PERF] Getting report for:", id);
       const rep = await invoke<PerformanceReport>("get_performance_report", {
         instanceId: id,
       });
-      console.log("[PERF] Report received:", rep);
+      if (import.meta.env.DEV) console.log("[PERF] Report received:", rep);
       setReport(rep);
       return rep;
     } catch (e) {

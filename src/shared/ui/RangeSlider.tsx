@@ -9,6 +9,7 @@ export interface RangeSliderProps {
   showTicks?: boolean;
   showLabels?: boolean;
   ticks?: number[];
+  labelTicks?: number[]; // Subset of ticks to show labels for (to avoid overlap)
   formatLabel?: (value: number) => string;
   disabled?: boolean;
   class?: string;
@@ -22,18 +23,23 @@ export function RangeSlider(props: RangeSliderProps) {
   const tickValues = createMemo(() => {
     if (props.ticks) return props.ticks;
 
+    // Always generate ticks based on step if specified
     const range = max() - min();
     const stepVal = step();
+    const ticks: number[] = [];
 
-    if (stepVal > 1 && range / stepVal <= 10) {
-      const ticks: number[] = [];
-      for (let v = min(); v <= max(); v += stepVal) {
-        ticks.push(v);
-      }
-      return ticks;
+    // Generate ticks from min to max using step
+    for (let v = min(); v <= max(); v += stepVal) {
+      ticks.push(v);
     }
 
-    return [min(), min() + range * 0.25, min() + range * 0.5, min() + range * 0.75, max()];
+    // Limit to reasonable number of ticks (max 20)
+    if (ticks.length > 20) {
+      // If too many ticks, use quartiles instead
+      return [min(), min() + range * 0.25, min() + range * 0.5, min() + range * 0.75, max()];
+    }
+
+    return ticks;
   });
 
   const getTickPercent = (tickValue: number) => {
@@ -49,12 +55,17 @@ export function RangeSlider(props: RangeSliderProps) {
     return ((props.value - min()) / (max() - min())) * 100;
   });
 
+  // Use labelTicks if provided, otherwise use all tickValues
+  const labelTickValues = createMemo(() => {
+    return props.labelTicks ?? tickValues();
+  });
+
   return (
-    <div class={`flex flex-col gap-1 ${props.class || ""}`}>
+    <div class={`flex flex-col ${props.class || ""}`}>
       {/* Track container */}
-      <div class="h-5 flex items-center" style={{ position: "relative" }}>
+      <div class="h-5 flex items-center relative">
         {/* Background track */}
-        <div class="absolute inset-x-0 top-1/2 h-1 bg-gray-700 rounded-full" style={{ transform: "translateY(-50%)" }}>
+        <div class="absolute inset-x-0 top-1/2 h-1 bg-gray-700 rounded-full -translate-y-1/2">
           {/* Fill */}
           <div
             class="h-full bg-blue-500 rounded-full"
@@ -67,8 +78,8 @@ export function RangeSlider(props: RangeSliderProps) {
           <For each={tickValues()}>
             {(tick) => (
               <div
-                class="absolute top-1/2 w-px h-2.5 bg-gray-500"
-                style={{ left: `${getTickPercent(tick)}%`, transform: "translateY(-50%)" }}
+                class="absolute top-1/2 w-px h-2.5 bg-gray-500 -translate-y-1/2"
+                style={{ left: `${getTickPercent(tick)}%` }}
               />
             )}
           </For>
@@ -82,7 +93,7 @@ export function RangeSlider(props: RangeSliderProps) {
           style={{ left: `${fillPercent()}%`, transform: "translate(-50%, -50%)" }}
         />
 
-        {/* Invisible input */}
+        {/* Invisible input - reduced height to match track */}
         <input
           type="range"
           min={min()}
@@ -91,17 +102,20 @@ export function RangeSlider(props: RangeSliderProps) {
           value={props.value}
           disabled={props.disabled}
           onInput={(e) => props.onChange(parseFloat(e.currentTarget.value))}
-          class="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+          class="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-1 opacity-0 cursor-pointer disabled:cursor-not-allowed"
           style={{ margin: "0" }}
         />
       </div>
 
-      {/* Labels */}
+      {/* Labels - positioned absolutely by tick percent, using labelTicks */}
       <Show when={props.showLabels}>
-        <div class="flex justify-between">
-          <For each={tickValues()}>
+        <div class="relative h-3.5 mt-0.5">
+          <For each={labelTickValues()}>
             {(tick) => (
-              <span class={`text-xs ${tick <= props.value ? "text-blue-400" : "text-gray-500"}`}>
+              <span
+                class={`absolute text-xs -translate-x-1/2 text-center ${tick <= props.value ? "text-blue-400" : "text-gray-500"}`}
+                style={{ left: `${getTickPercent(tick)}%` }}
+              >
                 {formatLabel(tick)}
               </span>
             )}

@@ -25,7 +25,10 @@
     "showMore": "Show more",
     "showLess": "Show less",
     "reset": "Reset",
-    "documentation": "Documentation"
+    "documentation": "Documentation",
+    "browse": "Browse",
+    "loader": "Loader",
+    "mods": "Mods"
   },
   "titleBar": {
     "devConsole": "Developer Console",
@@ -225,6 +228,86 @@
         "optimization": "Optimization",
         "commonDependency": "Common dependency"
       }
+    },
+    "dependencyGraph": {
+      "title": "Dependency Graph",
+      "loading": "Loading graph...",
+      "fetchingDeps": "Fetching dependencies from Modrinth...",
+      "calculatingLayout": "Calculating layout...",
+      "loadingData": "Loading graph data...",
+      "filters": {
+        "libs": "Libraries",
+        "disabled": "Disabled",
+        "issues": "Issues",
+        "solo": "Solo"
+      },
+      "legend": {
+        "modrinth": "Modrinth",
+        "curseforge": "CurseForge",
+        "library": "Library",
+        "disabled": "Disabled"
+      },
+      "panel": {
+        "source": "Source",
+        "status": "Status",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "dependencies": "Dependencies",
+        "dependents": "Dependents",
+        "library": "Library Mod",
+        "analyzeRemoval": "Analyze Removal",
+        "noDependencies": "No dependencies",
+        "requiredBy": "Required by",
+        "dependsOn": "Depends on",
+        "incompatibleWith": "Incompatible with"
+      },
+      "removal": {
+        "title": "Removal Analysis",
+        "safe": "This mod can be safely removed without breaking other mods.",
+        "unsafe": "Removing this mod may cause issues with other mods.",
+        "willBreak": "Will Break",
+        "modsCount": "mods",
+        "mayHaveIssues": "May Have Issues",
+        "close": "Close"
+      },
+      "tooltips": {
+        "refresh": "Refresh dependencies from Modrinth",
+        "fitToScreen": "Fit to screen",
+        "resetView": "Reset view",
+        "search": "Search (Ctrl+F)"
+      },
+      "search": {
+        "placeholder": "Search mods...",
+        "noResults": "No mods found",
+        "prev": "Previous (Shift+Enter)",
+        "next": "Next (Enter)"
+      }
+    },
+    "verification": {
+      "verify": "Verify authenticity",
+      "verifying": "Verifying...",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "tampered": "Tampered",
+      "status": {
+        "modrinth": "Verified by Modrinth",
+        "curseforge": "Verified by CurseForge",
+        "unknown": "Unknown source",
+        "local": "Local mod"
+      },
+      "results": {
+        "title": "Verification Results",
+        "allVerified": "All mods are verified and authentic",
+        "someUnverified": "Some mods were not found in official sources",
+        "verifiedCount": "Verified",
+        "unverifiedCount": "Not found",
+        "close": "Close"
+      },
+      "tooltip": {
+        "verified": "File hash matches official source",
+        "unverified": "Mod not found on Modrinth or CurseForge",
+        "local": "Local mod without verification"
+      }
     }
   },
   "modpacks": {
@@ -233,7 +316,81 @@
     "import": "Import",
     "export": "Export",
     "search": "Search modpacks...",
-    "install": "Install Modpack"
+    "install": "Install Modpack",
+    "launcherImport": {
+      "title": "Import from Launcher",
+      "autoDetect": "Auto-detect",
+      "fromFolder": "From folder",
+      "detectedLaunchers": "Detected Launchers",
+      "noLaunchers": "No launchers detected on your system",
+      "noLaunchersFound": "No launchers found on your system",
+      "detecting": "Detecting installed launchers...",
+      "selectLauncher": "Select a launcher to view its instances",
+      "instances": "instances",
+      "instancesIn": "Instances in",
+      "noInstances": "No instances found",
+      "loadingInstances": "Loading instances...",
+      "selectInstance": "Select an instance to import",
+      "instanceDetails": "Instance Details",
+      "minecraftVersion": "Minecraft",
+      "loader": "Loader",
+      "modsCount": "Mods",
+      "size": "Size",
+      "lastPlayed": "Last played",
+      "confidence": "Detection confidence",
+      "import": "Import",
+      "importing": "Importing...",
+      "refresh": "Refresh",
+      "instanceName": "Instance name",
+      "enterName": "Enter instance name",
+      "includeWorlds": "Include worlds and saves",
+      "folderPath": "Path to .minecraft folder",
+      "analyzing": "Analyzing folder...",
+      "folderAnalyzed": "Folder analyzed successfully",
+      "suspiciousFiles": "Suspicious files detected",
+      "startImport": "Start Import",
+      "importComplete": "Import completed successfully",
+      "filesCopied": "Files copied",
+      "modsImported": "Mods imported",
+      "totalSize": "Total size",
+      "phaseCreating": "Creating instance...",
+      "phaseScanning": "Scanning files...",
+      "phaseCopying": "Copying files...",
+      "phaseSaving": "Saving instance...",
+      "phaseSyncing": "Syncing mods database...",
+      "progress": {
+        "preparing": "Preparing import...",
+        "copying": "Copying files...",
+        "installing": "Installing mods...",
+        "finalizing": "Finalizing...",
+        "file": "File",
+        "of": "of"
+      },
+      "success": "Successfully imported",
+      "error": "Import failed",
+      "folderMode": {
+        "title": "Import from .minecraft folder",
+        "description": "Select any .minecraft folder or Minecraft installation directory",
+        "selectFolder": "Select folder",
+        "analyzing": "Analyzing folder...",
+        "analysis": "Folder Analysis",
+        "detectedVersion": "Detected version",
+        "detectedLoader": "Detected loader",
+        "filesCount": "Files to import",
+        "suspiciousFiles": "Suspicious files",
+        "suspiciousWarning": "The following files may be unwanted (adware, telemetry). They will be excluded from import:",
+        "noMinecraft": "This doesn't appear to be a Minecraft folder"
+      },
+      "launchers": {
+        "multimc": "MultiMC",
+        "prism": "Prism Launcher",
+        "curseforge_app": "CurseForge App",
+        "modrinth": "Modrinth App",
+        "atlauncher": "ATLauncher",
+        "gdlauncher": "GDLauncher",
+        "generic": "Generic Minecraft"
+      }
+    }
   },
   "settings": {
     "title": "Settings",
@@ -263,6 +420,11 @@
       "title": "Language",
       "select": "Select language",
       "changesApply": "Changes apply immediately"
+    },
+    "developer": {
+      "title": "Developer Mode",
+      "enable": "Enable Developer Mode",
+      "description": "Shows Console and Source Code buttons in TitleBar. Keyboard shortcuts (Ctrl+Shift+D/U/T) work in both modes."
     },
     "user": {
       "title": "User",
@@ -1425,6 +1587,86 @@
       "minutes": "min"
     }
   },
+  "editor": {
+    "projects": "Projects",
+    "refresh": "Refresh",
+    "searchFiles": "Search files...",
+    "failedToLoad": "Failed to load projects",
+    "retry": "Retry",
+    "empty": "Empty",
+    "createFile": "Create file",
+    "selectFile": "Select a file to edit",
+    "selectFileHint": "Use the project tree on the left to navigate. Click + next to a category to create a file from template.",
+    "saveShortcut": "Ctrl+S - save",
+    "fullscreenShortcut": "F11 - fullscreen",
+    "recipeBuilder": "Recipe Builder",
+    "recipes": "Recipes",
+    "metadataEditor": "Metadata Editor",
+    "metadata": "Metadata",
+    "copied": "Copied",
+    "copiedMessage": "Recipe code copied - open a file to paste",
+    "copyError": "Copy error",
+    "copyErrorMessage": "Could not copy to clipboard",
+    "recipeInserted": "Recipe inserted",
+    "recipeInsertedMessage": "Recipe code added to file",
+    "recipeBuilderTitle": "Recipe Builder",
+    "recipeBuilderDescription": "Create recipes for KubeJS, CraftTweaker or datapacks",
+    "recipeBuilderHint": "Drag or click to select items",
+    "recipeName": "Recipe Name",
+    "recipeNamePlaceholder": "my_custom_recipe",
+    "searchItems": "Search Items",
+    "searchItemsPlaceholder": "minecraft:diamond...",
+    "enterItemId": "Enter item ID to search",
+    "searchExample": "Example: diamond, iron_ingot",
+    "noItemsFound": "No items found",
+    "rebuildCacheHint": "Try rebuilding item cache in settings",
+    "selected": "Selected",
+    "clickToPlace": "Click a slot to place",
+    "shaped": "Shaped",
+    "shapeless": "Shapeless",
+    "smelting": "Smelting",
+    "blasting": "Blasting",
+    "smoking": "Smoking",
+    "ingredients": "Ingredients",
+    "clickToAdd": "click to add",
+    "input": "Input",
+    "output": "Output",
+    "clearAll": "Clear all",
+    "generatedCode": "Generated Code",
+    "configureRecipe": "Configure recipe to generate code...",
+    "insertCode": "Insert Code",
+    "loadingItems": "Loading items...",
+    "rebuildingCache": "Indexing items...",
+    "rebuildingCacheHint": "Parsing mod JAR files",
+    "noItemsInCache": "Item cache is empty",
+    "noItemsHint": "Install Minecraft and mods for this instance",
+    "dragToPlace": "Click or drag to place",
+    "dragItemHere": "Drag item here",
+    "clickToPlace": "Click to place",
+    "cacheRebuilt": "Cache updated",
+    "items": "items",
+    "mods": "mods",
+    "clickToRemove": "click to remove",
+    "filterByMod": "Filter by mod",
+    "allMods": "All mods",
+    "rebuildCache": "Rebuild item cache",
+    "visualTools": "Tools",
+    "visualToolsDescription": "Visual tools for creating modpack content",
+    "recipeBuilderDesc": "Create recipes for KubeJS, CraftTweaker, datapacks",
+    "metadataEditorDesc": "Edit pack.mcmeta and mod metadata",
+    "externalEditorTip": "For editing files, use an external editor (VS Code, Notepad++). Open the instance folder using the 'Open folder' button on the 'Files' tab."
+  },
+  "console": {
+    "title": "Console",
+    "running": "Running",
+    "notRunning": "Not running",
+    "lines": "lines",
+    "search": "Search...",
+    "copy": "Copy logs",
+    "readOnly": "Read-only. Logs are saved to logs/latest-stdout.log",
+    "startToSee": "Start the game to see console output",
+    "noResults": "No matching logs"
+  },
   "docs": {
     "title": "Documentation",
     "changelog": "Changelog",
@@ -1709,9 +1951,9 @@
         "overview": {
           "title": "Overview",
           "intro": "Professional editor for modpackers — edit configs, datapacks, KubeJS scripts with IntelliSense:",
-          "monaco": {
-            "title": "Monaco Editor",
-            "desc": "VSCode engine with syntax highlighting"
+          "highlighting": {
+            "title": "Syntax Highlighting",
+            "desc": "Highlighting for JS, JSON, TOML, YAML and more"
           },
           "intellisense": {
             "title": "IntelliSense",
@@ -2005,6 +2247,70 @@
         "tipTitle": "Important",
         "tipText": "In release builds, F12 doesn't work. Use Ctrl+Shift+D for developer console"
       }
+    }
+  },
+  "ui": {
+    "placeholders": {
+      "search": "Search...",
+      "searchVersions": "Search versions...",
+      "searchMods": "Search by name, mod ID, version or source...",
+      "searchModpacks": "Search modpacks...",
+      "enterName": "Enter name",
+      "enterNewName": "Enter new name...",
+      "enterCopyName": "Enter copy name...",
+      "myModpack": "My modpack",
+      "yourName": "Your name",
+      "description": "Description...",
+      "profileDescription": "Profile description...",
+      "modpackName": "Modpack name",
+      "yourNameOrNick": "Your name or nickname",
+      "shortDescription": "Short description (optional)",
+      "enterPlayerNick": "Enter player nickname...",
+      "templateName": "Template name...",
+      "cloudStorageUrl": "https://drive.google.com/... or https://dropbox.com/...",
+      "searchFiles": "Search files...",
+      "filterByExtension": "Filter by extension...",
+      "enterPath": "Enter path...",
+      "globalSearch": "Global search...",
+      "regexSearch": "Regex search...",
+      "searchByFiles": "Search files...",
+      "versionNumber": "1.0.0",
+      "modpackDescriptionLong": "Your modpack description...",
+      "searchModsOn": "Search mods on {source}..."
+    },
+    "tooltips": {
+      "copy": "Copy",
+      "close": "Close",
+      "closeAll": "Close all",
+      "unsaved": "Unsaved",
+      "clear": "Clear",
+      "filters": "Filters",
+      "syncMods": "Sync mods folder with database",
+      "addLocalMod": "Add local mod (.jar file)",
+      "deleteProject": "Delete project",
+      "deleteMod": "Delete mod",
+      "deleteProfile": "Delete profile",
+      "compare": "Compare two modpacks",
+      "createBackup": "Create backup",
+      "importProfile": "Import profile from file",
+      "exportProfile": "Export profile",
+      "searchAllFolders": "Search in all folders",
+      "useRegex": "Use regular expressions",
+      "goUp": "Go up one level",
+      "openInExplorer": "Open in explorer",
+      "downloadZip": "Download ZIP",
+      "copyGitClone": "Copy git clone",
+      "retry": "Retry",
+      "fullscreen": "Fullscreen mode (F11 or Ctrl+Shift+F)",
+      "exitFullscreen": "Exit fullscreen mode (Esc)",
+      "sourceCode": "Source code",
+      "createManifest": "Create manifest for tracking changes",
+      "previous": "Previous",
+      "next": "Next",
+      "deselect": "Deselect",
+      "modConfigs": "Mod configs from config/ folder",
+      "rootConfigs": "Configs from instance root",
+      "hasQuickPresets": "Has quick presets"
     }
   }
 }

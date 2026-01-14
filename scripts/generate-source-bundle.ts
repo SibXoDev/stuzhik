@@ -296,9 +296,10 @@ async function addFileSizes(
 
 function countLanguages(files: Record<string, string>): Record<string, number> {
   const languages: Record<string, number> = {};
-  for (const path of Object.keys(files)) {
+  for (const [path, content] of Object.entries(files)) {
     const ext = extname(path).toLowerCase().slice(1) || "other";
-    languages[ext] = (languages[ext] || 0) + 1;
+    // Count LINES of code, not files (to match GitHub's metrics)
+    languages[ext] = (languages[ext] || 0) + countLines(content);
   }
   return languages;
 }
@@ -538,10 +539,14 @@ export default sourceBundle;
   console.log(`   🗂️  Output: ${relative(ROOT, OUTPUT_FILE)}`);
   console.log(`\n   Languages:`);
 
+  // Calculate total lines for percentage
+  const totalLines = Object.values(languages).reduce((sum, count) => sum + count, 0);
+
   Object.entries(languages)
     .sort((a, b) => b[1] - a[1])
-    .forEach(([lang, count]) => {
-      console.log(`     ${lang}: ${count} files`);
+    .forEach(([lang, lines]) => {
+      const percent = ((lines / totalLines) * 100).toFixed(1);
+      console.log(`     ${lang}: ${lines.toLocaleString()} lines (${percent}%)`);
     });
 
   // Show excluded private files reminder

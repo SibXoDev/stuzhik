@@ -3,11 +3,12 @@ import { createVirtualizer } from "@tanstack/solid-virtual";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
-import JSZip from "jszip";
+// JSZip is lazy-loaded only when downloading ZIP to reduce initial bundle size
 import { sourceBundle, type FileNode, type FileChange } from "../../../generated/source-code";
-import { highlightCode, detectLanguage } from "../../../shared/utils/highlighter";
+import { highlightCode, detectLanguage, resetHighlighter } from "../../../shared/utils/highlighter";
 import { MarkdownRenderer } from "../../../shared/components/MarkdownRenderer";
 import { addToast } from "../../../shared/components/Toast";
+import { useSafeTimers } from "../../../shared/hooks";
 
 interface Props {
   onClose: () => void;
@@ -72,6 +73,8 @@ const SourceCodePage: Component<Props> = (props) => {
   const [showRawMd, setShowRawMd] = createSignal(false);
   const [codeHtml, setCodeHtml] = createSignal("");
   const [codeLoading, setCodeLoading] = createSignal(false);
+  const [codeError, setCodeError] = createSignal<string | null>(null);
+  const { setTimeout: safeTimeout } = useSafeTimers();
 
   let filesScrollRef: HTMLDivElement | undefined;
   let changesScrollRef: HTMLDivElement | undefined;
@@ -148,9 +151,6 @@ const SourceCodePage: Component<Props> = (props) => {
   // Store initial line to scroll to
   const [pendingScrollLine, setPendingScrollLine] = createSignal<number | null>(null);
 
-  // Timer ref for cleanup
-  let scrollTimer: ReturnType<typeof setTimeout> | undefined;
-
   onMount(() => {
     // Mark files tab ready after mount
     setFilesReady(true);
@@ -163,14 +163,10 @@ const SourceCodePage: Component<Props> = (props) => {
         setPendingScrollLine(props.initialLine);
       }
       // Scroll to file in tree after virtualizer is ready
-      scrollTimer = setTimeout(() => {
+      safeTimeout(() => {
         scrollToFile(props.initialPath!);
       }, 100);
     }
-  });
-
-  onCleanup(() => {
-    if (scrollTimer) clearTimeout(scrollTimer);
   });
 
   // Scroll to line after code is rendered
@@ -185,7 +181,7 @@ const SourceCodePage: Component<Props> = (props) => {
           lineEl.scrollIntoView({ behavior: "smooth", block: "center" });
           // Highlight the line temporarily
           lineEl.classList.add("bg-blue-500/20");
-          setTimeout(() => lineEl.classList.remove("bg-blue-500/20"), 2000);
+          safeTimeout(() => lineEl.classList.remove("bg-blue-500/20"), 2000);
         }
         setPendingScrollLine(null);
       });
@@ -268,7 +264,7 @@ const SourceCodePage: Component<Props> = (props) => {
         setShowRawMd(false);
       });
       // Scroll to file in tree after tab switch
-      setTimeout(() => scrollToFile(change.path), 50);
+      safeTimeout(() => scrollToFile(change.path), 50);
     }
   };
 
@@ -287,26 +283,82 @@ const SourceCodePage: Component<Props> = (props) => {
   });
 
   // Syntax highlight when file changes
-  createEffect(async () => {
+  // NOTE: Using sync wrapper to avoid SolidJS async effect issues
+  createEffect(() => {
     const content = selectedContent();
     const path = selectedPath();
     if (!content || !path || isImage() || shouldRenderAsPrettyMd()) {
       setCodeHtml("");
+      setCodeLoading(false);
+      setCodeError(null);
       return;
     }
 
+    // Track request to handle race conditions
+    const requestId = Date.now();
+    (window as any).__lastHighlightRequest = requestId;
+
     setCodeLoading(true);
-    try {
-      const lang = detectLanguage(path);
-      const html = await highlightCode(content, lang);
-      setCodeHtml(html);
-    } catch (e) {
-      console.error("Failed to highlight:", e);
-      setCodeHtml(`<pre><code>${content}</code></pre>`);
-    } finally {
-      setCodeLoading(false);
-    }
+    setCodeError(null);
+
+    const lang = detectLanguage(path);
+    if (import.meta.env.DEV) console.log("[SourceCodePage] Highlighting", path, "as", lang);
+
+    // Defensive timeout - ensure loading state is cleared even if highlighter hangs
+    const safetyTimeout = setTimeout(() => {
+      if ((window as any).__lastHighlightRequest === requestId) {
+        console.warn("[SourceCodePage] Safety timeout - highlighter might be stuck");
+        setCodeError("Подсветка синтаксиса недоступна (timeout)");
+        setCodeHtml(`<pre class="shiki"><code>${escapeHtmlBasic(content)}</code></pre>`);
+        setCodeLoading(false);
+      }
+    }, 15000); // 15 second safety net
+
+    // Cleanup timeout on effect re-run or unmount
+    onCleanup(() => clearTimeout(safetyTimeout));
+
+    highlightCode(content, lang)
+      .then((html) => {
+        clearTimeout(safetyTimeout);
+        // Only update if this is still the current request
+        if ((window as any).__lastHighlightRequest === requestId) {
+          const isFallback = html.includes("shiki-fallback");
+          if (import.meta.env.DEV) console.log("[SourceCodePage] Highlight done:", isFallback ? "fallback (plain text)" : "success", "HTML length:", html.length);
+          setCodeHtml(html);
+          setCodeLoading(false);
+          // Don't set error for fallback - it's still usable
+          setCodeError(null);
+        }
+      })
+      .catch((e) => {
+        clearTimeout(safetyTimeout);
+        console.error("[SourceCodePage] Failed to highlight:", e);
+        if ((window as any).__lastHighlightRequest === requestId) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          setCodeError(errorMsg);
+          // Still show fallback
+          setCodeHtml(`<pre class="shiki"><code>${escapeHtmlBasic(content)}</code></pre>`);
+          setCodeLoading(false);
+        }
+      });
   });
+
+  // Simple HTML escape for fallback (avoiding circular import)
+  const escapeHtmlBasic = (text: string): string => {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  };
+
+  // Retry highlighting
+  const retryHighlight = () => {
+    resetHighlighter();
+    // Trigger re-run by toggling a signal
+    const path = selectedPath();
+    setSelectedPath(null);
+    safeTimeout(() => setSelectedPath(path), 10);
+  };
 
   const getFileExt = (path: string): string => {
     const lastDot = path.lastIndexOf(".");
@@ -411,7 +463,7 @@ const SourceCodePage: Component<Props> = (props) => {
     try {
       await navigator.clipboard.writeText("git clone https://github.com/SibXoDev/stuzhik.git");
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      safeTimeout(() => setCopied(false), 2000);
     } catch (e) {
       console.error("Failed to copy:", e);
     }
@@ -423,7 +475,7 @@ const SourceCodePage: Component<Props> = (props) => {
     try {
       await navigator.clipboard.writeText(content);
       setFileCopied(true);
-      setTimeout(() => setFileCopied(false), 2000);
+      safeTimeout(() => setFileCopied(false), 2000);
     } catch (e) {
       console.error("Failed to copy:", e);
     }
@@ -442,6 +494,8 @@ const SourceCodePage: Component<Props> = (props) => {
 
     setDownloading(true);
     try {
+      // Lazy-load JSZip only when needed (reduces initial bundle by ~200KB)
+      const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
 
       // Add text files
@@ -468,7 +522,9 @@ const SourceCodePage: Component<Props> = (props) => {
         duration: 3000,
       });
     } catch (e) {
-      console.error("Failed to create ZIP:", e);
+      if (import.meta.env.DEV) {
+        console.error("Failed to create ZIP:", e);
+      }
       addToast({
         type: "error",
         title: "Ошибка",
@@ -846,11 +902,37 @@ const SourceCodePage: Component<Props> = (props) => {
               <Show when={codeLoading()}>
                 <div class="flex-center p-8">
                   <i class="i-svg-spinners-ring-resize w-6 h-6 text-gray-500" />
+                  <span class="ml-2 text-sm text-gray-500">Загрузка подсветки...</span>
                 </div>
               </Show>
+
+              {/* Error banner (shown above code if there was an error) */}
+              <Show when={!codeLoading() && codeError()}>
+                <div class="flex items-center justify-between px-4 py-2 bg-yellow-500/10 border-b border-yellow-500/30 text-yellow-400 text-sm">
+                  <div class="flex items-center gap-2">
+                    <i class="i-hugeicons-alert-02 w-4 h-4" />
+                    <span>Ошибка подсветки: {codeError()}</span>
+                  </div>
+                  <button
+                    class="btn-ghost p-1.5 text-yellow-400 hover:text-yellow-300"
+                    onClick={retryHighlight}
+                    title="Повторить"
+                  >
+                    <i class="i-hugeicons-refresh w-4 h-4" />
+                  </button>
+                </div>
+              </Show>
+
               <Show when={!codeLoading() && codeHtml()}>
                 {/* Raw innerHTML - parent has line-numbers class via CSS */}
                 <div innerHTML={codeHtml()} />
+              </Show>
+
+              {/* Fallback if no HTML at all */}
+              <Show when={!codeLoading() && !codeHtml() && selectedContent()}>
+                <pre class="p-4 text-sm font-mono text-gray-300 whitespace-pre-wrap">
+                  {selectedContent()}
+                </pre>
               </Show>
             </Show>
           </Show>

@@ -39,3 +39,7 @@ bun run tauri build
 
 - **Backend:** Rust, Tauri 2, SQLite
 - **Frontend:** TypeScript, SolidJS, UnoCSS
+
+## Лицензия
+
+MIT — см. [LICENSE](LICENSE)

@@ -75,14 +75,14 @@ export function useInstances() {
 
   async function startInstance(id: string) {
     if (operatingInstances().has(id)) {
-      console.log("Instance is already being started:", id);
+      if (import.meta.env.DEV) console.log("Instance is already being started:", id);
       return;
     }
 
     // Check current status - don't start if already running/starting/stopping
     const instance = instances().find(i => i.id === id);
     if (instance && ["running", "starting", "stopping"].includes(instance.status)) {
-      console.log(`Cannot start instance ${id} - current status: ${instance.status}`);
+      if (import.meta.env.DEV) console.log(`Cannot start instance ${id} - current status: ${instance.status}`);
       return;
     }
 
@@ -114,7 +114,7 @@ export function useInstances() {
 
   async function stopInstance(id: string) {
     if (operatingInstances().has(id)) {
-      console.log("Instance is already being stopped:", id);
+      if (import.meta.env.DEV) console.log("Instance is already being stopped:", id);
       return;
     }
 
@@ -259,7 +259,7 @@ export function useInstances() {
         ops.forEach(id => {
           const inst = insts.find(i => i.id === id);
           if (inst && ["running", "stopped", "error", "crashed", "restarting"].includes(inst.status)) {
-            console.log("Failsafe: clearing stuck operatingInstance:", id);
+            if (import.meta.env.DEV) console.log("Failsafe: clearing stuck operatingInstance:", id);
             clearOperating(id);
           }
         });
@@ -270,7 +270,7 @@ export function useInstances() {
     unlisteners.push(
       listen<InstanceEvent>("instance-installing", async (event) => {
         const { id, name } = event.payload;
-        console.log("Instance installing event:", id, name);
+        if (import.meta.env.DEV) console.log("Instance installing event:", id, name);
         await ensureInstanceInList(id, "installing");
       })
     );
@@ -285,7 +285,7 @@ export function useInstances() {
         if (instance && instance.status === "installing") {
           // Статус остаётся "installing", но мы знаем что процесс идёт
           // UI компоненты могут отображать текущий шаг через InstallProgressModal
-          console.log(`Installation progress for ${id}: ${step}`);
+          if (import.meta.env.DEV) console.log(`Installation progress for ${id}: ${step}`);
         }
       })
     );
@@ -351,7 +351,7 @@ export function useInstances() {
     unlisteners.push(
       listen<{ instance_id: string }>("server-restart-now", async (event) => {
         const { instance_id } = event.payload;
-        console.log("Auto-restarting server:", instance_id);
+        if (import.meta.env.DEV) console.log("Auto-restarting server:", instance_id);
 
         // Сначала обновим статус на "stopped" чтобы startInstance сработал
         updateInstanceStatus(instance_id, "stopped");

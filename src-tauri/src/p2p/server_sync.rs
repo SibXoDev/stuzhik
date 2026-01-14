@@ -179,8 +179,12 @@ impl ServerInvite {
         let mut rng = rand::rng();
         let chars: Vec<char> = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".chars().collect();
 
-        let part1: String = (0..4).map(|_| chars[rng.random_range(0..chars.len())]).collect();
-        let part2: String = (0..4).map(|_| chars[rng.random_range(0..chars.len())]).collect();
+        let part1: String = (0..4)
+            .map(|_| chars[rng.random_range(0..chars.len())])
+            .collect();
+        let part2: String = (0..4)
+            .map(|_| chars[rng.random_range(0..chars.len())])
+            .collect();
 
         format!("STUZHIK-{}-{}", part1, part2)
     }
@@ -469,7 +473,9 @@ impl ServerSyncManager {
         let path = std::path::Path::new(modpack_path);
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if ext != "stzhk" && ext != "mrpack" && ext != "zip" {
-            return Err("Invalid modpack file format. Supported: .stzhk, .mrpack, .zip".to_string());
+            return Err(
+                "Invalid modpack file format. Supported: .stzhk, .mrpack, .zip".to_string(),
+            );
         }
 
         let mut configs = self.configs.write().await;
@@ -556,7 +562,10 @@ impl ServerSyncManager {
             active: true,
         };
 
-        self.invites.write().await.insert(code.clone(), invite.clone());
+        self.invites
+            .write()
+            .await
+            .insert(code.clone(), invite.clone());
         self.save_invites().await?;
 
         log::info!("Created invite {} for server {}", code, server_instance_id);
@@ -699,7 +708,12 @@ impl ServerSyncManager {
 
     /// Get published servers
     pub async fn get_published_servers(&self) -> Vec<PublishedServer> {
-        self.published_servers.read().await.values().cloned().collect()
+        self.published_servers
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Update discovered server from peer
@@ -762,11 +776,7 @@ impl ServerSyncManager {
     }
 
     /// Revoke peer authorization
-    pub async fn revoke_peer(
-        &self,
-        server_instance_id: &str,
-        peer_id: &str,
-    ) -> Result<(), String> {
+    pub async fn revoke_peer(&self, server_instance_id: &str, peer_id: &str) -> Result<(), String> {
         let mut configs = self.configs.write().await;
         if let Some(config) = configs.get_mut(server_instance_id) {
             config.authorized_peers.retain(|p| p != peer_id);
@@ -792,14 +802,21 @@ impl ServerSyncManager {
     // ==================== Watch Mode ====================
 
     /// Convert server config to watch config for auto-sync
-    pub fn config_to_watch_config(config: &ServerSyncConfig, instance_path: &PathBuf) -> WatchConfig {
+    pub fn config_to_watch_config(
+        config: &ServerSyncConfig,
+        instance_path: &PathBuf,
+    ) -> WatchConfig {
         WatchConfig {
             modpack_name: config.server_instance_id.clone(),
             modpack_path: instance_path.clone(),
             enabled: config.auto_sync,
             debounce_ms: 5000, // 5 second debounce
             ignore_patterns: config.exclude_patterns.clone(),
-            watch_folders: vec!["mods".to_string(), "config".to_string(), "kubejs".to_string()],
+            watch_folders: vec![
+                "mods".to_string(),
+                "config".to_string(),
+                "kubejs".to_string(),
+            ],
             target_peers: config.authorized_peers.clone(),
         }
     }
@@ -809,11 +826,11 @@ impl ServerSyncManager {
 
 /// Format invite for sharing (returns shareable text with code)
 pub fn format_invite_for_sharing(invite: &ServerInvite) -> String {
-    let mut text = format!(
-        "🎮 Присоединяйся к серверу {}!\n\n",
-        invite.server_name
-    );
-    text.push_str(&format!("📦 Версия: {} ({})\n", invite.mc_version, invite.loader));
+    let mut text = format!("🎮 Присоединяйся к серверу {}!\n\n", invite.server_name);
+    text.push_str(&format!(
+        "📦 Версия: {} ({})\n",
+        invite.mc_version, invite.loader
+    ));
     text.push_str(&format!("🔗 Адрес: {}\n\n", invite.server_address));
     text.push_str(&format!("📋 Код приглашения: {}\n\n", invite.code));
     text.push_str("Введи код в Stuzhik → Присоединиться к серверу");

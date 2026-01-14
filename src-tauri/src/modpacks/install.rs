@@ -1329,3 +1329,469 @@ async fn try_modrinth_fallback(
     )
     .await
 }
+
+// ========== Standalone Manifest JSON Import ==========
+
+/// Detect manifest format from JSON content
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ManifestFormat {
+    Modrinth,
+    CurseForge,
+}
+
+/// Parse standalone JSON file and determine format
+pub async fn parse_standalone_manifest(json_path: &Path) -> Result<(ManifestFormat, String)> {
+    let content = tokio::fs::read_to_string(json_path).await?;
+
+    // Try to determine format
+    if content.contains("\"formatVersion\"") && content.contains("\"modrinth.index.json\"")
+        || content.contains("\"game\": \"minecraft\"")
+    {
+        Ok((ManifestFormat::Modrinth, content))
+    } else if content.contains("\"manifestType\"") && content.contains("\"minecraftModpack\"") {
+        Ok((ManifestFormat::CurseForge, content))
+    } else if content.contains("\"files\"") && content.contains("\"dependencies\"") {
+        // Modrinth format without explicit markers
+        Ok((ManifestFormat::Modrinth, content))
+    } else if content.contains("\"modLoaders\"") || content.contains("\"projectID\"") {
+        // CurseForge format without explicit markers
+        Ok((ManifestFormat::CurseForge, content))
+    } else {
+        Err(LauncherError::InvalidConfig(
+            "Unknown manifest format. Expected Modrinth or CurseForge manifest.".to_string(),
+        ))
+    }
+}
+
+impl ModpackManager {
+    /// Install from standalone manifest.json or modrinth.index.json
+    pub async fn install_from_standalone_manifest(
+        json_path: PathBuf,
+        instance_name: String,
+        download_manager: DownloadManager,
+        app_handle: tauri::AppHandle,
+    ) -> Result<String> {
+        // Generate operation ID for tracking/cancellation
+        let operation_id = uuid::Uuid::new_v4().to_string();
+        let cancel_token = cancellation::get_or_create_token(&operation_id);
+
+        let result = Self::install_from_standalone_manifest_internal(
+            json_path,
+            instance_name,
+            download_manager,
+            app_handle.clone(),
+            cancel_token,
+            operation_id.clone(),
+        )
+        .await;
+
+        cancellation::remove_token(&operation_id);
+
+        if let Err(ref e) = result {
+            app_handle
+                .emit(
+                    "modpack-install-error",
+                    serde_json::json!({
+                        "error": e.to_string(),
+                        "operation_id": operation_id,
+                    }),
+                )
+                .ok();
+        }
+
+        result
+    }
+
+    async fn install_from_standalone_manifest_internal(
+        json_path: PathBuf,
+        instance_name: String,
+        download_manager: DownloadManager,
+        app_handle: tauri::AppHandle,
+        cancel_token: tokio_util::sync::CancellationToken,
+        operation_id: String,
+    ) -> Result<String> {
+        // Parse and detect format
+        let (format, content) = parse_standalone_manifest(&json_path).await?;
+
+        match format {
+            ManifestFormat::Modrinth => {
+                let index: ModrinthModpackIndex = serde_json::from_str(&content)?;
+                Self::install_from_modrinth_manifest(
+                    index,
+                    instance_name,
+                    download_manager,
+                    app_handle,
+                    cancel_token,
+                    operation_id,
+                )
+                .await
+            }
+            ManifestFormat::CurseForge => {
+                let manifest: CurseForgeManifest = serde_json::from_str(&content)?;
+                Self::install_from_curseforge_manifest(
+                    manifest,
+                    instance_name,
+                    download_manager,
+                    app_handle,
+                    cancel_token,
+                    operation_id,
+                )
+                .await
+            }
+        }
+    }
+
+    /// Install from parsed Modrinth manifest (standalone or from archive)
+    async fn install_from_modrinth_manifest(
+        index: ModrinthModpackIndex,
+        instance_name: String,
+        download_manager: DownloadManager,
+        app_handle: tauri::AppHandle,
+        cancel_token: tokio_util::sync::CancellationToken,
+        operation_id: String,
+    ) -> Result<String> {
+        // Determine loader from dependencies
+        let (loader, loader_version) = if let Some(ref v) = index.dependencies.fabric_loader {
+            ("fabric".to_string(), Some(v.clone()))
+        } else if let Some(ref v) = index.dependencies.quilt_loader {
+            ("quilt".to_string(), Some(v.clone()))
+        } else if let Some(ref v) = index.dependencies.forge {
+            ("forge".to_string(), Some(v.clone()))
+        } else if let Some(ref v) = index.dependencies.neoforge {
+            ("neoforge".to_string(), Some(v.clone()))
+        } else {
+            ("vanilla".to_string(), None)
+        };
+
+        check_cancelled(&cancel_token)?;
+
+        // Create instance
+        let (instance_id, _instance_dir, mods_dir) = create_modpack_instance(
+            ModpackInstanceParams {
+                name: instance_name,
+                mc_version: index.dependencies.minecraft.clone(),
+                loader: loader.clone(),
+                loader_version,
+                modpack_name: index.name.clone(),
+            },
+            &app_handle,
+        )
+        .await?;
+
+        // Filter mod files (clone to avoid lifetime issues in async closures)
+        let mod_files: Vec<_> = index
+            .files
+            .iter()
+            .filter(|f| f.path.starts_with("mods/"))
+            .cloned()
+            .collect();
+
+        let total_files = mod_files.len() as u32;
+        let counter = Arc::new(AtomicU32::new(0));
+
+        emit_progress(
+            &app_handle,
+            "downloading_mods",
+            0,
+            total_files,
+            Some(format!("Скачивание {} модов...", total_files)),
+        );
+
+        // Download mods in parallel
+        let results: Vec<Result<String>> = stream::iter(mod_files)
+            .map(|file| {
+                let dm = download_manager.clone();
+                let mods_path = mods_dir.clone();
+                let counter = counter.clone();
+                let app = app_handle.clone();
+                let cancel = cancel_token.clone();
+                let op_id = operation_id.clone();
+                let total = total_files;
+
+                async move {
+                    check_cancelled(&cancel)?;
+
+                    let filename = file.path.strip_prefix("mods/").unwrap_or(&file.path);
+                    let dest_path = mods_path.join(filename);
+
+                    // Try each download URL
+                    let mut last_error = None;
+                    for url in &file.downloads {
+                        match dm
+                            .download_file_cancellable(
+                                url,
+                                &dest_path,
+                                filename,
+                                None,
+                                &cancel,
+                                Some(&op_id),
+                            )
+                            .await
+                        {
+                            Ok(()) => {
+                                let current = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                                emit_progress(
+                                    &app,
+                                    "downloading_mods",
+                                    current,
+                                    total,
+                                    Some(filename.to_string()),
+                                );
+                                return Ok(filename.to_string());
+                            }
+                            Err(LauncherError::OperationCancelled) => {
+                                return Err(LauncherError::OperationCancelled);
+                            }
+                            Err(e) => {
+                                last_error = Some(e);
+                            }
+                        }
+                    }
+
+                    // Update counter even on failure
+                    let current = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                    emit_progress(
+                        &app,
+                        "downloading_mods",
+                        current,
+                        total,
+                        Some(filename.to_string()),
+                    );
+
+                    Err(last_error.unwrap_or_else(|| {
+                        LauncherError::DownloadFailed(format!("No download URLs for {}", filename))
+                    }))
+                }
+            })
+            .buffer_unordered(MAX_PARALLEL_DOWNLOADS)
+            .collect()
+            .await;
+
+        // Count successes and failures
+        let mut success_count = 0;
+        let mut failed_count = 0;
+        for result in results {
+            match result {
+                Ok(_) => success_count += 1,
+                Err(LauncherError::OperationCancelled) => {
+                    return Err(LauncherError::OperationCancelled);
+                }
+                Err(_) => failed_count += 1,
+            }
+        }
+
+        log::info!(
+            "Modrinth manifest import complete: {} succeeded, {} failed",
+            success_count,
+            failed_count
+        );
+
+        emit_progress(&app_handle, "complete", total_files, total_files, None);
+
+        Ok(instance_id)
+    }
+
+    /// Install from parsed CurseForge manifest (standalone or from archive)
+    async fn install_from_curseforge_manifest(
+        manifest: CurseForgeManifest,
+        instance_name: String,
+        download_manager: DownloadManager,
+        app_handle: tauri::AppHandle,
+        cancel_token: tokio_util::sync::CancellationToken,
+        operation_id: String,
+    ) -> Result<String> {
+        // Determine loader
+        let (loader, loader_version) =
+            if let Some(mod_loader) = manifest.minecraft.mod_loaders.first() {
+                let id = &mod_loader.id;
+                if id.starts_with("forge-") {
+                    (
+                        "forge".to_string(),
+                        Some(id.strip_prefix("forge-").unwrap_or(id).to_string()),
+                    )
+                } else if id.starts_with("fabric-") {
+                    (
+                        "fabric".to_string(),
+                        Some(id.strip_prefix("fabric-").unwrap_or(id).to_string()),
+                    )
+                } else if id.starts_with("neoforge-") {
+                    (
+                        "neoforge".to_string(),
+                        Some(id.strip_prefix("neoforge-").unwrap_or(id).to_string()),
+                    )
+                } else if id.starts_with("quilt-") {
+                    (
+                        "quilt".to_string(),
+                        Some(id.strip_prefix("quilt-").unwrap_or(id).to_string()),
+                    )
+                } else {
+                    ("vanilla".to_string(), None)
+                }
+            } else {
+                ("vanilla".to_string(), None)
+            };
+
+        check_cancelled(&cancel_token)?;
+
+        // Create instance
+        let (instance_id, _instance_dir, mods_dir) = create_modpack_instance(
+            ModpackInstanceParams {
+                name: instance_name,
+                mc_version: manifest.minecraft.version.clone(),
+                loader: loader.clone(),
+                loader_version,
+                modpack_name: manifest.name.clone(),
+            },
+            &app_handle,
+        )
+        .await?;
+
+        let total_files = manifest.files.len() as u32;
+
+        emit_progress(
+            &app_handle,
+            "resolving_mods",
+            0,
+            total_files,
+            Some(format!(
+                "Запрос к CurseForge API ({} модов)...",
+                total_files
+            )),
+        );
+
+        // Build HTTP client with CurseForge API key
+        let http_client = reqwest::Client::builder()
+            .user_agent(crate::USER_AGENT)
+            .timeout(std::time::Duration::from_secs(120))
+            .default_headers({
+                let mut headers = reqwest::header::HeaderMap::new();
+                headers.insert(
+                    "x-api-key",
+                    "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
+                        .parse()
+                        .unwrap(),
+                );
+                headers
+            })
+            .build()?;
+
+        // Get file IDs
+        let file_ids: Vec<u64> = manifest.files.iter().map(|f| f.file_id).collect();
+
+        // Batch request to CurseForge API
+        let batch_response = http_client
+            .post("https://api.curseforge.com/v1/mods/files")
+            .json(&serde_json::json!({ "fileIds": file_ids }))
+            .send()
+            .await?
+            .json::<serde_json::Value>()
+            .await?;
+
+        // Parse response and build download map
+        let mut file_info_map: std::collections::HashMap<u64, (String, String)> =
+            std::collections::HashMap::new();
+
+        if let Some(data) = batch_response.get("data").and_then(|d| d.as_array()) {
+            for file_data in data {
+                if let (Some(id), Some(url), Some(filename)) = (
+                    file_data.get("id").and_then(|i| i.as_u64()),
+                    file_data.get("downloadUrl").and_then(|u| u.as_str()),
+                    file_data.get("fileName").and_then(|f| f.as_str()),
+                ) {
+                    file_info_map.insert(id, (url.to_string(), filename.to_string()));
+                }
+            }
+        }
+
+        check_cancelled(&cancel_token)?;
+
+        let counter = Arc::new(AtomicU32::new(0));
+
+        emit_progress(
+            &app_handle,
+            "downloading_mods",
+            0,
+            total_files,
+            Some("Скачивание модов...".to_string()),
+        );
+
+        // Download mods (clone manifest files to avoid lifetime issues in async closures)
+        let results: Vec<Result<String>> = stream::iter(manifest.files.iter().cloned())
+            .map(|manifest_file| {
+                let dm = download_manager.clone();
+                let mods_path = mods_dir.clone();
+                let counter = counter.clone();
+                let app = app_handle.clone();
+                let cancel = cancel_token.clone();
+                let op_id = operation_id.clone();
+                let total = total_files;
+                let file_info = file_info_map.get(&manifest_file.file_id).cloned();
+
+                async move {
+                    check_cancelled(&cancel)?;
+
+                    let (download_url, file_name) = match file_info {
+                        Some((url, name)) => (url, name),
+                        None => {
+                            log::warn!("No info for file_id {}", manifest_file.file_id);
+                            counter.fetch_add(1, Ordering::SeqCst);
+                            return Err(LauncherError::ModNotFound(format!(
+                                "No download info for file {}",
+                                manifest_file.file_id
+                            )));
+                        }
+                    };
+
+                    let dest_path = mods_path.join(&file_name);
+
+                    let result = dm
+                        .download_file_cancellable(
+                            &download_url,
+                            &dest_path,
+                            &file_name,
+                            None,
+                            &cancel,
+                            Some(&op_id),
+                        )
+                        .await;
+
+                    let current = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                    emit_progress(
+                        &app,
+                        "downloading_mods",
+                        current,
+                        total,
+                        Some(file_name.clone()),
+                    );
+
+                    result.map(|_| file_name)
+                }
+            })
+            .buffer_unordered(MAX_PARALLEL_DOWNLOADS)
+            .collect()
+            .await;
+
+        // Count results
+        let mut success_count = 0;
+        let mut failed_count = 0;
+        for result in results {
+            match result {
+                Ok(_) => success_count += 1,
+                Err(LauncherError::OperationCancelled) => {
+                    return Err(LauncherError::OperationCancelled);
+                }
+                Err(_) => failed_count += 1,
+            }
+        }
+
+        log::info!(
+            "CurseForge manifest import complete: {} succeeded, {} failed",
+            success_count,
+            failed_count
+        );
+
+        emit_progress(&app_handle, "complete", total_files, total_files, None);
+
+        Ok(instance_id)
+    }
+}

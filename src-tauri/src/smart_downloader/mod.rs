@@ -111,7 +111,7 @@ impl SpeedCalculator {
             last_bytes: 0,
             last_update: Instant::now(),
             min_interval: std::time::Duration::from_millis(100), // Минимум 100ms между измерениями
-            max_speed: 1_000_000_000.0, // 1 GB/s cap
+            max_speed: 1_000_000_000.0,                          // 1 GB/s cap
         }
     }
 
@@ -655,46 +655,47 @@ impl SmartDownloader {
         let status = response.status();
 
         // Определяем режим работы по статусу ответа
-        let (resume_offset, total_size, _supports_resume) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
-            // 206 - сервер поддерживает resume
-            let content_length = response.content_length().unwrap_or(0);
-            let total = existing_size + content_length;
-            log::info!(
-                "Server supports resume for {}, continuing from {} bytes (total: {})",
-                name,
-                existing_size,
-                total
-            );
-            (existing_size, total, true)
-        } else if status.is_success() {
-            // 200 - сервер не поддерживает resume или отправил полный файл
-            if is_resuming {
-                log::warn!(
-                    "Server doesn't support resume for {}, starting from scratch",
-                    name
+        let (resume_offset, total_size, _supports_resume) =
+            if status == reqwest::StatusCode::PARTIAL_CONTENT {
+                // 206 - сервер поддерживает resume
+                let content_length = response.content_length().unwrap_or(0);
+                let total = existing_size + content_length;
+                log::info!(
+                    "Server supports resume for {}, continuing from {} bytes (total: {})",
+                    name,
+                    existing_size,
+                    total
                 );
-                // Удаляем partial файл - начинаем заново
-                let _ = tokio::fs::remove_file(&part_path).await;
-            }
-            let total = response.content_length().unwrap_or(0);
-            (0, total, false)
-        } else {
-            log::error!("HTTP {} for URL: {}", status, url);
-            self.emit_progress(
-                download_id,
-                name,
-                0,
-                0,
-                0,
-                DownloadStatus::Failed,
-                operation_id,
-            )
-            .await;
-            return Err(LauncherError::DownloadFailed(format!(
-                "HTTP {}: {}",
-                status, url
-            )));
-        };
+                (existing_size, total, true)
+            } else if status.is_success() {
+                // 200 - сервер не поддерживает resume или отправил полный файл
+                if is_resuming {
+                    log::warn!(
+                        "Server doesn't support resume for {}, starting from scratch",
+                        name
+                    );
+                    // Удаляем partial файл - начинаем заново
+                    let _ = tokio::fs::remove_file(&part_path).await;
+                }
+                let total = response.content_length().unwrap_or(0);
+                (0, total, false)
+            } else {
+                log::error!("HTTP {} for URL: {}", status, url);
+                self.emit_progress(
+                    download_id,
+                    name,
+                    0,
+                    0,
+                    0,
+                    DownloadStatus::Failed,
+                    operation_id,
+                )
+                .await;
+                return Err(LauncherError::DownloadFailed(format!(
+                    "HTTP {}: {}",
+                    status, url
+                )));
+            };
 
         let start_time = Instant::now();
 
@@ -716,7 +717,11 @@ impl SmartDownloader {
                 .append(true)
                 .open(&part_path)
                 .map_err(|e| {
-                    log::error!("Failed to open file for resume {}: {}", part_path.display(), e);
+                    log::error!(
+                        "Failed to open file for resume {}: {}",
+                        part_path.display(),
+                        e
+                    );
                     LauncherError::Io(e)
                 })?;
             // Перемещаемся в конец для надёжности
@@ -874,7 +879,11 @@ impl SmartDownloader {
         file.sync_all().map_err(|e| LauncherError::Io(e))?;
         drop(file);
 
-        let final_total = if total_size > 0 { total_size } else { downloaded };
+        let final_total = if total_size > 0 {
+            total_size
+        } else {
+            downloaded
+        };
         let duration = start_time.elapsed();
         let speed_mbps = if duration.as_secs() > 0 {
             (session_downloaded as f64 / 1_000_000.0) / duration.as_secs_f64()
@@ -945,15 +954,17 @@ impl SmartDownloader {
         }
 
         // Переименовываем .part в финальный файл
-        tokio::fs::rename(&part_path, destination).await.map_err(|e| {
-            log::error!(
-                "Failed to rename {} to {}: {}",
-                part_path.display(),
-                destination.display(),
-                e
-            );
-            LauncherError::Io(e)
-        })?;
+        tokio::fs::rename(&part_path, destination)
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "Failed to rename {} to {}: {}",
+                    part_path.display(),
+                    destination.display(),
+                    e
+                );
+                LauncherError::Io(e)
+            })?;
 
         self.emit_progress(
             download_id,
@@ -1029,8 +1040,15 @@ impl SmartDownloader {
         cancel_token: &CancellationToken,
         operation_id: Option<&str>,
     ) -> Result<()> {
-        self.download_cancellable(url, destination, name, expected_hash, cancel_token, operation_id)
-            .await
+        self.download_cancellable(
+            url,
+            destination,
+            name,
+            expected_hash,
+            cancel_token,
+            operation_id,
+        )
+        .await
     }
 
     /// Алиас для download() - SmartDownloader уже автоматически использует зеркала
@@ -1086,7 +1104,12 @@ impl SmartDownloader {
                 let downloader = self.clone();
                 async move {
                     downloader
-                        .download_file(&task.url, &task.destination, &task.name, task.hash.as_deref())
+                        .download_file(
+                            &task.url,
+                            &task.destination,
+                            &task.name,
+                            task.hash.as_deref(),
+                        )
                         .await
                 }
             })
@@ -1108,7 +1131,11 @@ pub struct DownloadTask {
 }
 
 impl DownloadTask {
-    pub fn new(url: impl Into<String>, destination: impl Into<std::path::PathBuf>, name: impl Into<String>) -> Self {
+    pub fn new(
+        url: impl Into<String>,
+        destination: impl Into<std::path::PathBuf>,
+        name: impl Into<String>,
+    ) -> Self {
         Self {
             url: url.into(),
             destination: destination.into(),
@@ -1235,7 +1262,7 @@ mod tests {
 
         // Проверяем что cap работает
         calc.speed_ema = 2_000_000_000.0; // 2 GB/s (нереально)
-        // current_speed возвращает как есть, cap применяется в update()
+                                          // current_speed возвращает как есть, cap применяется в update()
         assert_eq!(calc.current_speed(), 2_000_000_000);
     }
 

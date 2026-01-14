@@ -9,11 +9,31 @@ import {
 } from 'unocss';
 
 export default defineConfig({
-  // Custom rules for gray-alpha colors
+  content: {
+    filesystem: [
+      'src/**/*.{vue,ts,tsx,js,jsx,html}',
+    ],
+    pipeline: {
+      include: [
+        /\.(vue|ts|tsx|js|jsx|html)$/,
+      ],
+      exclude: [
+        'node_modules',
+        'src-tauri',
+        'dist',
+        'target',
+        'src/generated',  // Exclude auto-generated source bundle to prevent UnoCSS from parsing stringified code
+      ],
+    },
+  },
+
+  // Custom rules for gray-alpha colors and missing utilities
   rules: [
     ['bg-gray-alpha-30', { 'background-color': 'rgba(26, 27, 31, 0.3)' }],
     ['bg-gray-alpha-50', { 'background-color': 'rgba(26, 27, 31, 0.5)' }],
     ['bg-gray-alpha-70', { 'background-color': 'rgba(26, 27, 31, 0.7)' }],
+    // Fix missing container size in presetWind4 v66
+    ['max-w-5xl', { 'max-width': '64rem' }],
   ],
 
   shortcuts: [
@@ -66,6 +86,10 @@ export default defineConfig({
   ],
 
   theme: {
+    // Fix missing container sizes in presetWind4 v66
+    container: {
+      '5xl': '64rem',  // 1024px - missing in presetWind4
+    },
     // Override default gray palette with pure grays (no blue tint)
     colors: {
       gray: {
@@ -108,13 +132,18 @@ export default defineConfig({
 
   presets: [
     presetWind4(),
-    presetAttributify(),
+    presetAttributify({
+      strict: true,
+      // CRITICAL: Only scan specific attribute prefixes to avoid parsing random strings
+      prefix: 'un-',
+      prefixedOnly: true,  // Only process attributes with un- prefix
+    }),
     presetIcons({
-      scale: 1.2,
+      scale: 1,
       warn: true,
-      collections: {
-        hugeicons: () => import('@iconify-json/hugeicons/icons.json').then(i => i.default),
-      },
+      // collections: {
+        // hugeicons: () => import('@iconify-json/hugeicons/icons.json').then(i => i.default),
+      // },
     }),
     presetTypography(),
     // Fonts are loaded locally from public/fonts/
@@ -125,13 +154,19 @@ export default defineConfig({
     transformerVariantGroup(),
   ],
 
-  // Block false positives from TypeScript/JS code being parsed as icon suffix
+  // Block false positives from TypeScript/JS code being parsed as CSS
   blocklist: [
     /i-hugeicons-.*-as$/,
     /i-hugeicons-package-\d+$/,
     /i-simple-icons-.*-as$/,
     // Block common variable property suffixes mistaken as icon names
     /i-hugeicons-.*-(const|ext|case|return|type|name|value|length|path|size)$/,
+
+    // CRITICAL: Block JavaScript code patterns that UnoCSS might parse
+    // These patterns appear when source code is stringified (e.g., in generated files)
+    /scheme-.*\.js/,              // JavaScript scheme patterns (e.g., scheme-RFLM74UC.js)
+    /__proto__/,                  // JavaScript prototype chain
+    /\$HAS/,                      // JavaScript variable patterns like $HAS
   ],
 
   safelist: [
@@ -140,6 +175,39 @@ export default defineConfig({
     'z-[61]',
     'z-[62]',
     'pointer-events-auto',
+
+    // Container sizes (missing in presetWind4 v66)
+    'max-w-5xl',
+
+    // Border colors for Toast, LogAnalyzer, etc. (with opacity variants)
+    'border-green-700', 'border-green-600', 'border-green-500',
+    'border-green-500/30', 'border-green-500/40', 'border-green-500/50',
+    'border-red-700', 'border-red-600', 'border-red-500',
+    'border-red-500/20', 'border-red-500/30', 'border-red-500/40', 'border-red-500/50',
+    'border-red-600/50',
+    'border-amber-700', 'border-amber-600', 'border-amber-500',
+    'border-yellow-700', 'border-yellow-600', 'border-yellow-500',
+    'border-yellow-500/30', 'border-yellow-500/40', 'border-yellow-500/50',
+    'border-blue-700', 'border-blue-600', 'border-blue-500',
+    'border-blue-500/30', 'border-blue-500/40', 'border-blue-500/50',
+    'border-orange-700', 'border-orange-600', 'border-orange-500',
+    'border-orange-500/20', 'border-orange-500/30',
+    'border-gray-600', 'border-gray-700',
+    // Background colors for Toast and LogAnalyzer
+    'bg-green-900/90', 'bg-red-900/90', 'bg-amber-900/90',
+    'bg-green-500/5', 'bg-green-500/10', 'bg-green-500/20',
+    'bg-red-500/5', 'bg-red-500/10', 'bg-red-500/20',
+    'bg-yellow-500/5', 'bg-yellow-500/10', 'bg-yellow-500/20',
+    'bg-blue-500/5', 'bg-blue-500/10', 'bg-blue-500/20',
+    'bg-orange-500/10',
+
+    // Position utilities that may need explicit inclusion
+    'left-1', 'right-1', 'top-1', 'bottom-1',
+    'left-2', 'right-2', 'top-2', 'bottom-2',
+    'left-3', 'right-3', 'top-3', 'bottom-3',
+    'left-4', 'right-4', 'top-4', 'bottom-4',
+    'inset-0', 'inset-1', 'inset-2', 'inset-4',
+    '-left-1', '-right-1', '-top-1', '-bottom-1',
 
     // SVG Spinners
     'i-svg-spinners-6-dots-scale',
@@ -171,6 +239,7 @@ export default defineConfig({
     'i-hugeicons-cancel-circle',
     'i-hugeicons-car-01',
     'i-hugeicons-chart-line-data-01',
+    'i-hugeicons-chart-relationship',
     'i-hugeicons-checkmark-circle-02',
     'i-hugeicons-clock-01',
     'i-hugeicons-cloud',
@@ -219,6 +288,7 @@ export default defineConfig({
     'i-hugeicons-hard-drive',
     'i-hugeicons-help-circle',
     'i-hugeicons-hierarchy',
+    'i-hugeicons-hierarchy-square-01',
     'i-hugeicons-idea',
     'i-hugeicons-image-01',
     'i-hugeicons-image-not-found-01',
@@ -244,6 +314,7 @@ export default defineConfig({
     'i-hugeicons-paint-board',
     'i-hugeicons-paint-brush-01',
     'i-hugeicons-pin',
+    'i-hugeicons-pin-off',
     'i-hugeicons-play',
     'i-hugeicons-plug-01',
     'i-hugeicons-power-socket-01',

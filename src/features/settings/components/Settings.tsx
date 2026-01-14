@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show, onMount, For } from "solid-js";
+import { createSignal, createEffect, createMemo, Show, onMount, For } from "solid-js";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Settings, StorageInfo, AppPaths, OrphanedFolder, GpuDetectionResult, GpuDevice, SharedResourcesBreakdown, SystemJavaInfo, JavaInstallationInfo } from "../../../shared/types";
@@ -13,7 +13,7 @@ import {
   type BackgroundType
 } from "../../../shared/components/AppBackground";
 import { useI18n, type Language } from "../../../shared/i18n";
-import { BackgroundOption, RadioOption, LazyPreview, Toggle, Select } from "../../../shared/ui";
+import { BackgroundOption, RadioOption, LazyPreview, Toggle, Select, RangeSlider } from "../../../shared/ui";
 import FloatingLines from "../../../shared/components/FloatingLines";
 import Aurora from "../../../shared/components/Aurora";
 import DotGrid from "../../../shared/components/DotGrid";
@@ -52,11 +52,67 @@ export default function SettingsDialog(props: Props) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
+
+  // Get memory step based on total memory
+  const getMemoryStep = (maxMemory: number): number => {
+    return maxMemory <= 8192 ? 512 : 1024;
+  };
+
+  // Generate memory markers for RangeSlider based on max memory
+  const generateMemoryMarkers = (maxMemory: number): number[] => {
+    const markers: number[] = [];
+    const step = maxMemory <= 8192 ? 512 : 1024; // 512MB step for <=8GB, 1GB step for >8GB
+
+    // Generate all ticks from step to maxMemory
+    for (let i = step; i <= maxMemory; i += step) {
+      markers.push(i);
+    }
+
+    // Always add max value as last marker if not already there
+    if (markers.length > 0 && markers[markers.length - 1] !== maxMemory) {
+      markers.push(maxMemory);
+    }
+
+    return markers;
+  };
+
+  // Generate filtered ticks for labels - only multiples of 2GB to avoid clutter
+  // Always includes first and last tick
+  const generateLabelTicks = (allTicks: number[]): number[] => {
+    if (allTicks.length <= 8) return allTicks; // Show all if few ticks
+
+    const result: number[] = [allTicks[0]]; // Always include first
+
+    // Only show values that are multiples of 2048 (2 GB)
+    for (const tick of allTicks) {
+      if (tick % 2048 === 0 && tick !== allTicks[0] && tick !== allTicks[allTicks.length - 1]) {
+        result.push(tick);
+      }
+    }
+
+    result.push(allTicks[allTicks.length - 1]); // Always include last
+    return result;
+  };
+
+  // Format memory value for labels (MB to GB with 1 decimal, hide .0)
+  const formatMemoryLabel = (mb: number): string => {
+    const gb = mb / 1024;
+    return gb % 1 === 0 ? `${gb.toFixed(0)} GB` : `${gb.toFixed(1)} GB`;
+  };
   const [settings, setSettings] = createSignal<Settings>({} as Settings);
+  const [initialSettings, setInitialSettings] = createSignal<Settings>({} as Settings); // Initial state for Cancel
+  const [totalMemory, setTotalMemory] = createSignal(8192); // default value
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [success, setSuccess] = createSignal(false);
+
+  // Check if settings have changed
+  const hasChanges = createMemo(() => {
+    const current = settings();
+    const initial = initialSettings();
+    return JSON.stringify(current) !== JSON.stringify(initial);
+  });
 
   // Storage info
   const [storageInfo, setStorageInfo] = createSignal<StorageInfo | null>(null);
@@ -95,6 +151,27 @@ export default function SettingsDialog(props: Props) {
   const [installedJavaVersions, setInstalledJavaVersions] = createSignal<number[]>([]);
   const [javaByVersion, setJavaByVersion] = createSignal<Record<number, JavaInstallationInfo[]>>({});
   const [loadingJavaVersions, setLoadingJavaVersions] = createSignal(false);
+
+  // Auto-save settings with debounce (300ms)
+  const { debounce: debounceSettingsSave } = useDebounce();
+  createEffect(() => {
+    const currentSettings = settings();
+    const initial = initialSettings();
+
+    // Skip first run and if settings are empty
+    if (!currentSettings || Object.keys(currentSettings).length === 0 || currentSettings === initial) {
+      return;
+    }
+
+    // Auto-save settings after 300ms of no changes
+    debounceSettingsSave(async () => {
+      try {
+        await invoke("save_settings", { settings: currentSettings });
+      } catch (e) {
+        console.error("Auto-save failed:", e);
+      }
+    }, 300);
+  });
 
   // Stuzhik Connect (P2P)
   type Permission = "deny" | "friends_only" | "ask" | "allow";
@@ -145,13 +222,16 @@ export default function SettingsDialog(props: Props) {
   // Загружаем данные параллельно при монтировании - максимально быстрое открытие
   onMount(async () => {
     try {
-      // Параллельно загружаем settings и paths - это критично для UI
-      const [data, paths] = await Promise.all([
+      // Параллельно загружаем settings, paths и totalMemory - это критично для UI
+      const [data, paths, memory] = await Promise.all([
         invoke<Settings>("get_settings"),
         invoke<AppPaths>("get_app_paths"),
+        invoke<number>("get_total_memory"),
       ]);
       setSettings(data);
+      setInitialSettings(data); // Save initial state for Cancel button
       setAppPaths(paths);
+      setTotalMemory(memory);
       setLoading(false); // Сразу показываем UI после основных данных
 
       // НЕ загружаем storageInfo и GPU автоматически - это тяжёлые операции
@@ -344,7 +424,7 @@ export default function SettingsDialog(props: Props) {
     setCleaningJava(version);
     try {
       const freedBytes = await invoke<number>("cleanup_java_version", { version });
-      console.log(`Cleaned up Java ${version}, freed ${formatSize(freedBytes)}`);
+      if (import.meta.env.DEV) console.log(`Cleaned up Java ${version}, freed ${formatSize(freedBytes)}`);
       // Перезагружаем информацию
       await loadSharedResources();
       if (storageInfo()) await loadStorageInfo();
@@ -373,7 +453,7 @@ export default function SettingsDialog(props: Props) {
     setCleaningJava("all");
     try {
       const freedBytes = await invoke<number>("cleanup_all_unused_java");
-      console.log(`Cleaned up all unused Java, freed ${formatSize(freedBytes)}`);
+      if (import.meta.env.DEV) console.log(`Cleaned up all unused Java, freed ${formatSize(freedBytes)}`);
       await loadSharedResources();
       if (storageInfo()) await loadStorageInfo();
       showSuccessNotification();
@@ -583,18 +663,27 @@ export default function SettingsDialog(props: Props) {
     21: "MC 1.20.5+"
   };
 
-  const handleSave = async () => {
+  // Cancel - revert to initial state when Settings opened
+  const handleCancel = async () => {
     if (saving()) return;
 
     try {
       setSaving(true);
       setError(null);
-      await invoke("save_settings", { settings: settings() });
-      showSuccessNotification();
+      // Revert to initial settings
+      setSettings(initialSettings());
+      // Save reverted settings to database
+      await invoke("save_settings", { settings: initialSettings() });
+      // Also revert language
+      if (initialSettings().language) {
+        setLanguage(initialSettings().language);
+      }
+      // Close dialog
+      props.onClose?.();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to save settings:", e);
+      console.error("Failed to cancel settings:", e);
     } finally {
       setSaving(false);
     }
@@ -724,6 +813,19 @@ export default function SettingsDialog(props: Props) {
     updateSetting("language", lang as 'ru' | 'en');
   };
 
+  // Изменить режим разработчика (сохраняется сразу)
+  const handleDeveloperModeChange = async (checked: boolean) => {
+    updateSetting("developer_mode", checked);
+    try {
+      // Сохраняем сразу, не ждем кнопки Save
+      await invoke("save_settings", { settings: { ...settings(), developer_mode: checked } });
+      // Отправляем событие для обновления UI
+      window.dispatchEvent(new CustomEvent("developerModeChange", { detail: checked }));
+    } catch (e) {
+      console.error("Failed to save developer mode setting:", e);
+    }
+  };
+
   // Загрузить список GPU
   const loadGpuDevices = async () => {
     setLoadingGpu(true);
@@ -754,7 +856,7 @@ export default function SettingsDialog(props: Props) {
   return (
     <div class="fixed inset-0 z-50 pt-[var(--titlebar-height)] pb-4 px-4 flex items-center justify-center pointer-events-none">
       <div
-        class="bg-gray-850 rounded-2xl shadow-2xl w-full max-w-5xl max-h-full flex flex-col border border-gray-750 pointer-events-auto"
+        class="bg-gray-850 rounded-2xl shadow-2xl w-full max-w-6xl max-h-full flex flex-col border border-gray-750 pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -816,8 +918,8 @@ export default function SettingsDialog(props: Props) {
                 </legend>
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-sm font-medium mb-3">{t().settings.appearance.background}</label>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <label class="block text-sm font-medium mb-2">{t().settings.appearance.background}</label>
+                    <div class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                       {/* Floating Lines */}
                       <BackgroundOption
                         type="floatingLines"
@@ -825,12 +927,13 @@ export default function SettingsDialog(props: Props) {
                         active={backgroundType() === "floatingLines"}
                         onClick={() => handleBackgroundTypeChange("floatingLines")}
                         preview={
-                          <LazyPreview>
+                          <LazyPreview keepAlive>
                             <FloatingLines
                               linesGradient={["#1e3a5f", "#2d1b4e", "#1a3d5c", "#3d1f5c"]}
                               lineCount={4}
                               lineDistance={4}
                               animationSpeed={0.3}
+                              previewMode
                             />
                           </LazyPreview>
                         }
@@ -843,12 +946,13 @@ export default function SettingsDialog(props: Props) {
                         active={backgroundType() === "aurora"}
                         onClick={() => handleBackgroundTypeChange("aurora")}
                         preview={
-                          <LazyPreview>
+                          <LazyPreview keepAlive>
                             <Aurora
                               colorStops={["#0d3d4d", "#0d4035", "#2d1b4e"]}
                               amplitude={1.2}
                               blend={0.4}
                               speed={0.4}
+                              previewMode
                             />
                           </LazyPreview>
                         }
@@ -861,7 +965,7 @@ export default function SettingsDialog(props: Props) {
                         active={backgroundType() === "dotGrid"}
                         onClick={() => handleBackgroundTypeChange("dotGrid")}
                         preview={
-                          <LazyPreview>
+                          <LazyPreview keepAlive>
                             <DotGrid
                               dotSize={2}
                               gap={16}
@@ -869,6 +973,7 @@ export default function SettingsDialog(props: Props) {
                               activeColor="#3b82f6"
                               waveIntensity={0.15}
                               waveSpeed={0.2}
+                              previewMode
                             />
                           </LazyPreview>
                         }
@@ -881,13 +986,14 @@ export default function SettingsDialog(props: Props) {
                         active={backgroundType() === "rippleGrid"}
                         onClick={() => handleBackgroundTypeChange("rippleGrid")}
                         preview={
-                          <LazyPreview>
+                          <LazyPreview keepAlive>
                             <RippleGrid
                               gridColor="#2d3748"
                               rippleIntensity={0.04}
                               gridSize={10.0}
                               gridThickness={20.0}
                               vignetteStrength={3.0}
+                              previewMode
                             />
                           </LazyPreview>
                         }
@@ -900,11 +1006,12 @@ export default function SettingsDialog(props: Props) {
                         active={backgroundType() === "edgePixels"}
                         onClick={() => handleBackgroundTypeChange("edgePixels")}
                         preview={
-                          <LazyPreview>
+                          <LazyPreview keepAlive>
                             <EdgePixels
                               pixelColor="#3b82f6"
-                              pixelSize={3}
-                              edgeWidth={0.2}
+                              pixelSize={2}
+                              edgeWidth={0.35}
+                              previewMode
                             />
                           </LazyPreview>
                         }
@@ -988,14 +1095,15 @@ export default function SettingsDialog(props: Props) {
                       <span>{t().settings.appearance.dimming}</span>
                       <span class="text-muted">{backgroundDimming()}%</span>
                     </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="80"
-                      step="5"
+                    <RangeSlider
                       value={backgroundDimming()}
-                      onInput={(e) => handleDimmingChange(parseInt(e.currentTarget.value, 10))}
-                      class="w-full"
+                      onChange={handleDimmingChange}
+                      min={0}
+                      max={80}
+                      step={5}
+                      showTicks
+                      showLabels
+                      formatLabel={(val) => `${val}%`}
                     />
                     <p class="text-xs text-muted mt-1">{t().settings.appearance.dimmingHint}</p>
                   </div>
@@ -1030,6 +1138,28 @@ export default function SettingsDialog(props: Props) {
                     <p class="text-xs text-muted mt-2">
                       {t().settings.language.changesApply}
                     </p>
+                  </div>
+                </div>
+              </fieldset>
+
+              {/* Developer Mode */}
+              <fieldset>
+                <legend class="text-base font-medium mb-4 inline-flex items-center gap-2">
+                  <i class="i-hugeicons-code-circle w-5 h-5" />
+                  {t().settings.developer?.title || "Developer Mode"}
+                </legend>
+                <div class="space-y-4">
+                  <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                      <p class="text-sm font-medium">{t().settings.developer?.enable || "Enable Developer Mode"}</p>
+                      <p class="text-xs text-muted mt-1">
+                        {t().settings.developer?.description || "Shows Console and Source Code buttons in TitleBar. Keyboard shortcuts (Ctrl+Shift+D/U/T) work in both modes."}
+                      </p>
+                    </div>
+                    <Toggle
+                      checked={settings().developer_mode}
+                      onChange={handleDeveloperModeChange}
+                    />
                   </div>
                 </div>
               </fieldset>
@@ -1125,7 +1255,7 @@ export default function SettingsDialog(props: Props) {
                             }`}
                             onClick={() => updateConnectSetting("visibility", "friends_only")}
                           >
-                            <i class="i-hugeicons:user-multiple w-5 h-5 mb-1" />
+                            <i class="i-hugeicons-user-multiple w-5 h-5 mb-1" />
                             <p class="text-xs">{t().connect.settings.visibilityFriends}</p>
                           </button>
                           <button
@@ -1288,7 +1418,7 @@ export default function SettingsDialog(props: Props) {
                                 <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                                   <div class="flex items-center gap-3 min-w-0">
                                     <div class="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                                      <i class="i-hugeicons:user-check-01 w-4 h-4 text-green-400" />
+                                      <i class="i-hugeicons-user-check-01 w-4 h-4 text-green-400" />
                                     </div>
                                     <div class="min-w-0">
                                       <p class="text-sm font-medium truncate">{friend.nickname}</p>
@@ -1314,7 +1444,7 @@ export default function SettingsDialog(props: Props) {
                                       }
                                     }}
                                   >
-                                    <i class="i-hugeicons:user-minus-01 w-3.5 h-3.5" />
+                                    <i class="i-hugeicons-user-minus-01 w-3.5 h-3.5" />
                                     {t().connect.settings.removeFriend}
                                   </button>
                                 </div>
@@ -1342,45 +1472,51 @@ export default function SettingsDialog(props: Props) {
                   <i class="i-hugeicons-cpu w-5 h-5" />
                   {t().settings.memory.title}
                 </legend>
-                <div class="space-y-4">
+                <div class="space-y-6">
                   <div>
-                    <label class="block text-sm font-medium mb-2">
+                    <label class="block text-sm font-medium mb-3">
                       {t().settings.memory.minMemory}: {settings().default_memory_min} МБ
+                      <span class="text-muted ml-2">({(settings().default_memory_min / 1024).toFixed(1)} ГБ)</span>
                     </label>
-                    <input
-                      type="range"
-                      min="512"
-                      max="16384"
-                      step="128"
+                    <RangeSlider
                       value={settings().default_memory_min}
-                      onInput={(e) => {
-                        const val = Number(e.currentTarget.value);
+                      onChange={(val) => {
                         updateSetting("default_memory_min", val);
                         if (val > settings().default_memory_max) {
                           updateSetting("default_memory_max", val);
                         }
                       }}
-                      class="w-full"
+                      min={getMemoryStep(Math.min(settings().default_memory_max, totalMemory()))}
+                      max={Math.min(settings().default_memory_max, totalMemory())}
+                      step={getMemoryStep(Math.min(settings().default_memory_max, totalMemory()))}
+                      showTicks
+                      showLabels
+                      ticks={generateMemoryMarkers(Math.min(settings().default_memory_max, totalMemory()))}
+                      labelTicks={generateLabelTicks(generateMemoryMarkers(Math.min(settings().default_memory_max, totalMemory())))}
+                      formatLabel={formatMemoryLabel}
                     />
                   </div>
                   <div>
-                    <label class="block text-sm font-medium mb-2">
+                    <label class="block text-sm font-medium mb-3">
                       {t().settings.memory.maxMemory}: {settings().default_memory_max} МБ
+                      <span class="text-muted ml-2">({(settings().default_memory_max / 1024).toFixed(1)} ГБ)</span>
                     </label>
-                    <input
-                      type="range"
-                      min="512"
-                      max="16384"
-                      step="128"
+                    <RangeSlider
                       value={settings().default_memory_max}
-                      onInput={(e) => {
-                        const val = Number(e.currentTarget.value);
+                      onChange={(val) => {
                         updateSetting("default_memory_max", val);
                         if (val < settings().default_memory_min) {
                           updateSetting("default_memory_min", val);
                         }
                       }}
-                      class="w-full"
+                      min={getMemoryStep(totalMemory())}
+                      max={totalMemory()}
+                      step={getMemoryStep(totalMemory())}
+                      showTicks
+                      showLabels
+                      ticks={generateMemoryMarkers(totalMemory())}
+                      labelTicks={generateLabelTicks(generateMemoryMarkers(totalMemory()))}
+                      formatLabel={formatMemoryLabel}
                     />
                   </div>
                 </div>
@@ -1841,47 +1977,47 @@ export default function SettingsDialog(props: Props) {
                     <label class="block text-sm font-medium mb-2">
                       {t().settings.downloads.threads}: {settings().download_threads}
                     </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="8"
-                      step="1"
+                    <RangeSlider
                       value={settings().download_threads}
-                      onInput={(e) => updateSetting("download_threads", Number(e.currentTarget.value))}
-                      class="w-full"
+                      onChange={(val) => updateSetting("download_threads", val)}
+                      min={1}
+                      max={8}
+                      step={1}
+                      showTicks
+                      showLabels
+                      formatLabel={(val) => String(val)}
                     />
                   </div>
                   <div>
                     <label class="block text-sm font-medium mb-2">
                       {t().settings.downloads.maxConcurrent}: {settings().max_concurrent_downloads}
                     </label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="16"
-                      step="1"
+                    <RangeSlider
                       value={settings().max_concurrent_downloads}
-                      onInput={(e) => updateSetting("max_concurrent_downloads", Number(e.currentTarget.value))}
-                      class="w-full"
+                      onChange={(val) => updateSetting("max_concurrent_downloads", val)}
+                      min={1}
+                      max={16}
+                      step={1}
+                      showTicks
+                      showLabels
+                      formatLabel={(val) => String(val)}
                     />
                   </div>
                   <div>
                     <label class="block text-sm font-medium mb-2">
-                      {t().settings.downloads.bandwidthLimit}: {settings().bandwidth_limit === 0 ? t().settings.downloads.unlimited : `${Math.round(settings().bandwidth_limit / 1_000_000)} MB/s`}
+                      {t().settings.downloads.bandwidthLimit}: {settings().bandwidth_limit === 0 ? "∞" : `${Math.round(settings().bandwidth_limit / 1_000_000)} MB/s`}
                     </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
+                    <RangeSlider
                       value={Math.round(settings().bandwidth_limit / 1_000_000)}
-                      onInput={(e) => {
-                        const val = Number(e.currentTarget.value);
-                        updateSetting("bandwidth_limit", val * 1_000_000);
-                      }}
-                      class="w-full"
+                      onChange={(val) => updateSetting("bandwidth_limit", val * 1_000_000)}
+                      min={0}
+                      max={100}
+                      step={1}
+                      showTicks
+                      showLabels
+                      ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                      formatLabel={(val) => val === 0 ? "∞" : `${val} MB/s`}
                     />
-                    <p class="text-xs text-gray-400 mt-1">{t().settings.downloads.bandwidthHint}</p>
                   </div>
                 </div>
               </fieldset>
@@ -1955,13 +2091,15 @@ export default function SettingsDialog(props: Props) {
                           {settings().backup_max_count}
                         </span>
                       </div>
-                      <input
-                        type="range"
-                        min="1"
-                        max="20"
+                      <RangeSlider
                         value={settings().backup_max_count}
-                        onInput={(e) => updateSetting("backup_max_count", Number(e.currentTarget.value))}
-                        class="w-full"
+                        onChange={(val) => updateSetting("backup_max_count", val)}
+                        min={1}
+                        max={20}
+                        step={1}
+                        showTicks
+                        showLabels
+                        formatLabel={(val) => String(val)}
                       />
                     </div>
 
@@ -2370,32 +2508,22 @@ export default function SettingsDialog(props: Props) {
             <i class="i-hugeicons-refresh w-4 h-4" />
             {t().settings.actions.reset}
           </button>
-          <div class="flex gap-2">
-            <button
-              type="button"
-              class="btn-secondary"
-              onClick={() => props.onClose?.()}
-              disabled={saving()}
-            >
-              {t().common.cancel}
-            </button>
-            <button
-              type="button"
-              class="btn-primary"
-              onClick={handleSave}
-              disabled={saving() || loading()}
-            >
-              <Show when={saving()} fallback={
-                <>
-                  <i class="i-hugeicons-checkmark-circle-02 w-4 h-4" />
-                  {t().settings.actions.save}
-                </>
-              }>
-                <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                {t().settings.actions.saving}
-              </Show>
-            </button>
-          </div>
+          <button
+            type="button"
+            class="btn-secondary"
+            onClick={handleCancel}
+            disabled={saving() || loading() || !hasChanges()}
+          >
+            <Show when={saving()} fallback={
+              <>
+                <i class="i-hugeicons-cancel-01 w-4 h-4" />
+                {t().settings.actions.discardChanges || t().common.cancel}
+              </>
+            }>
+              <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
+              {t().settings.actions.reverting || "Отмена..."}
+            </Show>
+          </button>
         </div>
       </div>
 

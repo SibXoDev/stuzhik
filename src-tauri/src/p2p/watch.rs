@@ -283,10 +283,10 @@ impl WatchManager {
             }
         });
 
-        self.watchers.write().await.insert(
-            modpack_name.to_string(),
-            WatcherHandle { watcher, stop_tx },
-        );
+        self.watchers
+            .write()
+            .await
+            .insert(modpack_name.to_string(), WatcherHandle { watcher, stop_tx });
 
         self.event_tx
             .send(WatchEvent::WatchStarted {
@@ -520,11 +520,7 @@ impl SelectiveSyncManager {
     }
 
     /// Отфильтровать список файлов по конфигурации
-    pub async fn filter_files(
-        &self,
-        modpack_name: &str,
-        files: Vec<String>,
-    ) -> Vec<String> {
+    pub async fn filter_files(&self, modpack_name: &str, files: Vec<String>) -> Vec<String> {
         let config = self.configs.read().await.get(modpack_name).cloned();
 
         match config {
@@ -578,6 +574,9 @@ mod tests {
         assert!(WatchManager::matches_glob("logs/latest.log", "logs/*"));
         assert!(WatchManager::matches_glob("test.log", "*.log"));
         assert!(!WatchManager::matches_glob("test.jar", "*.log"));
-        assert!(WatchManager::matches_glob("crash-reports/crash.txt", "crash-reports/*"));
+        assert!(WatchManager::matches_glob(
+            "crash-reports/crash.txt",
+            "crash-reports/*"
+        ));
     }
 }

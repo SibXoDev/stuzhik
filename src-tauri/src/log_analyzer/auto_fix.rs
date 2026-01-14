@@ -823,6 +823,8 @@ async fn update_loader_fix(
 
     // Устанавливаем новую версию загрузчика
     let download_manager = DownloadManager::new(app_handle)?;
+    // Создаём токен отмены для операции (auto-fix обычно не отменяется)
+    let cancel_token = tokio_util::sync::CancellationToken::new();
 
     match LoaderManager::install_loader(
         instance_id,
@@ -831,6 +833,7 @@ async fn update_loader_fix(
         Some(&latest_version),
         is_server,
         &download_manager,
+        &cancel_token,
     )
     .await
     {

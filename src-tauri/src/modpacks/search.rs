@@ -413,8 +413,14 @@ impl ModpackManager {
                         Some(ModpackGalleryImage {
                             url: img.get("url")?.as_str()?.to_string(),
                             title: img.get("title").and_then(|t| t.as_str()).map(String::from),
-                            description: img.get("description").and_then(|d| d.as_str()).map(String::from),
-                            featured: img.get("featured").and_then(|f| f.as_bool()).unwrap_or(false),
+                            description: img
+                                .get("description")
+                                .and_then(|d| d.as_str())
+                                .map(String::from),
+                            featured: img
+                                .get("featured")
+                                .and_then(|f| f.as_bool())
+                                .unwrap_or(false),
                         })
                     })
                     .collect()
@@ -504,7 +510,10 @@ impl ModpackManager {
                         Some(ModpackGalleryImage {
                             url: img.get("url")?.as_str()?.to_string(),
                             title: img.get("title").and_then(|t| t.as_str()).map(String::from),
-                            description: img.get("description").and_then(|d| d.as_str()).map(String::from),
+                            description: img
+                                .get("description")
+                                .and_then(|d| d.as_str())
+                                .map(String::from),
                             featured: false, // CurseForge doesn't have featured flag
                         })
                     })

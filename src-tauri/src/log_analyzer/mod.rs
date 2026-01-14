@@ -26,7 +26,7 @@ pub use live_monitor::{
     get_monitored_instances, init_live_monitor, is_live_monitoring, start_live_monitoring,
     stop_live_monitoring, LiveCrashEvent,
 };
-pub use mappings::{analyze_class_path, extract_mod_id_from_class, KNOWN_PACKAGE_MAPPINGS};
+pub use mappings::{analyze_class_path, extract_mod_id_from_class, FRAMEWORK_PACKAGES, KNOWN_PACKAGE_MAPPINGS};
 pub use solution_finder::{
     find_online_solutions, OnlineSolution, SolutionSearchResult, SolutionSource,
 };
@@ -81,15 +81,20 @@ impl LogAnalyzer {
         ];
 
         // Находим индекс последнего маркера начала сессии
+        // ОПТИМИЗАЦИЯ: используем case-insensitive поиск без аллокаций
         let last_session_start = all_lines
             .iter()
             .enumerate()
             .rev() // Ищем с конца
             .find(|(_, line)| {
-                let line_lower = line.to_lowercase();
-                session_markers
-                    .iter()
-                    .any(|marker| line_lower.contains(&marker.to_lowercase()))
+                // Быстрая проверка без to_lowercase() - ищем паттерны case-insensitive
+                session_markers.iter().any(|marker| {
+                    line.len() >= marker.len()
+                        && line
+                            .as_bytes()
+                            .windows(marker.len())
+                            .any(|window| window.eq_ignore_ascii_case(marker.as_bytes()))
+                })
             })
             .map(|(idx, _)| idx);
 
@@ -168,6 +173,21 @@ impl LogAnalyzer {
 
         let patterns_start = std::time::Instant::now();
 
+        // ОПТИМИЗАЦИЯ: Используем атомарный счётчик для early termination
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let problem_count = AtomicUsize::new(0);
+        const MAX_PROBLEMS: usize = 100; // Лимит проблем для early termination
+
+        // ОПТИМИЗАЦИЯ: case-insensitive contains без аллокаций
+        fn contains_ci(haystack: &str, needle: &str) -> bool {
+            if haystack.len() < needle.len() {
+                return false;
+            }
+            haystack
+                .as_bytes()
+                .windows(needle.len())
+                .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+        }
 
         // Параллельно анализируем ВСЕ потенциально проблемные строки (rayon)
         // Это даёт 2-4x ускорение на многоядерных CPU
@@ -175,19 +195,24 @@ impl LogAnalyzer {
             .par_iter()
             .enumerate()
             .filter_map(|(i, line)| {
-                let line_num = i as u32 + 1;
-                let line_lower = line.to_lowercase();
+                // Early termination: если уже нашли достаточно проблем
+                if problem_count.load(Ordering::Relaxed) >= MAX_PROBLEMS {
+                    return None;
+                }
 
-                // Быстрая проверка - есть ли в строке что-то интересное
-                let has_indicator = error_indicators.iter().any(|ind| line_lower.contains(ind));
+                let line_num = i as u32 + 1;
+
+                // ОПТИМИЗАЦИЯ: Быстрая проверка БЕЗ to_lowercase()
+                // Используем case-insensitive сравнение на уровне байтов
+                let has_indicator = error_indicators
+                    .iter()
+                    .any(|ind| contains_ci(line, ind));
                 if !has_indicator {
                     return None;
                 }
 
                 // Пропускаем строки с noise patterns (ложные срабатывания)
-                let is_noise = noise_patterns
-                    .iter()
-                    .any(|noise| line_lower.contains(noise));
+                let is_noise = noise_patterns.iter().any(|noise| contains_ci(line, noise));
                 if is_noise {
                     return None;
                 }
@@ -205,6 +230,8 @@ impl LogAnalyzer {
                     let pattern = &patterns[idx];
                     if let Some(caps) = pattern.pattern.captures(line) {
                         if let Some(problem) = (pattern.handler)(&caps, line, line_num) {
+                            // Инкрементируем счётчик найденных проблем
+                            problem_count.fetch_add(1, Ordering::Relaxed);
                             // Возвращаем первую найденную проблему в строке
                             return Some(problem);
                         }
@@ -421,6 +448,7 @@ impl LogAnalyzer {
     }
 
     /// Анализ цепочек ошибок - найти связи между проблемами
+    /// ОПТИМИЗИРОВАНО: без to_lowercase() аллокаций
     fn analyze_error_chains(lines: &[&str]) -> ErrorChainAnalysis {
         let mut analysis = ErrorChainAnalysis {
             root_causes: Vec::new(),
@@ -431,10 +459,20 @@ impl LogAnalyzer {
         let mut current_exception: Option<String> = None;
         let mut current_chain: Vec<String> = Vec::new();
 
-        for (i, line) in lines.iter().enumerate() {
-            let line_lower = line.to_lowercase();
+        // ОПТИМИЗАЦИЯ: case-insensitive contains без аллокаций
+        fn contains_ci_local(haystack: &str, needle: &str) -> bool {
+            if haystack.len() < needle.len() {
+                return false;
+            }
+            haystack
+                .as_bytes()
+                .windows(needle.len())
+                .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+        }
 
-            // Detect exception start
+        for (i, line) in lines.iter().enumerate() {
+            // ОПТИМИЗАЦИЯ: быстрая проверка без аллокаций
+            // Detect exception start (case-sensitive - Exception/Error: всегда с заглавной)
             if line.contains("Exception") || line.contains("Error:") {
                 if let Some(prev_exc) = current_exception.take() {
                     // Save previous chain
@@ -454,8 +492,8 @@ impl LogAnalyzer {
                 }
             }
 
-            // Track "Caused by" chain
-            if line_lower.contains("caused by:") || line_lower.contains("caused by ") {
+            // Track "Caused by" chain (case-insensitive)
+            if contains_ci_local(line, "caused by:") || contains_ci_local(line, "caused by ") {
                 if let Some(cause) = Self::extract_exception_type(line) {
                     current_chain.push(cause.clone());
 
@@ -498,19 +536,30 @@ impl LogAnalyzer {
     }
 
     /// Извлечь улучшенные hints из контекста с учётом цепочек ошибок
+    /// ОПТИМИЗИРОВАНО: без to_lowercase() аллокаций
     fn extract_enhanced_hints(
         context: &[String],
         chain_analysis: &ErrorChainAnalysis,
     ) -> Vec<String> {
         let mut hints = Vec::new();
 
+        // ОПТИМИЗАЦИЯ: case-insensitive contains без аллокаций
+        fn contains_ci_local(haystack: &str, needle: &str) -> bool {
+            if haystack.len() < needle.len() {
+                return false;
+            }
+            haystack
+                .as_bytes()
+                .windows(needle.len())
+                .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+        }
+
         // 1. Найти root cause из "Caused by" цепочки
         let mut found_caused_by = false;
         let mut root_cause_line: Option<&String> = None;
 
         for line in context.iter().rev() {
-            let line_lower = line.to_lowercase();
-            if line_lower.contains("caused by:") || line_lower.contains("caused by ") {
+            if contains_ci_local(line, "caused by:") || contains_ci_local(line, "caused by ") {
                 found_caused_by = true;
                 root_cause_line = Some(line);
             }
@@ -571,21 +620,39 @@ impl LogAnalyzer {
         }
 
         // 3. Добавить info о root causes из chain analysis
+        // Но только если это не стандартное Java исключение
         if !chain_analysis.root_causes.is_empty() && !found_caused_by {
-            let root = &chain_analysis.root_causes[0];
-            // Format nicely
-            let root_name = root.split('.').last().unwrap_or(root);
-            if !hints.iter().any(|h| h.contains(root_name)) {
-                hints.push(format!("Root cause: {}", root_name));
+            // Фильтруем бесполезные root causes - это стандартные Java исключения
+            const USELESS_ROOT_CAUSES: &[&str] = &[
+                // Network exceptions - not helpful for crash debugging
+                "ConnectException", "IOException", "SocketException", "SocketTimeoutException",
+                "UnresolvedAddressException", "UnknownHostException", "BindException",
+                "PortUnreachableException", "NoRouteToHostException",
+                // Standard Java exceptions - too generic
+                "FileNotFoundException", "NullPointerException", "IllegalStateException",
+                "IllegalArgumentException", "IndexOutOfBoundsException", "ClassCastException",
+                "NoSuchMethodError", "NoSuchFieldError", "NoClassDefFoundError",
+                "UnsupportedOperationException", "RuntimeException", "Exception",
+                "Error", "Throwable", "AssertionError",
+            ];
+
+            // Находим первый полезный root cause
+            let useful_root = chain_analysis.root_causes.iter()
+                .map(|r| r.split('.').last().unwrap_or(r))
+                .find(|root_name| !USELESS_ROOT_CAUSES.contains(root_name));
+
+            if let Some(root_name) = useful_root {
+                if !hints.iter().any(|h| h.contains(root_name)) {
+                    hints.push(format!("Root cause: {}", root_name));
+                }
             }
         }
 
         // 4. Ищем специфические ключевые слова в контексте
         for line in context {
-            let line_lower = line.to_lowercase();
-
+            // ОПТИМИЗАЦИЯ: без to_lowercase() аллокаций
             // Missing dependency hints
-            if line_lower.contains("requires") && line_lower.contains("version") {
+            if contains_ci_local(line, "requires") && contains_ci_local(line, "version") {
                 if hints.len() < 3 {
                     // Extract version requirement
                     if let Some(req) = Self::extract_version_requirement(line) {
@@ -595,7 +662,7 @@ impl LogAnalyzer {
             }
 
             // Mixin error specifics
-            if line_lower.contains("mixin") && line_lower.contains("failed") {
+            if contains_ci_local(line, "mixin") && contains_ci_local(line, "failed") {
                 if let Some(target) = Self::extract_mixin_target(line) {
                     hints.push(format!("Mixin target: {}", target));
                 }
@@ -672,9 +739,25 @@ impl LogAnalyzer {
 
     /// Identify mod from class path using known mappings and heuristics
     fn identify_mod_from_class(class_path: &str) -> Option<String> {
+        use mappings::{FRAMEWORK_PACKAGES, LIBRARY_PACKAGES};
+
         let parts: Vec<&str> = class_path.split('.').collect();
         if parts.is_empty() {
             return None;
+        }
+
+        // 0. СНАЧАЛА проверяем library пакеты - они НИКОГДА не виновники
+        for lib in LIBRARY_PACKAGES {
+            if class_path.starts_with(lib) {
+                return None; // Library = не виновник
+            }
+        }
+
+        // 0.1 Проверяем framework пакеты - они тоже НИКОГДА не виновники
+        for framework in FRAMEWORK_PACKAGES {
+            if class_path.starts_with(framework) {
+                return None; // Framework = не виновник
+            }
         }
 
         // 1. Check known package mappings
@@ -686,10 +769,12 @@ impl LogAnalyzer {
                     .all(|(expected, actual)| expected == actual);
 
                 if matches {
-                    // Skip system identifiers
-                    if !mod_id.starts_with("__") {
-                        return Some(mod_id.to_string());
+                    // Системные идентификаторы (loaders, minecraft) = НЕ виновники
+                    // ВАЖНО: возвращаем None, а не падаем в эвристику!
+                    if mod_id.starts_with("__") {
+                        return None; // Loader/Minecraft/Library = не виновник
                     }
+                    return Some(mod_id.to_string());
                 }
             }
         }
@@ -710,6 +795,33 @@ impl LogAnalyzer {
 
             if parts.len() > start_idx {
                 let mod_id = parts[start_idx];
+                let mod_id_lower = mod_id.to_lowercase();
+
+                // Blacklist для framework-подобных имён которые НЕ являются модами
+                const FRAMEWORK_NAMES: &[&str] = &[
+                    // Mod loaders
+                    "fml", "eventbus", "modlauncher", "bootstraplauncher",
+                    "forge", "neoforge", "neoforged", "minecraftforge",
+                    "fabric", "fabricmc", "quilt", "quiltmc",
+                    "mixin", "asm", "sponge", "spongepowered",
+                    // Generic names
+                    "common", "client", "server", "api", "core",
+                    "loader", "bootstrap", "launch", "launcher",
+                    "util", "utils", "helper", "helpers", "lib", "library",
+                    // Libraries
+                    "registrate", "gson", "guava", "netty", "lwjgl",
+                    "apache", "slf4j", "log4j", "twelvemonkeys",
+                    "geckolib", "lodestone", "moonlight", "architectury",
+                    "caffeine", "jctools", "objectweb",
+                    // Author names (NOT mod IDs!)
+                    "eliotlash", "bernie", "jellysquid", "caffeinemc",
+                    "tterrag", "simibubi", "vazkii", "mezz",
+                ];
+
+                if FRAMEWORK_NAMES.contains(&mod_id_lower.as_str()) {
+                    return None; // Framework name = не виновник
+                }
+
                 // Validate it looks like a mod id
                 if mod_id.len() >= 3
                     && !mod_id.starts_with("mojang")
@@ -718,7 +830,7 @@ impl LogAnalyzer {
                         .chars()
                         .all(|c| c.is_ascii_alphanumeric() || c == '_')
                 {
-                    return Some(mod_id.to_lowercase());
+                    return Some(mod_id_lower);
                 }
             }
         }
@@ -938,34 +1050,6 @@ impl LogAnalyzer {
 
             if in_stack_trace && line_trimmed.starts_with("at ") {
                 stack_trace.push(line_trimmed.to_string());
-
-                // Пробуем определить мод-виновник (первый не-системный пакет)
-                if culprit_mod.is_none() {
-                    let package = line_trimmed
-                        .split('(')
-                        .next()
-                        .unwrap_or("")
-                        .replace("at ", "")
-                        .trim()
-                        .to_string();
-
-                    // Пропускаем системные пакеты
-                    if !package.starts_with("java.")
-                        && !package.starts_with("jdk.")
-                        && !package.starts_with("sun.")
-                        && !package.starts_with("net.minecraft.")
-                        && !package.starts_with("com.mojang.")
-                        && !package.starts_with("org.lwjgl.")
-                        && !package.starts_with("io.netty.")
-                        && !package.starts_with("com.google.")
-                        && !package.starts_with("org.apache.")
-                    {
-                        // Используем identify_mod_from_class для точного определения
-                        if let Some(mod_id) = Self::identify_mod_from_class(&package) {
-                            culprit_mod = Some(mod_id);
-                        }
-                    }
-                }
             }
 
             // Конец stack trace
@@ -973,6 +1057,10 @@ impl LogAnalyzer {
                 in_stack_trace = false;
             }
         }
+
+        // === УМНОЕ ОПРЕДЕЛЕНИЕ ВИНОВНИКА ===
+        // Анализируем весь stack trace для нахождения реального виновника
+        culprit_mod = Self::find_culprit_from_stacktrace(&stack_trace, &loaded_mods);
 
         // Генерируем рекомендации на основе собранной информации
         let recommendations =
@@ -997,6 +1085,270 @@ impl LogAnalyzer {
                 None
             },
         })
+    }
+
+    /// Умный поиск виновника в stacktrace
+    /// Анализирует весь стек, извлекает jar файлы, ранжирует кандидатов
+    fn find_culprit_from_stacktrace(
+        stack_trace: &[String],
+        loaded_mods: &[ModInfo],
+    ) -> Option<String> {
+        use mappings::FRAMEWORK_PACKAGES;
+
+        // Структура для хранения кандидата на виновника
+        #[derive(Debug)]
+        struct CulpritCandidate {
+            mod_id: String,
+            jar_file: Option<String>,
+            position: usize, // Позиция в стеке (меньше = ближе к исключению)
+            score: i32,      // Итоговый скор (больше = вероятнее виновник)
+        }
+
+        let mut candidates: Vec<CulpritCandidate> = Vec::new();
+        let mut seen_mods = std::collections::HashSet::new();
+
+        for (position, line) in stack_trace.iter().enumerate() {
+            // Пропускаем строки которые не являются stack frame
+            if !line.contains("at ") || !line.contains("(") {
+                continue;
+            }
+
+            // Извлекаем путь класса и jar файл
+            // Формат: at com.example.Mod.method(File.java:123) ~[modname-1.0.jar:?]
+            let class_part = line
+                .split('(')
+                .next()
+                .unwrap_or("")
+                .replace("at ", "")
+                .trim()
+                .to_string();
+
+            // Извлекаем имя jar файла из [...jar...]
+            let jar_file: Option<String> = if let Some(bracket_start) = line.find('[') {
+                if let Some(bracket_end) = line.find(']') {
+                    let bracket_content = &line[bracket_start + 1..bracket_end];
+                    // Ищем .jar в содержимом
+                    if bracket_content.contains(".jar") {
+                        // Извлекаем имя файла до :
+                        let jar_name = bracket_content.split(':').next().unwrap_or("");
+                        if jar_name.ends_with(".jar") {
+                            Some(jar_name.to_string())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            // Пропускаем framework пакеты
+            let is_framework = FRAMEWORK_PACKAGES
+                .iter()
+                .any(|fw| class_part.starts_with(fw));
+            if is_framework {
+                continue;
+            }
+
+            // Пропускаем системные пакеты
+            if class_part.starts_with("java.")
+                || class_part.starts_with("jdk.")
+                || class_part.starts_with("sun.")
+                || class_part.starts_with("net.minecraft.")
+                || class_part.starts_with("com.mojang.")
+                || class_part.starts_with("org.lwjgl.")
+                || class_part.starts_with("io.netty.")
+                || class_part.starts_with("com.google.")
+                || class_part.starts_with("org.apache.")
+            {
+                continue;
+            }
+
+            // Пробуем определить mod_id
+            if let Some(mod_id) = Self::identify_mod_from_class(&class_part) {
+                // Избегаем дубликатов
+                if seen_mods.contains(&mod_id) {
+                    continue;
+                }
+                seen_mods.insert(mod_id.clone());
+
+                // Вычисляем начальный скор на основе позиции
+                // Ближе к началу стека (exception) = выше скор
+                let mut score = 100 - (position as i32).min(100);
+
+                // Бонус если есть jar файл
+                if let Some(ref jar) = jar_file {
+                    score += 20;
+
+                    // Дополнительный бонус если jar содержит mod_id
+                    let jar_lower = jar.to_lowercase();
+                    if jar_lower.contains(&mod_id.to_lowercase()) {
+                        score += 30;
+                    }
+                }
+
+                // Бонус если мод есть в списке загруженных модов
+                let is_loaded = loaded_mods
+                    .iter()
+                    .any(|m| m.id.to_lowercase() == mod_id.to_lowercase());
+                if is_loaded {
+                    score += 25;
+                }
+
+                // Штраф за библиотечные/API моды (часто появляются в стеке, но редко виновники)
+                let is_lib = mod_id.contains("lib")
+                    || mod_id.contains("api")
+                    || mod_id == "registrate"
+                    || mod_id == "flywheel"
+                    || mod_id == "geckolib"
+                    || mod_id == "architectury"
+                    || mod_id == "cloth"
+                    || mod_id == "placebo";
+                if is_lib {
+                    score -= 40;
+                }
+
+                // Штраф за utility/UI моды (они хукаются везде, но редко виновники)
+                // Например map моды появляются в rendering стеке, но не вызывают ошибки
+                let is_utility_mod = mod_id.contains("xaero")
+                    || mod_id.contains("minimap")
+                    || mod_id.contains("worldmap")
+                    || mod_id == "journeymap"
+                    || mod_id == "voxelmap"
+                    || mod_id.contains("waila")
+                    || mod_id == "jade"
+                    || mod_id == "theoneprobe"
+                    || mod_id == "jei"
+                    || mod_id == "emi"
+                    || mod_id.contains("rei");
+                if is_utility_mod {
+                    score -= 35;
+                }
+
+                candidates.push(CulpritCandidate {
+                    mod_id,
+                    jar_file,
+                    position,
+                    score,
+                });
+            }
+        }
+
+        // Дополнительный анализ: извлекаем mod_id из jar файлов
+        // Это помогает когда package mapping не работает
+        for (position, line) in stack_trace.iter().enumerate() {
+            if let Some(bracket_start) = line.find('[') {
+                if let Some(bracket_end) = line.find(']') {
+                    let bracket_content = &line[bracket_start + 1..bracket_end];
+                    if let Some(jar_name) = bracket_content.split(':').next() {
+                        if jar_name.ends_with(".jar") {
+                            // Извлекаем mod_id из имени jar
+                            // Примеры: create-1.20.1-6.0.8.jar → create
+                            //          jei-1.20.1-15.2.0.jar → jei
+                            if let Some(mod_id) = Self::extract_mod_id_from_jar_name(jar_name) {
+                                if !seen_mods.contains(&mod_id) {
+                                    seen_mods.insert(mod_id.clone());
+
+                                    let mut score = 90 - (position as i32).min(90);
+
+                                    // Бонус за точное совпадение с загруженным модом
+                                    let is_loaded = loaded_mods
+                                        .iter()
+                                        .any(|m| m.id.to_lowercase() == mod_id.to_lowercase());
+                                    if is_loaded {
+                                        score += 30;
+                                    }
+
+                                    // Пропускаем системные jar файлы
+                                    let jar_lower = jar_name.to_lowercase();
+                                    if jar_lower.contains("minecraft")
+                                        || jar_lower.contains("forge-")
+                                        || jar_lower.contains("neoforge-")
+                                        || jar_lower.contains("fabric")
+                                        || jar_lower.contains("fml")
+                                        || jar_lower.contains("modlauncher")
+                                        || jar_lower.contains("eventbus")
+                                    {
+                                        continue;
+                                    }
+
+                                    candidates.push(CulpritCandidate {
+                                        mod_id,
+                                        jar_file: Some(jar_name.to_string()),
+                                        position,
+                                        score,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Сортируем по скору (больше = лучше)
+        candidates.sort_by(|a, b| b.score.cmp(&a.score));
+
+        // Логируем для отладки
+        if !candidates.is_empty() {
+            log::debug!(
+                "🔍 Culprit candidates: {:?}",
+                candidates
+                    .iter()
+                    .take(5)
+                    .map(|c| format!("{}(score={})", c.mod_id, c.score))
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        // Возвращаем лучшего кандидата
+        candidates.first().map(|c| c.mod_id.clone())
+    }
+
+    /// Извлечь mod_id из имени jar файла
+    /// Примеры:
+    /// - create-1.20.1-6.0.8.jar → Some("create")
+    /// - jei-1.20.1-forge-15.2.0.jar → Some("jei")
+    /// - TConstruct-1.20.1-3.8.3.jar → Some("tconstruct")
+    fn extract_mod_id_from_jar_name(jar_name: &str) -> Option<String> {
+        // Убираем .jar расширение
+        let name = jar_name.trim_end_matches(".jar");
+
+        // Разбиваем по - или _
+        let parts: Vec<&str> = name.split(|c| c == '-' || c == '_').collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        // Первая часть обычно mod_id (до версии)
+        let first_part = parts[0].to_lowercase();
+
+        // Проверяем что это не версия (не начинается с цифры)
+        if first_part.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(true) {
+            return None;
+        }
+
+        // Минимальная длина для mod_id
+        if first_part.len() < 2 {
+            return None;
+        }
+
+        // Blacklist системных jar имён
+        const SYSTEM_JARS: &[&str] = &[
+            "minecraft", "forge", "neoforge", "fabric", "quilt",
+            "fml", "loader", "modlauncher", "eventbus", "bootstrap",
+            "client", "server", "common", "api", "lib",
+        ];
+
+        if SYSTEM_JARS.contains(&first_part.as_str()) {
+            return None;
+        }
+
+        Some(first_part)
     }
 
     /// Извлечь версию из строки по ключевым словам
@@ -1204,6 +1556,17 @@ impl LogAnalyzer {
         let mut entity_counts: Vec<u64> = Vec::new();
         let mut chunk_counts: Vec<u64> = Vec::new();
 
+        // ОПТИМИЗАЦИЯ: case-insensitive поиск без аллокаций
+        fn contains_ci_perf(haystack: &str, needle: &str) -> bool {
+            if haystack.len() < needle.len() {
+                return false;
+            }
+            haystack
+                .as_bytes()
+                .windows(needle.len())
+                .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+        }
+
         for line in lines {
             let line_str = *line;
 
@@ -1288,9 +1651,10 @@ impl LogAnalyzer {
                 }
             }
 
-            // Общие паттерны лагов
-            let line_lower = line_str.to_lowercase();
-            if line_lower.contains("server overloaded") || line_lower.contains("can't keep up") {
+            // Общие паттерны лагов (без to_lowercase аллокаций)
+            if contains_ci_perf(line_str, "server overloaded")
+                || contains_ci_perf(line_str, "can't keep up")
+            {
                 lag_spikes.push(LagSpike {
                     duration_ms: 0,
                     timestamp: None,

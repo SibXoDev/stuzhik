@@ -87,33 +87,34 @@ mod code_editor;
 mod collections;
 mod config_editor;
 mod conflict_predictor;
+mod downloader; // Re-exports SmartDownloader as DownloadManager
 mod error_reporter;
 mod game_settings;
 mod gpu;
 mod instances;
 mod integrity;
 mod java;
+mod launchers;
 mod loaders;
 mod log_analyzer;
 mod minecraft;
 mod modpack_editor;
 mod modpacks;
 mod mods;
+mod p2p;
 mod paths;
 mod performance;
 mod recommendations;
 mod resources;
 mod secrets;
+mod server;
 mod settings;
 mod smart_downloader; // Must be before downloader (downloader re-exports from it)
-mod downloader;       // Re-exports SmartDownloader as DownloadManager
-mod server;
 mod stzhk;
 mod sync;
 mod tray;
 mod utils;
 mod wiki;
-mod p2p;
 
 use error::Result;
 
@@ -428,7 +429,16 @@ async fn install_mod_by_slug(
     let loader = instance.loader.as_str().to_string();
 
     // Используем основную функцию установки
-    install_mod(instance_id, slug, source, minecraft_version, loader, None, app_handle).await
+    install_mod(
+        instance_id,
+        slug,
+        source,
+        minecraft_version,
+        loader,
+        None,
+        app_handle,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -439,6 +449,385 @@ async fn install_mod_local(
 ) -> Result<mods::InstalledMod> {
     let path = std::path::PathBuf::from(file_path);
     mods::ModManager::install_local(&instance_id, &path, analyze).await
+}
+
+/// Batch install multiple local mod files with optimized API lookups
+#[tauri::command]
+async fn install_mods_local_batch(
+    instance_id: String,
+    file_paths: Vec<String>,
+) -> Result<Vec<mods::BatchModInstallResult>> {
+    let paths: Vec<std::path::PathBuf> = file_paths
+        .into_iter()
+        .map(std::path::PathBuf::from)
+        .collect();
+    mods::ModManager::install_local_batch(&instance_id, paths).await
+}
+
+/// Verify all mods in an instance against Modrinth and CurseForge
+#[tauri::command]
+async fn verify_instance_mods(
+    app_handle: tauri::AppHandle,
+    instance_id: String,
+) -> Result<Vec<mods::ModVerifyResult>> {
+    mods::ModManager::verify_instance_mods(&instance_id, Some(app_handle)).await
+}
+
+/// Check for updates for all mods in an instance
+#[tauri::command]
+async fn check_mod_updates(
+    instance_id: String,
+    minecraft_version: String,
+    loader: String,
+) -> Result<mods::UpdateCheckResult> {
+    mods::ModManager::check_mod_updates(&instance_id, &minecraft_version, &loader).await
+}
+
+/// Verification result for a mod file
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModVerificationResult {
+    /// Whether the mod was found on official platforms
+    pub verified: bool,
+    /// Platform where mod was found: "modrinth", "curseforge", or "unknown"
+    pub platform: String,
+    /// Project name if found
+    pub project_name: Option<String>,
+    /// Project slug/id if found
+    pub project_slug: Option<String>,
+    /// Version string if found
+    pub version: Option<String>,
+    /// Mod ID extracted from JAR
+    pub mod_id: Option<String>,
+}
+
+#[tauri::command]
+async fn verify_mod_file(file_path: String) -> Result<ModVerificationResult> {
+    use crate::api::curseforge::CurseForgeClient;
+    use crate::api::modrinth::ModrinthClient;
+    use crate::code_editor::minecraft_data::jar_parser::JarParser;
+    use crate::error::LauncherError;
+    use crate::utils::calculate_sha1;
+
+    let path = std::path::PathBuf::from(&file_path);
+
+    // Extract mod_id from JAR
+    let mod_id = tokio::task::spawn_blocking({
+        let path = path.clone();
+        move || {
+            JarParser::parse_mod_jar(&path)
+                .ok()
+                .and_then(|data| data.mod_info.map(|info| info.mod_id))
+        }
+    })
+    .await
+    .ok()
+    .flatten();
+
+    // Calculate SHA-1 hash for Modrinth
+    let hash = tokio::task::spawn_blocking({
+        let path = path.clone();
+        move || calculate_sha1(&path)
+    })
+    .await
+    .map_err(|e| LauncherError::InvalidConfig(format!("Hash calculation failed: {}", e)))?
+    .map_err(|e| LauncherError::InvalidConfig(format!("Hash calculation failed: {}", e)))?;
+
+    // Try Modrinth API first
+    let modrinth_result = ModrinthClient::get_versions_by_hashes(&[hash.clone()], "sha1").await;
+
+    if let Ok(versions) = modrinth_result {
+        if let Some(version) = versions.get(&hash) {
+            return Ok(ModVerificationResult {
+                verified: true,
+                platform: "modrinth".to_string(),
+                project_name: Some(version.name.clone()),
+                project_slug: Some(version.project_id.clone()),
+                version: Some(version.version_number.clone()),
+                mod_id,
+            });
+        }
+    }
+
+    // Try CurseForge fingerprint API
+    let fingerprint = tokio::task::spawn_blocking({
+        let path = path.clone();
+        move || compute_curseforge_fingerprint(&path)
+    })
+    .await
+    .ok()
+    .flatten();
+
+    if let Some(fp) = fingerprint {
+        if let Ok(client) = CurseForgeClient::new() {
+            if let Ok(matches) = client.get_fingerprint_matches(&[fp]).await {
+                if let Some(match_result) = matches.first() {
+                    // Get mod info from CurseForge
+                    if let Ok(mod_info) = client.get_mod(match_result.id).await {
+                        return Ok(ModVerificationResult {
+                            verified: true,
+                            platform: "curseforge".to_string(),
+                            project_name: Some(mod_info.name),
+                            project_slug: Some(mod_info.slug),
+                            version: Some(match_result.file.display_name.clone()),
+                            mod_id,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Not found on any platform
+    Ok(ModVerificationResult {
+        verified: false,
+        platform: "unknown".to_string(),
+        project_name: None,
+        project_slug: None,
+        version: None,
+        mod_id,
+    })
+}
+
+/// Batch result for verify_mod_files_batch
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BatchVerificationResult {
+    pub file_path: String,
+    pub result: ModVerificationResult,
+}
+
+/// Batch verify multiple mod files in a single API call
+#[tauri::command]
+async fn verify_mod_files_batch(file_paths: Vec<String>) -> Result<Vec<BatchVerificationResult>> {
+    use crate::api::curseforge::CurseForgeClient;
+    use crate::api::modrinth::ModrinthClient;
+    use crate::error::LauncherError;
+    use crate::utils::calculate_sha1;
+    use std::collections::HashMap;
+
+    if file_paths.is_empty() {
+        return Ok(vec![]);
+    }
+
+    log::info!("Batch verifying {} mod files", file_paths.len());
+
+    // Step 1: Calculate SHA-1 hashes for all files in parallel
+    let hash_futures: Vec<_> = file_paths
+        .iter()
+        .map(|path| {
+            let path = path.clone();
+            async move {
+                let p = std::path::PathBuf::from(&path);
+                let hash_result = tokio::task::spawn_blocking(move || calculate_sha1(&p))
+                    .await
+                    .ok()
+                    .and_then(|r| r.ok());
+                (path, hash_result)
+            }
+        })
+        .collect();
+
+    let hash_results: Vec<(String, Option<String>)> = futures::future::join_all(hash_futures).await;
+
+    // Build hash -> file_path map
+    let mut hash_to_path: HashMap<String, String> = HashMap::new();
+    let mut results: HashMap<String, ModVerificationResult> = HashMap::new();
+
+    for (path, hash) in &hash_results {
+        if let Some(h) = hash {
+            hash_to_path.insert(h.clone(), path.clone());
+        } else {
+            // Failed to hash - mark as error
+            results.insert(
+                path.clone(),
+                ModVerificationResult {
+                    verified: false,
+                    platform: "error".to_string(),
+                    project_name: None,
+                    project_slug: None,
+                    version: None,
+                    mod_id: None,
+                },
+            );
+        }
+    }
+
+    // Step 2: Batch lookup on Modrinth
+    let hashes: Vec<String> = hash_to_path.keys().cloned().collect();
+    if !hashes.is_empty() {
+        if let Ok(versions) = ModrinthClient::get_versions_by_hashes(&hashes, "sha1").await {
+            for (hash, version) in versions {
+                if let Some(path) = hash_to_path.get(&hash) {
+                    results.insert(
+                        path.clone(),
+                        ModVerificationResult {
+                            verified: true,
+                            platform: "modrinth".to_string(),
+                            project_name: Some(version.name.clone()),
+                            project_slug: Some(version.project_id.clone()),
+                            version: Some(version.version_number.clone()),
+                            mod_id: None,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    // Step 3: For files not found on Modrinth, try CurseForge batch
+    let unverified_paths: Vec<&String> = file_paths
+        .iter()
+        .filter(|p| !results.contains_key(*p))
+        .collect();
+
+    if !unverified_paths.is_empty() {
+        // Calculate CurseForge fingerprints
+        let fp_futures: Vec<_> = unverified_paths
+            .iter()
+            .map(|path| {
+                let path = (*path).clone();
+                async move {
+                    let p = std::path::PathBuf::from(&path);
+                    let fp =
+                        tokio::task::spawn_blocking(move || compute_curseforge_fingerprint(&p))
+                            .await
+                            .ok()
+                            .flatten();
+                    (path, fp)
+                }
+            })
+            .collect();
+
+        let fp_results: Vec<(String, Option<u32>)> = futures::future::join_all(fp_futures).await;
+
+        let mut fp_to_path: HashMap<u32, String> = HashMap::new();
+        for (path, fp) in &fp_results {
+            if let Some(fingerprint) = fp {
+                fp_to_path.insert(*fingerprint, path.clone());
+            }
+        }
+
+        // Batch CurseForge lookup
+        if !fp_to_path.is_empty() {
+            if let Ok(client) = CurseForgeClient::new() {
+                let fingerprints: Vec<u32> = fp_to_path.keys().cloned().collect();
+                if let Ok(matches) = client.get_fingerprint_matches(&fingerprints).await {
+                    for match_result in matches {
+                        // Find the fingerprint that matched
+                        for (fp, path) in &fp_to_path {
+                            if match_result.fingerprint == *fp {
+                                if let Ok(mod_info) = client.get_mod(match_result.id).await {
+                                    results.insert(
+                                        path.clone(),
+                                        ModVerificationResult {
+                                            verified: true,
+                                            platform: "curseforge".to_string(),
+                                            project_name: Some(mod_info.name),
+                                            project_slug: Some(mod_info.slug),
+                                            version: Some(match_result.file.display_name.clone()),
+                                            mod_id: None,
+                                        },
+                                    );
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Step 4: Mark remaining as unknown
+    for path in &file_paths {
+        results
+            .entry(path.clone())
+            .or_insert(ModVerificationResult {
+                verified: false,
+                platform: "unknown".to_string(),
+                project_name: None,
+                project_slug: None,
+                version: None,
+                mod_id: None,
+            });
+    }
+
+    // Convert to Vec
+    let final_results: Vec<BatchVerificationResult> = file_paths
+        .into_iter()
+        .filter_map(|path| {
+            results.remove(&path).map(|result| BatchVerificationResult {
+                file_path: path,
+                result,
+            })
+        })
+        .collect();
+
+    log::info!(
+        "Batch verification complete: {} verified, {} unknown",
+        final_results.iter().filter(|r| r.result.verified).count(),
+        final_results.iter().filter(|r| !r.result.verified).count()
+    );
+
+    Ok(final_results)
+}
+
+/// Compute CurseForge fingerprint (MurmurHash2 with whitespace normalization)
+fn compute_curseforge_fingerprint(path: &std::path::Path) -> Option<u32> {
+    let content = std::fs::read(path).ok()?;
+
+    // CurseForge fingerprint: normalize whitespace and compute MurmurHash2
+    let normalized: Vec<u8> = content
+        .into_iter()
+        .filter(|&b| b != 9 && b != 10 && b != 13 && b != 32) // Remove whitespace
+        .collect();
+
+    Some(murmur2_hash(&normalized, 1))
+}
+
+/// MurmurHash2 implementation (seed=1, as used by CurseForge)
+fn murmur2_hash(data: &[u8], seed: u32) -> u32 {
+    const M: u32 = 0x5bd1e995;
+    const R: i32 = 24;
+
+    let len = data.len() as u32;
+    let mut h = seed ^ len;
+
+    let chunks = data.chunks_exact(4);
+    let remainder = chunks.remainder();
+
+    for chunk in chunks {
+        let mut k = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        k = k.wrapping_mul(M);
+        k ^= k >> R;
+        k = k.wrapping_mul(M);
+        h = h.wrapping_mul(M);
+        h ^= k;
+    }
+
+    match remainder.len() {
+        3 => {
+            h ^= (remainder[2] as u32) << 16;
+            h ^= (remainder[1] as u32) << 8;
+            h ^= remainder[0] as u32;
+            h = h.wrapping_mul(M);
+        }
+        2 => {
+            h ^= (remainder[1] as u32) << 8;
+            h ^= remainder[0] as u32;
+            h = h.wrapping_mul(M);
+        }
+        1 => {
+            h ^= remainder[0] as u32;
+            h = h.wrapping_mul(M);
+        }
+        _ => {}
+    }
+
+    h ^= h >> 13;
+    h = h.wrapping_mul(M);
+    h ^= h >> 15;
+
+    h
 }
 
 #[tauri::command]
@@ -466,6 +855,24 @@ async fn sync_mods_folder(instance_id: String) -> Result<mods::SyncResult> {
     mods::ModManager::sync_mods_with_folder(&instance_id).await
 }
 
+/// Start watching mods folder for changes (emits "mods_folder_changed" events)
+#[tauri::command]
+async fn start_mods_watcher(instance_id: String, app_handle: tauri::AppHandle) -> Result<()> {
+    mods::ModManager::start_watching(&instance_id, app_handle).await
+}
+
+/// Stop watching mods folder
+#[tauri::command]
+async fn stop_mods_watcher(instance_id: String) -> Result<()> {
+    mods::ModManager::stop_watching(&instance_id).await
+}
+
+/// Check if mods folder is being watched
+#[tauri::command]
+async fn is_watching_mods(instance_id: String) -> bool {
+    mods::ModManager::is_watching(&instance_id).await
+}
+
 #[tauri::command]
 async fn update_mod(instance_id: String, mod_id: i64, app_handle: tauri::AppHandle) -> Result<()> {
     let download_manager = downloader::DownloadManager::new(app_handle)?;
@@ -482,10 +889,7 @@ async fn bulk_toggle_mods(
 }
 
 #[tauri::command]
-async fn bulk_remove_mods(
-    instance_id: String,
-    mod_ids: Vec<i64>,
-) -> Result<Vec<i64>> {
+async fn bulk_remove_mods(instance_id: String, mod_ids: Vec<i64>) -> Result<Vec<i64>> {
     mods::ModManager::bulk_remove_mods(&instance_id, &mod_ids).await
 }
 
@@ -501,6 +905,96 @@ async fn bulk_toggle_auto_update(
 #[tauri::command]
 async fn check_mod_dependencies(instance_id: String) -> Result<Vec<mods::ModConflict>> {
     mods::ModManager::check_dependencies(&instance_id)
+}
+
+/// Превентивная проверка зависимостей перед запуском экземпляра
+#[tauri::command]
+async fn pre_launch_check(instance_id: String) -> Result<mods::PreLaunchCheckResult> {
+    mods::ModManager::pre_launch_check(&instance_id)
+}
+
+/// Получить граф зависимостей для визуализации
+#[tauri::command]
+async fn get_dependency_graph(instance_id: String) -> Result<mods::DependencyGraph> {
+    mods::ModManager::get_dependency_graph(&instance_id)
+}
+
+/// Clean up duplicate mods from the database
+#[tauri::command]
+fn cleanup_duplicate_mods(instance_id: String) -> Result<usize> {
+    mods::ModManager::cleanup_duplicate_mods(&instance_id)
+}
+
+/// Clear update check cache to allow re-checking
+#[tauri::command]
+fn clear_update_cache(instance_id: String) -> Result<usize> {
+    mods::ModManager::clear_update_cache(&instance_id)
+}
+
+/// Анализ безопасности удаления мода
+#[tauri::command]
+async fn analyze_mod_removal(
+    instance_id: String,
+    mod_slug: String,
+) -> Result<mods::ModRemovalAnalysis> {
+    mods::ModManager::analyze_mod_removal(&instance_id, &mod_slug)
+}
+
+/// Get the full path to a mod file
+#[tauri::command]
+fn get_mod_file_path(instance_id: String, file_name: String) -> Result<String> {
+    let mods_dir = paths::instance_mods_dir(&instance_id);
+    let file_path = mods_dir.join(&file_name);
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+/// Проверяет, нужно ли обновлять данные о зависимостях
+#[tauri::command]
+fn needs_dependency_enrichment(instance_id: String) -> Result<bool> {
+    mods::ModManager::needs_dependency_enrichment(&instance_id)
+}
+
+/// Check if enrichment is needed (based on file hashes)
+/// Returns true if enrichment should run, false if cached data is still valid
+#[tauri::command]
+fn check_enrichment_needed(instance_id: String) -> Result<bool> {
+    let (needs_enrichment, _hash) = mods::ModManager::check_enrichment_needed(&instance_id)?;
+    Ok(needs_enrichment)
+}
+
+/// Обогащение данных о модах через API (batch-запрос)
+/// Загружает зависимости для всех модов из Modrinth
+/// Now with built-in hash check - skips if already enriched with same mods
+#[tauri::command]
+async fn enrich_mod_dependencies(instance_id: String) -> Result<mods::EnrichmentResult> {
+    mods::ModManager::enrich_mod_dependencies(&instance_id).await
+}
+
+/// Force enrich dependencies - clears cache and re-fetches from API
+/// Used when user manually requests refresh
+#[tauri::command]
+async fn force_enrich_mod_dependencies(instance_id: String) -> Result<mods::EnrichmentResult> {
+    mods::ModManager::force_enrich_mod_dependencies(&instance_id).await
+}
+
+/// Incremental verification: only verify specified mod IDs
+/// Used after sync to verify only newly added mods
+#[tauri::command]
+async fn verify_mods_by_ids(
+    instance_id: String,
+    mod_ids: Vec<i64>,
+) -> Result<Vec<mods::ModVerifyResult>> {
+    mods::ModManager::verify_mods_by_ids(&instance_id, &mod_ids).await
+}
+
+/// Incremental enrichment: only enrich specified mod IDs
+/// Used after sync to enrich only newly added mods
+#[tauri::command]
+async fn enrich_mods_by_ids(
+    instance_id: String,
+    mod_ids: Vec<i64>,
+) -> Result<mods::EnrichmentResult> {
+    mods::ModManager::enrich_mods_by_ids(&instance_id, &mod_ids).await
 }
 
 /// Предсказание конфликтов ДО установки мода
@@ -572,17 +1066,27 @@ async fn resolve_dependencies(
 // ========== Config Editor ==========
 
 #[tauri::command]
-async fn list_config_files(instance_id: String, subdir: String) -> Result<Vec<config_editor::ConfigFile>> {
+async fn list_config_files(
+    instance_id: String,
+    subdir: String,
+) -> Result<Vec<config_editor::ConfigFile>> {
     config_editor::ConfigManager::list_config_files(&instance_id, &subdir).await
 }
 
 #[tauri::command]
-async fn read_config_file(instance_id: String, relative_path: String) -> Result<config_editor::ConfigContent> {
+async fn read_config_file(
+    instance_id: String,
+    relative_path: String,
+) -> Result<config_editor::ConfigContent> {
     config_editor::ConfigManager::read_config_file(&instance_id, &relative_path).await
 }
 
 #[tauri::command]
-async fn write_config_file(instance_id: String, relative_path: String, content: String) -> Result<()> {
+async fn write_config_file(
+    instance_id: String,
+    relative_path: String,
+    content: String,
+) -> Result<()> {
     config_editor::ConfigManager::write_config_file(&instance_id, &relative_path, &content).await
 }
 
@@ -617,12 +1121,14 @@ async fn browse_instance_files(instance_id: String, subpath: String) -> Result<V
         error::LauncherError::InvalidConfig("Instance directory not found".to_string())
     })?;
 
-    let canonical_target = target_dir.canonicalize().map_err(|_| {
-        error::LauncherError::InvalidConfig("Path not found".to_string())
-    })?;
+    let canonical_target = target_dir
+        .canonicalize()
+        .map_err(|_| error::LauncherError::InvalidConfig("Path not found".to_string()))?;
 
     if !canonical_target.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Path traversal detected".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Path traversal detected".to_string(),
+        ));
     }
 
     let mut entries = Vec::new();
@@ -638,17 +1144,20 @@ async fn browse_instance_files(instance_id: String, subpath: String) -> Result<V
             error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to read metadata"))
         })?;
 
-        let name = path.file_name()
+        let name = path
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("")
             .to_string();
 
-        let relative_path = path.strip_prefix(&base_dir.join(&instance_id))
+        let relative_path = path
+            .strip_prefix(&base_dir.join(&instance_id))
             .unwrap_or(&path)
             .to_string_lossy()
             .to_string();
 
-        let modified = metadata.modified()
+        let modified = metadata
+            .modified()
             .ok()
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_secs())
@@ -665,19 +1174,21 @@ async fn browse_instance_files(instance_id: String, subpath: String) -> Result<V
         });
     }
 
-    entries.sort_by(|a, b| {
-        match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.cmp(&b.name),
-        }
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.cmp(&b.name),
     });
 
     Ok(entries)
 }
 
 #[tauri::command]
-async fn search_instance_files(instance_id: String, query: String, use_regex: bool) -> Result<Vec<FileEntry>> {
+async fn search_instance_files(
+    instance_id: String,
+    query: String,
+    use_regex: bool,
+) -> Result<Vec<FileEntry>> {
     use crate::paths::get_base_dir;
     use regex::Regex;
 
@@ -687,13 +1198,14 @@ async fn search_instance_files(instance_id: String, query: String, use_regex: bo
     })?;
 
     // Compile regex if needed
-    let regex_pattern = if use_regex {
-        Some(Regex::new(&query).map_err(|e| {
-            error::LauncherError::InvalidConfig(format!("Invalid regex: {}", e))
-        })?)
-    } else {
-        None
-    };
+    let regex_pattern =
+        if use_regex {
+            Some(Regex::new(&query).map_err(|e| {
+                error::LauncherError::InvalidConfig(format!("Invalid regex: {}", e))
+            })?)
+        } else {
+            None
+        };
 
     let mut results = Vec::new();
     let query_lower = query.to_lowercase();
@@ -714,9 +1226,7 @@ async fn search_instance_files(instance_id: String, query: String, use_regex: bo
             let metadata = entry.metadata().await?;
 
             // Skip hidden directories and common cache/log folders
-            let name = path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("");
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
             if name.starts_with('.') || matches!(name, "logs" | "crash-reports" | "cache") {
                 continue;
@@ -724,7 +1234,16 @@ async fn search_instance_files(instance_id: String, query: String, use_regex: bo
 
             if metadata.is_dir() {
                 // Recursively search subdirectories
-                if let Err(e) = Box::pin(walk_dir(&path, base, query, regex_pattern, results, instance_id)).await {
+                if let Err(e) = Box::pin(walk_dir(
+                    &path,
+                    base,
+                    query,
+                    regex_pattern,
+                    results,
+                    instance_id,
+                ))
+                .await
+                {
                     eprintln!("Failed to read subdirectory {:?}: {}", path, e);
                 }
             } else {
@@ -736,12 +1255,14 @@ async fn search_instance_files(instance_id: String, query: String, use_regex: bo
                 };
 
                 if matches {
-                    let relative_path = path.strip_prefix(base)
+                    let relative_path = path
+                        .strip_prefix(base)
                         .unwrap_or(&path)
                         .to_string_lossy()
                         .to_string();
 
-                    let modified = metadata.modified()
+                    let modified = metadata
+                        .modified()
                         .ok()
                         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                         .map(|d| d.as_secs())
@@ -763,9 +1284,16 @@ async fn search_instance_files(instance_id: String, query: String, use_regex: bo
         Ok(())
     }
 
-    walk_dir(&canonical_base, &canonical_base, &query_lower, &regex_pattern, &mut results, &instance_id)
-        .await
-        .map_err(|e| error::LauncherError::Io(std::io::Error::new(e.kind(), "Search failed")))?;
+    walk_dir(
+        &canonical_base,
+        &canonical_base,
+        &query_lower,
+        &regex_pattern,
+        &mut results,
+        &instance_id,
+    )
+    .await
+    .map_err(|e| error::LauncherError::Io(std::io::Error::new(e.kind(), "Search failed")))?;
 
     // Sort results by relevance (exact matches first, then alphabetically)
     results.sort_by(|a, b| a.name.cmp(&b.name));
@@ -784,21 +1312,27 @@ async fn read_instance_file(instance_id: String, relative_path: String) -> Resul
         error::LauncherError::InvalidConfig("Instance directory not found".to_string())
     })?;
 
-    let canonical_file = file_path.canonicalize().map_err(|_| {
-        error::LauncherError::InvalidConfig("File not found".to_string())
-    })?;
+    let canonical_file = file_path
+        .canonicalize()
+        .map_err(|_| error::LauncherError::InvalidConfig("File not found".to_string()))?;
 
     if !canonical_file.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Path traversal detected".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Path traversal detected".to_string(),
+        ));
     }
 
-    tokio::fs::read_to_string(&file_path).await.map_err(|e| {
-        error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to read file"))
-    })
+    tokio::fs::read_to_string(&file_path)
+        .await
+        .map_err(|e| error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to read file")))
 }
 
 #[tauri::command]
-async fn write_instance_file(instance_id: String, relative_path: String, content: String) -> Result<()> {
+async fn write_instance_file(
+    instance_id: String,
+    relative_path: String,
+    content: String,
+) -> Result<()> {
     use crate::paths::get_base_dir;
 
     let base_dir = get_base_dir().join("instances");
@@ -810,20 +1344,27 @@ async fn write_instance_file(instance_id: String, relative_path: String, content
 
     if let Some(parent) = file_path.parent() {
         tokio::fs::create_dir_all(parent).await.map_err(|e| {
-            error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to create directories"))
+            error::LauncherError::Io(std::io::Error::new(
+                e.kind(),
+                "Failed to create directories",
+            ))
         })?;
     }
 
     let canonical_file = file_path.canonicalize().or_else(|_| {
-        let parent = file_path.parent()
+        let parent = file_path
+            .parent()
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Invalid path"))?;
-        parent
-            .canonicalize()
-            .map(|p| p.join(file_path.file_name().unwrap()))
+        let file_name = file_path
+            .file_name()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid file name"))?;
+        parent.canonicalize().map(|p| p.join(file_name))
     })?;
 
     if !canonical_file.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Path traversal detected".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Path traversal detected".to_string(),
+        ));
     }
 
     tokio::fs::write(&file_path, content).await.map_err(|e| {
@@ -842,26 +1383,31 @@ async fn delete_instance_file(instance_id: String, relative_path: String) -> Res
         error::LauncherError::InvalidConfig("Instance directory not found".to_string())
     })?;
 
-    let canonical_file = file_path.canonicalize().map_err(|_| {
-        error::LauncherError::InvalidConfig("File not found".to_string())
-    })?;
+    let canonical_file = file_path
+        .canonicalize()
+        .map_err(|_| error::LauncherError::InvalidConfig("File not found".to_string()))?;
 
     if !canonical_file.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Path traversal detected".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Path traversal detected".to_string(),
+        ));
     }
 
     if canonical_file.is_dir() {
         tokio::fs::remove_dir_all(&file_path).await
     } else {
         tokio::fs::remove_file(&file_path).await
-    }.map_err(|e| {
-        error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to delete"))
-    })
+    }
+    .map_err(|e| error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to delete")))
 }
 
 /// Rename instance file or directory
 #[tauri::command]
-async fn rename_instance_file(instance_id: String, relative_path: String, new_name: String) -> Result<()> {
+async fn rename_instance_file(
+    instance_id: String,
+    relative_path: String,
+    new_name: String,
+) -> Result<()> {
     use crate::paths::get_base_dir;
 
     let base_dir = get_base_dir().join("instances");
@@ -871,12 +1417,14 @@ async fn rename_instance_file(instance_id: String, relative_path: String, new_na
         error::LauncherError::InvalidConfig("Instance directory not found".to_string())
     })?;
 
-    let canonical_old = old_path.canonicalize().map_err(|_| {
-        error::LauncherError::InvalidConfig("File not found".to_string())
-    })?;
+    let canonical_old = old_path
+        .canonicalize()
+        .map_err(|_| error::LauncherError::InvalidConfig("File not found".to_string()))?;
 
     if !canonical_old.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Path traversal detected".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Path traversal detected".to_string(),
+        ));
     }
 
     // Build new path
@@ -888,22 +1436,30 @@ async fn rename_instance_file(instance_id: String, relative_path: String, new_na
 
     // Validate new path is also within instance directory
     if !new_path.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Invalid new name".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Invalid new name".to_string(),
+        ));
     }
 
     // Check if destination already exists
     if new_path.exists() {
-        return Err(error::LauncherError::InvalidConfig("File with this name already exists".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "File with this name already exists".to_string(),
+        ));
     }
 
-    tokio::fs::rename(&canonical_old, &new_path).await.map_err(|e| {
-        error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to rename"))
-    })
+    tokio::fs::rename(&canonical_old, &new_path)
+        .await
+        .map_err(|e| error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to rename")))
 }
 
 /// Copy instance file or directory
 #[tauri::command]
-async fn copy_instance_file(instance_id: String, relative_path: String, new_name: String) -> Result<()> {
+async fn copy_instance_file(
+    instance_id: String,
+    relative_path: String,
+    new_name: String,
+) -> Result<()> {
     use crate::paths::get_base_dir;
 
     let base_dir = get_base_dir().join("instances");
@@ -913,12 +1469,14 @@ async fn copy_instance_file(instance_id: String, relative_path: String, new_name
         error::LauncherError::InvalidConfig("Instance directory not found".to_string())
     })?;
 
-    let canonical_src = src_path.canonicalize().map_err(|_| {
-        error::LauncherError::InvalidConfig("File not found".to_string())
-    })?;
+    let canonical_src = src_path
+        .canonicalize()
+        .map_err(|_| error::LauncherError::InvalidConfig("File not found".to_string()))?;
 
     if !canonical_src.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Path traversal detected".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Path traversal detected".to_string(),
+        ));
     }
 
     // Build destination path
@@ -930,22 +1488,27 @@ async fn copy_instance_file(instance_id: String, relative_path: String, new_name
 
     // Validate destination is also within instance directory
     if !dest_path.starts_with(&canonical_base) {
-        return Err(error::LauncherError::InvalidConfig("Invalid destination name".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "Invalid destination name".to_string(),
+        ));
     }
 
     // Check if destination already exists
     if dest_path.exists() {
-        return Err(error::LauncherError::InvalidConfig("File with this name already exists".to_string()));
+        return Err(error::LauncherError::InvalidConfig(
+            "File with this name already exists".to_string(),
+        ));
     }
 
     // Copy file or directory
     if canonical_src.is_dir() {
         copy_dir_recursive(canonical_src.to_path_buf(), dest_path.clone()).await
     } else {
-        tokio::fs::copy(&canonical_src, &dest_path).await.map(|_| ())
-    }.map_err(|e| {
-        error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to copy"))
-    })
+        tokio::fs::copy(&canonical_src, &dest_path)
+            .await
+            .map(|_| ())
+    }
+    .map_err(|e| error::LauncherError::Io(std::io::Error::new(e.kind(), "Failed to copy")))
 }
 
 /// Recursive directory copy helper
@@ -1042,37 +1605,14 @@ fn list_mod_profiles(instance_id: String) -> Result<Vec<ModProfile>> {
 
     let mut stmt = conn.prepare(
         "SELECT id, name, description, instance_id, enabled_mods, created_at
-         FROM mod_profiles WHERE instance_id = ?1 ORDER BY created_at DESC"
+         FROM mod_profiles WHERE instance_id = ?1 ORDER BY created_at DESC",
     )?;
 
-    let profiles = stmt.query_map([&instance_id], |row| {
-        let enabled_mods_json: String = row.get(4)?;
-        let enabled_mods: Vec<i64> = serde_json::from_str(&enabled_mods_json).unwrap_or_default();
-
-        Ok(ModProfile {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            description: row.get(2)?,
-            instance_id: row.get(3)?,
-            enabled_mods,
-            created_at: row.get(5)?,
-        })
-    })?.collect::<std::result::Result<Vec<_>, _>>()?;
-
-    Ok(profiles)
-}
-
-#[tauri::command]
-async fn apply_mod_profile(instance_id: String, profile_id: String) -> Result<()> {
-    let conn = db::get_db_conn()?;
-
-    let profile: ModProfile = conn.query_row(
-        "SELECT id, name, description, instance_id, enabled_mods, created_at
-         FROM mod_profiles WHERE id = ?1",
-        [&profile_id],
-        |row| {
+    let profiles = stmt
+        .query_map([&instance_id], |row| {
             let enabled_mods_json: String = row.get(4)?;
-            let enabled_mods: Vec<i64> = serde_json::from_str(&enabled_mods_json).unwrap_or_default();
+            let enabled_mods: Vec<i64> =
+                serde_json::from_str(&enabled_mods_json).unwrap_or_default();
 
             Ok(ModProfile {
                 id: row.get(0)?,
@@ -1082,8 +1622,37 @@ async fn apply_mod_profile(instance_id: String, profile_id: String) -> Result<()
                 enabled_mods,
                 created_at: row.get(5)?,
             })
-        },
-    ).map_err(|_| error::LauncherError::NotFound("Profile not found".to_string()))?;
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    Ok(profiles)
+}
+
+#[tauri::command]
+async fn apply_mod_profile(instance_id: String, profile_id: String) -> Result<()> {
+    let conn = db::get_db_conn()?;
+
+    let profile: ModProfile = conn
+        .query_row(
+            "SELECT id, name, description, instance_id, enabled_mods, created_at
+         FROM mod_profiles WHERE id = ?1",
+            [&profile_id],
+            |row| {
+                let enabled_mods_json: String = row.get(4)?;
+                let enabled_mods: Vec<i64> =
+                    serde_json::from_str(&enabled_mods_json).unwrap_or_default();
+
+                Ok(ModProfile {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    description: row.get(2)?,
+                    instance_id: row.get(3)?,
+                    enabled_mods,
+                    created_at: row.get(5)?,
+                })
+            },
+        )
+        .map_err(|_| error::LauncherError::NotFound("Profile not found".to_string()))?;
 
     let all_mods = mods::ModManager::list_mods(&instance_id)?;
 
@@ -1097,7 +1666,11 @@ async fn apply_mod_profile(instance_id: String, profile_id: String) -> Result<()
         let _ = mods::ModManager::toggle_mod(&instance_id, mod_id, true).await;
     }
 
-    log::info!("Applied mod profile {} to instance {}", profile.name, instance_id);
+    log::info!(
+        "Applied mod profile {} to instance {}",
+        profile.name,
+        instance_id
+    );
     Ok(())
 }
 
@@ -1108,7 +1681,9 @@ fn delete_mod_profile(profile_id: String) -> Result<()> {
     let deleted = conn.execute("DELETE FROM mod_profiles WHERE id = ?1", [&profile_id])?;
 
     if deleted == 0 {
-        return Err(error::LauncherError::NotFound("Profile not found".to_string()));
+        return Err(error::LauncherError::NotFound(
+            "Profile not found".to_string(),
+        ));
     }
 
     Ok(())
@@ -1119,21 +1694,23 @@ fn delete_mod_profile(profile_id: String) -> Result<()> {
 fn export_mod_profile(profile_id: String) -> Result<String> {
     let conn = db::get_db_conn()?;
 
-    let mut stmt = conn.prepare(
-        "SELECT name, description, enabled_mods FROM mod_profiles WHERE id = ?1"
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT name, description, enabled_mods FROM mod_profiles WHERE id = ?1")?;
 
-    let profile = stmt.query_row([&profile_id], |row| {
-        Ok(serde_json::json!({
-            "name": row.get::<_, String>(0)?,
-            "description": row.get::<_, Option<String>>(1)?,
-            "enabled_mods": row.get::<_, String>(2)?,
-            "version": "1.0",
-            "exported_at": chrono::Local::now().to_rfc3339(),
-        }))
-    }).map_err(|_| error::LauncherError::NotFound("Profile not found".to_string()))?;
+    let profile = stmt
+        .query_row([&profile_id], |row| {
+            Ok(serde_json::json!({
+                "name": row.get::<_, String>(0)?,
+                "description": row.get::<_, Option<String>>(1)?,
+                "enabled_mods": row.get::<_, String>(2)?,
+                "version": "1.0",
+                "exported_at": chrono::Local::now().to_rfc3339(),
+            }))
+        })
+        .map_err(|_| error::LauncherError::NotFound("Profile not found".to_string()))?;
 
-    Ok(serde_json::to_string_pretty(&profile).unwrap())
+    serde_json::to_string_pretty(&profile)
+        .map_err(|e| error::LauncherError::InvalidConfig(format!("Failed to serialize profile: {}", e)))
 }
 
 /// Import mod profile from JSON string
@@ -1142,11 +1719,13 @@ fn import_mod_profile(instance_id: String, json_data: String) -> Result<String> 
     let data: serde_json::Value = serde_json::from_str(&json_data)
         .map_err(|e| error::LauncherError::InvalidConfig(format!("Invalid JSON: {}", e)))?;
 
-    let name = data["name"].as_str()
+    let name = data["name"]
+        .as_str()
         .ok_or_else(|| error::LauncherError::InvalidConfig("Missing 'name' field".to_string()))?;
     let description = data["description"].as_str();
-    let enabled_mods_str = data["enabled_mods"].as_str()
-        .ok_or_else(|| error::LauncherError::InvalidConfig("Missing 'enabled_mods' field".to_string()))?;
+    let enabled_mods_str = data["enabled_mods"].as_str().ok_or_else(|| {
+        error::LauncherError::InvalidConfig("Missing 'enabled_mods' field".to_string())
+    })?;
 
     // Валидация JSON
     let _: Vec<i64> = serde_json::from_str(enabled_mods_str)
@@ -1312,6 +1891,79 @@ async fn install_modpack_from_file(
         .await
 }
 
+/// Install from standalone manifest.json (CurseForge) or modrinth.index.json (Modrinth)
+#[tauri::command]
+async fn install_modpack_from_manifest(
+    file_path: String,
+    instance_name: String,
+    app_handle: tauri::AppHandle,
+) -> Result<String> {
+    let download_manager = downloader::DownloadManager::new(app_handle.clone())?;
+    let path = std::path::PathBuf::from(file_path);
+
+    modpacks::ModpackManager::install_from_standalone_manifest(
+        path,
+        instance_name,
+        download_manager,
+        app_handle,
+    )
+    .await
+}
+
+/// Preview a standalone manifest file (detect format and return info)
+#[tauri::command]
+async fn preview_manifest_file(file_path: String) -> Result<serde_json::Value> {
+    let path = std::path::PathBuf::from(&file_path);
+    let (format, content) = modpacks::install::parse_standalone_manifest(&path).await?;
+
+    // Parse based on format
+    match format {
+        modpacks::install::ManifestFormat::Modrinth => {
+            let index: modpacks::ModrinthModpackIndex = serde_json::from_str(&content)?;
+            let loader = if index.dependencies.fabric_loader.is_some() {
+                "fabric"
+            } else if index.dependencies.quilt_loader.is_some() {
+                "quilt"
+            } else if index.dependencies.forge.is_some() {
+                "forge"
+            } else if index.dependencies.neoforge.is_some() {
+                "neoforge"
+            } else {
+                "vanilla"
+            };
+
+            Ok(serde_json::json!({
+                "format": "modrinth",
+                "name": index.name,
+                "version": index.version_id,
+                "minecraft_version": index.dependencies.minecraft,
+                "loader": loader,
+                "mods_count": index.files.iter().filter(|f| f.path.starts_with("mods/")).count(),
+                "total_files": index.files.len(),
+            }))
+        }
+        modpacks::install::ManifestFormat::CurseForge => {
+            let manifest: modpacks::CurseForgeManifest = serde_json::from_str(&content)?;
+            let loader = manifest
+                .minecraft
+                .mod_loaders
+                .first()
+                .map(|l| l.id.split('-').next().unwrap_or("vanilla"))
+                .unwrap_or("vanilla");
+
+            Ok(serde_json::json!({
+                "format": "curseforge",
+                "name": manifest.name,
+                "version": manifest.version,
+                "author": manifest.author,
+                "minecraft_version": manifest.minecraft.version,
+                "loader": loader,
+                "mods_count": manifest.files.len(),
+            }))
+        }
+    }
+}
+
 #[tauri::command]
 async fn preview_modpack_file(file_path: String) -> Result<modpacks::ModpackFilePreview> {
     let path = std::path::PathBuf::from(file_path);
@@ -1319,10 +1971,24 @@ async fn preview_modpack_file(file_path: String) -> Result<modpacks::ModpackFile
 }
 
 #[tauri::command]
+async fn preview_modpack_detailed(file_path: String) -> Result<modpacks::ModpackPreview> {
+    modpacks::preview::get_modpack_preview(std::path::Path::new(&file_path)).await
+}
+
+#[tauri::command]
 async fn compare_modpacks(path1: String, path2: String) -> Result<modpacks::ModpackComparison> {
     let p1 = std::path::PathBuf::from(path1);
     let p2 = std::path::PathBuf::from(path2);
     modpacks::ModpackManager::compare_modpacks(&p1, &p2).await
+}
+
+#[tauri::command]
+async fn read_modpack_file_content(
+    archive_path: String,
+    file_path: String,
+) -> Result<Option<String>> {
+    let path = std::path::PathBuf::from(archive_path);
+    modpacks::ModpackManager::read_file_from_archive(&path, &file_path).await
 }
 
 /// Создать патч из результата сравнения модпаков
@@ -1652,7 +2318,10 @@ fn check_java_compatibility(java_major: u32, minecraft_version: String) -> java:
 }
 
 #[tauri::command]
-async fn check_java_compatibility_for_path(java_path: String, minecraft_version: String) -> java::JavaCompatibility {
+async fn check_java_compatibility_for_path(
+    java_path: String,
+    minecraft_version: String,
+) -> java::JavaCompatibility {
     java::JavaManager::check_java_compatibility_for_path(&java_path, &minecraft_version).await
 }
 
@@ -1829,7 +2498,11 @@ async fn save_connect_settings(settings: p2p::ConnectSettings) -> Result<()> {
     // Обновляем ConnectService
     let service = get_connect_service();
     let was_enabled = service.read().await.get_settings().await.enabled;
-    service.write().await.update_settings(settings.clone()).await;
+    service
+        .write()
+        .await
+        .update_settings(settings.clone())
+        .await;
 
     // Если включили - запускаем discovery
     if settings.enabled && !was_enabled {
@@ -1894,7 +2567,7 @@ async fn connect_by_code(code: String) -> Result<p2p::PeerInfo> {
         .await
         .connect_by_code(&code)
         .await
-        .map_err(|e| error::LauncherError::InvalidConfig(e))
+        .map_err(|e| error::LauncherError::P2PConnection(e))
 }
 
 /// Ответить на запрос согласия
@@ -1933,12 +2606,14 @@ async fn respond_to_consent(request_id: String, approved: bool, remember: bool) 
             });
 
             // Добавляем новое разрешение
-            settings.remembered_permissions.push(p2p::RememberedPermission {
-                peer_id: req.peer_id.clone(),
-                content_type: req.consent_type.to_string(),
-                allowed: approved,
-                created_at: chrono::Utc::now().to_rfc3339(),
-            });
+            settings
+                .remembered_permissions
+                .push(p2p::RememberedPermission {
+                    peer_id: req.peer_id.clone(),
+                    content_type: req.consent_type.to_string(),
+                    allowed: approved,
+                    created_at: chrono::Utc::now().to_rfc3339(),
+                });
 
             // Сохраняем в БД
             let conn = db::get_db_conn()?;
@@ -1949,11 +2624,17 @@ async fn respond_to_consent(request_id: String, approved: bool, remember: bool) 
             )?;
 
             // Обновляем ConnectService
-            get_connect_service().write().await.update_settings(settings).await;
+            get_connect_service()
+                .write()
+                .await
+                .update_settings(settings)
+                .await;
 
             log::info!(
                 "Remembered permission for peer {} type {}: allowed={}",
-                req.peer_id, req.consent_type, approved
+                req.peer_id,
+                req.consent_type,
+                approved
             );
         }
     }
@@ -1984,7 +2665,11 @@ async fn block_peer(peer_id: String) -> Result<()> {
         )?;
 
         // Обновляем ConnectService
-        get_connect_service().write().await.update_settings(settings).await;
+        get_connect_service()
+            .write()
+            .await
+            .update_settings(settings)
+            .await;
 
         log::info!("Blocked peer: {}", peer_id);
     }
@@ -2007,7 +2692,11 @@ async fn unblock_peer(peer_id: String) -> Result<()> {
     )?;
 
     // Обновляем ConnectService
-    get_connect_service().write().await.update_settings(settings).await;
+    get_connect_service()
+        .write()
+        .await
+        .update_settings(settings)
+        .await;
 
     log::info!("Unblocked peer: {}", peer_id);
     Ok(())
@@ -2238,7 +2927,11 @@ fn compute_sync_diff(
 /// Получить активные сессии передачи
 #[tauri::command]
 async fn get_transfer_sessions() -> Vec<p2p::TransferSession> {
-    get_connect_service().read().await.get_transfer_sessions().await
+    get_connect_service()
+        .read()
+        .await
+        .get_transfer_sessions()
+        .await
 }
 
 /// Отменить передачу файлов
@@ -2257,13 +2950,21 @@ async fn cancel_transfer(session_id: String) -> Result<()> {
 /// Получить историю передач
 #[tauri::command]
 async fn get_transfer_history() -> Vec<p2p::TransferHistoryEntry> {
-    get_connect_service().read().await.get_transfer_history().await
+    get_connect_service()
+        .read()
+        .await
+        .get_transfer_history()
+        .await
 }
 
 /// Получить последние N записей истории
 #[tauri::command]
 async fn get_recent_transfer_history(limit: usize) -> Vec<p2p::TransferHistoryEntry> {
-    get_connect_service().read().await.get_recent_history(limit).await
+    get_connect_service()
+        .read()
+        .await
+        .get_recent_history(limit)
+        .await
 }
 
 /// Получить статистику истории передач
@@ -2288,19 +2989,31 @@ async fn clear_transfer_history() -> Result<()> {
 /// Установить конфигурацию selective sync для модпака
 #[tauri::command]
 async fn set_selective_sync_config(config: p2p::SelectiveSyncConfig) {
-    get_connect_service().read().await.set_selective_sync(config).await;
+    get_connect_service()
+        .read()
+        .await
+        .set_selective_sync(config)
+        .await;
 }
 
 /// Получить конфигурацию selective sync для модпака
 #[tauri::command]
 async fn get_selective_sync_config(modpack_name: String) -> Option<p2p::SelectiveSyncConfig> {
-    get_connect_service().read().await.get_selective_sync(&modpack_name).await
+    get_connect_service()
+        .read()
+        .await
+        .get_selective_sync(&modpack_name)
+        .await
 }
 
 /// Удалить конфигурацию selective sync для модпака
 #[tauri::command]
 async fn remove_selective_sync_config(modpack_name: String) {
-    get_connect_service().read().await.remove_selective_sync(&modpack_name).await;
+    get_connect_service()
+        .read()
+        .await
+        .remove_selective_sync(&modpack_name)
+        .await;
 }
 
 // ==================== Watch Mode Commands ====================
@@ -2319,13 +3032,21 @@ async fn add_watch_config(config: p2p::WatchConfig) -> Result<()> {
 /// Получить конфигурацию watch mode для модпака
 #[tauri::command]
 async fn get_watch_config(modpack_name: String) -> Option<p2p::WatchConfig> {
-    get_connect_service().read().await.get_watch_config(&modpack_name).await
+    get_connect_service()
+        .read()
+        .await
+        .get_watch_config(&modpack_name)
+        .await
 }
 
 /// Получить все конфигурации watch mode
 #[tauri::command]
 async fn get_all_watch_configs() -> Vec<p2p::WatchConfig> {
-    get_connect_service().read().await.get_all_watch_configs().await
+    get_connect_service()
+        .read()
+        .await
+        .get_all_watch_configs()
+        .await
 }
 
 /// Начать отслеживание модпака
@@ -2353,13 +3074,21 @@ async fn stop_watching(modpack_name: String) -> Result<()> {
 /// Проверить активен ли watch mode для модпака
 #[tauri::command]
 async fn is_watching(modpack_name: String) -> bool {
-    get_connect_service().read().await.is_watching(&modpack_name).await
+    get_connect_service()
+        .read()
+        .await
+        .is_watching(&modpack_name)
+        .await
 }
 
 /// Получить список активных watchers
 #[tauri::command]
 async fn get_active_watches() -> Vec<String> {
-    get_connect_service().read().await.get_active_watches().await
+    get_connect_service()
+        .read()
+        .await
+        .get_active_watches()
+        .await
 }
 
 /// Остановить все watchers
@@ -2388,7 +3117,11 @@ async fn queue_transfer(
 /// Получить очередь передач
 #[tauri::command]
 async fn get_transfer_queue() -> Vec<p2p::QueuedTransfer> {
-    get_connect_service().read().await.get_transfer_queue().await
+    get_connect_service()
+        .read()
+        .await
+        .get_transfer_queue()
+        .await
 }
 
 /// Отменить передачу в очереди
@@ -2416,7 +3149,11 @@ async fn set_transfer_priority(queue_id: String, priority: p2p::TransferPriority
 /// Установить максимальное количество одновременных передач
 #[tauri::command]
 async fn set_max_concurrent_transfers(max: usize) {
-    get_connect_service().read().await.set_max_concurrent_transfers(max).await;
+    get_connect_service()
+        .read()
+        .await
+        .set_max_concurrent_transfers(max)
+        .await;
 }
 
 /// Повторить неудачную передачу
@@ -2433,7 +3170,11 @@ async fn retry_queued_transfer(queue_id: String) -> Result<()> {
 /// Очистить очередь передач
 #[tauri::command]
 async fn clear_transfer_queue() {
-    get_connect_service().read().await.clear_transfer_queue().await;
+    get_connect_service()
+        .read()
+        .await
+        .clear_transfer_queue()
+        .await;
 }
 
 // ==================== Peer Groups Commands ====================
@@ -2452,7 +3193,11 @@ async fn load_peer_groups() -> Result<()> {
 /// Создать группу пиров
 #[tauri::command]
 async fn create_peer_group(name: String) -> p2p::PeerGroup {
-    get_connect_service().read().await.create_peer_group(&name).await
+    get_connect_service()
+        .read()
+        .await
+        .create_peer_group(&name)
+        .await
 }
 
 /// Удалить группу пиров
@@ -2469,13 +3214,21 @@ async fn delete_peer_group(group_id: String) -> Result<()> {
 /// Получить группу по ID
 #[tauri::command]
 async fn get_peer_group(group_id: String) -> Option<p2p::PeerGroup> {
-    get_connect_service().read().await.get_peer_group(&group_id).await
+    get_connect_service()
+        .read()
+        .await
+        .get_peer_group(&group_id)
+        .await
 }
 
 /// Получить все группы пиров
 #[tauri::command]
 async fn get_all_peer_groups() -> Vec<p2p::PeerGroup> {
-    get_connect_service().read().await.get_all_peer_groups().await
+    get_connect_service()
+        .read()
+        .await
+        .get_all_peer_groups()
+        .await
 }
 
 /// Добавить пира в группу
@@ -2503,7 +3256,11 @@ async fn remove_peer_from_group(group_id: String, peer_id: String) -> Result<()>
 /// Получить группы для пира
 #[tauri::command]
 async fn get_groups_for_peer(peer_id: String) -> Vec<p2p::PeerGroup> {
-    get_connect_service().read().await.get_groups_for_peer(&peer_id).await
+    get_connect_service()
+        .read()
+        .await
+        .get_groups_for_peer(&peer_id)
+        .await
 }
 
 /// Переименовать группу
@@ -2522,73 +3279,121 @@ async fn rename_peer_group(group_id: String, new_name: String) -> Result<()> {
 /// Включить/выключить уведомления об обновлениях
 #[tauri::command]
 async fn set_update_notifications_enabled(enabled: bool) {
-    get_connect_service().read().await.set_update_notifications_enabled(enabled).await;
+    get_connect_service()
+        .read()
+        .await
+        .set_update_notifications_enabled(enabled)
+        .await;
 }
 
 /// Установить локальную версию модпака
 #[tauri::command]
 async fn set_local_modpack_version(modpack_name: String, version: String) {
-    get_connect_service().read().await.set_local_modpack_version(&modpack_name, &version).await;
+    get_connect_service()
+        .read()
+        .await
+        .set_local_modpack_version(&modpack_name, &version)
+        .await;
 }
 
 /// Получить уведомления об обновлениях
 #[tauri::command]
 async fn get_update_notifications() -> Vec<p2p::UpdateNotification> {
-    get_connect_service().read().await.get_update_notifications().await
+    get_connect_service()
+        .read()
+        .await
+        .get_update_notifications()
+        .await
 }
 
 /// Получить непрочитанные уведомления
 #[tauri::command]
 async fn get_unread_update_notifications() -> Vec<p2p::UpdateNotification> {
-    get_connect_service().read().await.get_unread_update_notifications().await
+    get_connect_service()
+        .read()
+        .await
+        .get_unread_update_notifications()
+        .await
 }
 
 /// Получить количество непрочитанных уведомлений
 #[tauri::command]
 async fn get_unread_notification_count() -> usize {
-    get_connect_service().read().await.get_unread_notification_count().await
+    get_connect_service()
+        .read()
+        .await
+        .get_unread_notification_count()
+        .await
 }
 
 /// Отметить уведомление как прочитанное
 #[tauri::command]
 async fn mark_notification_read(notification_id: String) {
-    get_connect_service().read().await.mark_notification_read(&notification_id).await;
+    get_connect_service()
+        .read()
+        .await
+        .mark_notification_read(&notification_id)
+        .await;
 }
 
 /// Отметить все уведомления как прочитанные
 #[tauri::command]
 async fn mark_all_notifications_read() {
-    get_connect_service().read().await.mark_all_notifications_read().await;
+    get_connect_service()
+        .read()
+        .await
+        .mark_all_notifications_read()
+        .await;
 }
 
 /// Отклонить уведомление
 #[tauri::command]
 async fn dismiss_notification(notification_id: String) {
-    get_connect_service().read().await.dismiss_notification(&notification_id).await;
+    get_connect_service()
+        .read()
+        .await
+        .dismiss_notification(&notification_id)
+        .await;
 }
 
 /// Очистить все уведомления
 #[tauri::command]
 async fn clear_update_notifications() {
-    get_connect_service().read().await.clear_update_notifications().await;
+    get_connect_service()
+        .read()
+        .await
+        .clear_update_notifications()
+        .await;
 }
 
 /// Отслеживать модпак для уведомлений
 #[tauri::command]
 async fn track_modpack_updates(modpack_name: String) {
-    get_connect_service().read().await.track_modpack_updates(&modpack_name).await;
+    get_connect_service()
+        .read()
+        .await
+        .track_modpack_updates(&modpack_name)
+        .await;
 }
 
 /// Перестать отслеживать модпак
 #[tauri::command]
 async fn untrack_modpack_updates(modpack_name: String) {
-    get_connect_service().read().await.untrack_modpack_updates(&modpack_name).await;
+    get_connect_service()
+        .read()
+        .await
+        .untrack_modpack_updates(&modpack_name)
+        .await;
 }
 
 /// Получить пиров с конкретным модпаком
 #[tauri::command]
 async fn get_peers_with_modpack(modpack_name: String) -> Vec<p2p::PeerModpackVersion> {
-    get_connect_service().read().await.get_peers_with_modpack(&modpack_name).await
+    get_connect_service()
+        .read()
+        .await
+        .get_peers_with_modpack(&modpack_name)
+        .await
 }
 
 // ==================== Server P2P Sync ====================
@@ -2601,7 +3406,9 @@ fn get_server_sync_manager() -> Arc<p2p::ServerSyncManager> {
 /// Get server sync config
 #[tauri::command]
 async fn get_server_sync_config(server_instance_id: String) -> Option<p2p::ServerSyncConfig> {
-    get_server_sync_manager().get_config(&server_instance_id).await
+    get_server_sync_manager()
+        .get_config(&server_instance_id)
+        .await
 }
 
 /// Set server sync config
@@ -2613,7 +3420,10 @@ async fn set_server_sync_config(config: p2p::ServerSyncConfig) -> Result<()> {
 
 /// Link client instance to server
 #[tauri::command]
-async fn link_client_to_server(server_instance_id: String, client_instance_id: String) -> Result<()> {
+async fn link_client_to_server(
+    server_instance_id: String,
+    client_instance_id: String,
+) -> Result<()> {
     get_server_sync_manager()
         .link_client_to_server(&server_instance_id, &client_instance_id)
         .await
@@ -2777,10 +3587,7 @@ fn format_invite_text(invite: p2p::ServerInvite) -> String {
 /// 2. Find or create a matching client instance
 /// 3. Set up the game to connect to the server
 #[tauri::command]
-async fn quick_join_by_invite(
-    invite_code: String,
-    app: tauri::AppHandle,
-) -> Result<String> {
+async fn quick_join_by_invite(invite_code: String, app: tauri::AppHandle) -> Result<String> {
     log::info!("Quick join by invite: {}", invite_code);
 
     // 1. Validate and use the invite
@@ -2790,11 +3597,14 @@ async fn quick_join_by_invite(
         .map_err(|e| error::LauncherError::InvalidConfig(e))?;
 
     // Emit progress event
-    let _ = app.emit("quick_join_status", serde_json::json!({
-        "stage": "validating",
-        "progress": 10,
-        "message": "Проверка приглашения..."
-    }));
+    let _ = app.emit(
+        "quick_join_status",
+        serde_json::json!({
+            "stage": "validating",
+            "progress": 10,
+            "message": "Проверка приглашения..."
+        }),
+    );
 
     // Use the invite (increment counter)
     get_server_sync_manager()
@@ -2803,11 +3613,14 @@ async fn quick_join_by_invite(
         .map_err(|e| error::LauncherError::InvalidConfig(e))?;
 
     // 2. Find a matching local instance
-    let _ = app.emit("quick_join_status", serde_json::json!({
-        "stage": "finding_instance",
-        "progress": 30,
-        "message": "Поиск подходящего экземпляра..."
-    }));
+    let _ = app.emit(
+        "quick_join_status",
+        serde_json::json!({
+            "stage": "finding_instance",
+            "progress": 30,
+            "message": "Поиск подходящего экземпляра..."
+        }),
+    );
 
     let all_instances = instances::list_instances().await?;
 
@@ -2831,16 +3644,23 @@ async fn quick_join_by_invite(
             log::info!("Found instance by name: {} ({})", inst.name, inst.id);
             inst.clone()
         } else {
-            log::warn!("No matching instance found for {} {} {}",
-                invite.server_name, invite.mc_version, invite.loader);
+            log::warn!(
+                "No matching instance found for {} {} {}",
+                invite.server_name,
+                invite.mc_version,
+                invite.loader
+            );
 
-            let _ = app.emit("quick_join_status", serde_json::json!({
-                "stage": "error",
-                "progress": 0,
-                "message": "Не найден подходящий экземпляр",
-                "error": format!("Создайте экземпляр с версией {} и загрузчиком {}",
-                    invite.mc_version, invite.loader)
-            }));
+            let _ = app.emit(
+                "quick_join_status",
+                serde_json::json!({
+                    "stage": "error",
+                    "progress": 0,
+                    "message": "Не найден подходящий экземпляр",
+                    "error": format!("Создайте экземпляр с версией {} и загрузчиком {}",
+                        invite.mc_version, invite.loader)
+                }),
+            );
 
             return Err(error::LauncherError::InvalidConfig(format!(
                 "No instance found for {} {} {}. Please create one first.",
@@ -2850,11 +3670,14 @@ async fn quick_join_by_invite(
     };
 
     // 3. Update instance to connect to server
-    let _ = app.emit("quick_join_status", serde_json::json!({
-        "stage": "configuring",
-        "progress": 60,
-        "message": "Настройка подключения..."
-    }));
+    let _ = app.emit(
+        "quick_join_status",
+        serde_json::json!({
+            "stage": "configuring",
+            "progress": 60,
+            "message": "Настройка подключения..."
+        }),
+    );
 
     let server_arg = format!("--server {}", invite.server_address);
     let game_args = match &instance.game_args {
@@ -2881,11 +3704,14 @@ async fn quick_join_by_invite(
         rusqlite::params![game_args, instance.id],
     )?;
 
-    let _ = app.emit("quick_join_status", serde_json::json!({
-        "stage": "complete",
-        "progress": 100,
-        "message": "Готово! Запускаем игру..."
-    }));
+    let _ = app.emit(
+        "quick_join_status",
+        serde_json::json!({
+            "stage": "complete",
+            "progress": 100,
+            "message": "Готово! Запускаем игру..."
+        }),
+    );
 
     log::info!(
         "Quick join configured: instance={}, server={}",
@@ -2900,7 +3726,10 @@ async fn quick_join_by_invite(
 
 /// Diagnose P2P network issues
 #[tauri::command]
-async fn diagnose_p2p_network(discovery_port: u16, connect_enabled: bool) -> p2p::NetworkDiagnostics {
+async fn diagnose_p2p_network(
+    discovery_port: u16,
+    connect_enabled: bool,
+) -> p2p::NetworkDiagnostics {
     p2p::network::diagnose_network(discovery_port, connect_enabled).await
 }
 
@@ -3097,7 +3926,8 @@ pub fn run() {
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 // Создаём канал для передачи событий transfer
-                let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<p2p::TransferEvent>(100);
+                let (event_tx, mut event_rx) =
+                    tokio::sync::mpsc::channel::<p2p::TransferEvent>(100);
 
                 // Загружаем сохранённые настройки
                 let settings = get_connect_settings();
@@ -3180,6 +4010,52 @@ pub fn run() {
                 });
             }
 
+            // Handle deep links (stuzhik:// URLs)
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let app_handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    let urls = event.urls();
+                    log::info!("Deep link received: {:?}", urls);
+                    for url in urls {
+                        let url_str = url.to_string();
+                        // Handle stuzhik:// protocol
+                        if url_str.starts_with("stuzhik://") {
+                            // Parse the URL path: stuzhik://import/path or stuzhik://join/code
+                            if let Some(path) = url_str.strip_prefix("stuzhik://") {
+                                if path.starts_with("import/") {
+                                    let file_path = path.strip_prefix("import/").unwrap_or("");
+                                    let _ = app_handle.emit("open-modpack-file", file_path);
+                                } else if path.starts_with("join/") {
+                                    let invite_code = path.strip_prefix("join/").unwrap_or("");
+                                    let _ = app_handle.emit("join-server-invite", invite_code);
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Handle file arguments on first launch (double-click on .stzhk file)
+            let args: Vec<String> = std::env::args().collect();
+            if args.len() > 1 {
+                let file_path = &args[1];
+                if file_path.ends_with(".stzhk")
+                    || file_path.ends_with(".mrpack")
+                    || file_path.ends_with(".zip")
+                {
+                    log::info!("Opening modpack file from command line: {}", file_path);
+                    let app_handle = app.handle().clone();
+                    let file_path = file_path.clone();
+                    // Delay emit to ensure frontend is ready
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                        let _ = app_handle.emit("open-modpack-file", &file_path);
+                    });
+                }
+            }
+
             Ok(())
         })
         .manage(Arc::new(Mutex::new(HashMap::<String, Child>::new())))
@@ -3191,6 +4067,31 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // Second instance was launched - focus existing window and handle file arguments
+            log::info!("Second instance detected with args: {:?}", argv);
+
+            // Focus the main window
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+                let _ = window.show();
+            }
+
+            // If arguments contain a file path, emit event to frontend
+            if argv.len() > 1 {
+                let file_path = &argv[1];
+                // Check if it's a modpack file
+                if file_path.ends_with(".stzhk")
+                    || file_path.ends_with(".mrpack")
+                    || file_path.ends_with(".zip")
+                {
+                    log::info!("Opening modpack file from second instance: {}", file_path);
+                    let _ = app.emit("open-modpack-file", file_path);
+                }
+            }
+        }))
         .invoke_handler(tauri::generate_handler![
             // Instances
             instances::lifecycle::list_instances,
@@ -3204,23 +4105,44 @@ pub fn run() {
             instances::installation::repair_instance,
             instances::installation::retry_instance_installation,
             instances::utilities::open_instance_folder,
+            instances::utilities::reveal_instance_file,
             instances::lifecycle::reset_instance_version,
             // Mods
             search_mods,
             install_mod,
             install_mod_by_slug,
             install_mod_local,
+            install_mods_local_batch,
+            verify_instance_mods,
+            check_mod_updates,
+            verify_mod_file,
+            verify_mod_files_batch,
             list_mods,
             toggle_mod,
             toggle_mod_auto_update,
             remove_mod,
             sync_mods_folder,
+            start_mods_watcher,
+            stop_mods_watcher,
+            is_watching_mods,
             update_mod,
             bulk_toggle_mods,
             bulk_remove_mods,
             bulk_toggle_auto_update,
             check_mod_dependencies,
+            pre_launch_check,
             resolve_dependencies,
+            get_dependency_graph,
+            cleanup_duplicate_mods,
+            clear_update_cache,
+            analyze_mod_removal,
+            get_mod_file_path,
+            needs_dependency_enrichment,
+            check_enrichment_needed,
+            enrich_mod_dependencies,
+            force_enrich_mod_dependencies,
+            verify_mods_by_ids,
+            enrich_mods_by_ids,
             // Conflict Predictor
             predict_mod_conflicts,
             get_conflicting_mods,
@@ -3233,8 +4155,12 @@ pub fn run() {
             get_modpack_details,
             install_modpack,
             install_modpack_from_file,
+            install_modpack_from_manifest,
+            preview_manifest_file,
             preview_modpack_file,
+            preview_modpack_detailed,
             compare_modpacks,
+            read_modpack_file_content,
             // Patch system
             create_modpack_patch,
             save_modpack_patch,
@@ -3318,6 +4244,7 @@ pub fn run() {
             stzhk::install_stzhk_from_url,
             stzhk::export_stzhk,
             stzhk::verify_stzhk_instance,
+            stzhk::export_mrpack,
             // Log Analyzer
             log_analyzer::analyze_log_file,
             log_analyzer::analyze_instance_log,
@@ -3633,6 +4560,17 @@ pub fn run() {
             code_editor::search_minecraft_items,
             code_editor::search_minecraft_blocks,
             code_editor::search_minecraft_tags,
+            code_editor::search_minecraft_entries,
+            code_editor::get_minecraft_mods,
+            // Code Editor - Project Detection
+            code_editor::project_detector::get_instance_projects,
+            code_editor::project_detector::get_project_templates,
+            code_editor::project_detector::create_file_from_template,
+            // Code Editor - Metadata
+            code_editor::metadata::detect_metadata_files,
+            code_editor::metadata::parse_metadata_file,
+            code_editor::metadata::save_metadata_file,
+            code_editor::metadata::create_pack_mcmeta,
             // Mod Profiles
             save_mod_profile,
             list_mod_profiles,
@@ -3640,6 +4578,13 @@ pub fn run() {
             delete_mod_profile,
             export_mod_profile,
             import_mod_profile,
+            // Launcher Import (MultiMC, Prism, CurseForge App, Modrinth App, generic .minecraft)
+            launchers::detect_launchers,
+            launchers::list_launcher_instances,
+            launchers::list_detected_launcher_instances,
+            launchers::import_launcher_instance,
+            launchers::analyze_minecraft_folder,
+            launchers::import_minecraft_folder,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
@@ -3657,8 +4602,10 @@ pub fn run() {
                                 log::info!("Stopping P2P Connect service...");
                                 if let Ok(mut guard) = tokio::time::timeout(
                                     std::time::Duration::from_secs(1),
-                                    service.write()
-                                ).await {
+                                    service.write(),
+                                )
+                                .await
+                                {
                                     guard.disable().await;
                                     log::info!("P2P Connect service stopped");
                                 }
@@ -3668,12 +4615,15 @@ pub fn run() {
                             if let Some(service) = CONNECT_SERVICE.get() {
                                 if let Ok(guard) = tokio::time::timeout(
                                     std::time::Duration::from_secs(1),
-                                    service.read()
-                                ).await {
+                                    service.read(),
+                                )
+                                .await
+                                {
                                     guard.stop_all_watches().await;
                                 }
                             }
-                        }).await
+                        })
+                        .await
                     });
 
                     if cleanup_result.is_err() {

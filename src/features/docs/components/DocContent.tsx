@@ -275,14 +275,14 @@ const CodeBlock: Component<{
 }> = (props) => {
   const [html, setHtml] = createSignal<string>("");
 
-  createEffect(async () => {
-    try {
-      const highlighted = await highlightCode(props.code, props.language);
-      setHtml(highlighted);
-    } catch {
-      // Fallback to plain text
-      setHtml(`<pre class="shiki"><code>${props.code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`);
-    }
+  // NOTE: Using sync wrapper to avoid SolidJS async effect issues
+  createEffect(() => {
+    highlightCode(props.code, props.language)
+      .then((highlighted) => setHtml(highlighted))
+      .catch(() => {
+        // Fallback to plain text
+        setHtml(`<pre class="shiki"><code>${props.code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>`);
+      });
   });
 
   return (

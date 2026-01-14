@@ -5,3 +5,4 @@ export { default as ModpackCompareDialog } from './components/ModpackCompareDial
 export { default as ModpackProjectList } from './components/ModpackProjectList';
 export { default as StzhkExportDialog } from './components/StzhkExportDialog';
 export { default as PatchApplyDialog } from './components/PatchApplyDialog';
+export { default as LauncherImportDialog } from './components/LauncherImportDialog';

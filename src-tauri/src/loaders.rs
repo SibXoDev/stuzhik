@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
+use tokio_util::sync::CancellationToken;
 
 /// Windows flag to hide console window
 #[cfg(windows)]
@@ -601,7 +602,13 @@ impl NeoForgeInstaller {
         loader_version: Option<&str>,
         download_manager: &DownloadManager,
         is_server: bool,
+        cancel_token: &CancellationToken,
     ) -> Result<PathBuf> {
+        // Check cancellation before starting
+        if cancel_token.is_cancelled() {
+            return Err(LauncherError::OperationCancelled);
+        }
+
         // Handle empty string as None - use latest version
         let version = match loader_version {
             Some(v) if !v.is_empty() => v.to_string(),
@@ -643,12 +650,14 @@ impl NeoForgeInstaller {
                 );
             }
 
-            // Запускаем установку
+            // Запускаем установку с поддержкой отмены
             let mut cmd = tokio::process::Command::new("java");
             cmd.arg("-jar")
                 .arg(&installer_path)
                 .arg("--installServer")
-                .current_dir(&instance_path);
+                .current_dir(&instance_path)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
 
             #[cfg(windows)]
             cmd.creation_flags(CREATE_NO_WINDOW);
@@ -657,20 +666,43 @@ impl NeoForgeInstaller {
                 "Running NeoForge server installer (timeout: {}s)...",
                 JAVA_INSTALLER_TIMEOUT_SECS
             );
-            let output = tokio::time::timeout(
-                std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS),
-                cmd.output()
-            ).await
-                .map_err(|_| LauncherError::DownloadFailed(format!(
-                    "NeoForge server installer timed out after {} seconds - server may be slow or unresponsive",
-                    JAVA_INSTALLER_TIMEOUT_SECS
-                )))?
-                ?;
 
-            if !output.status.success() {
+            let mut child = cmd.spawn().map_err(|e| {
+                LauncherError::DownloadFailed(format!(
+                    "Failed to start NeoForge server installer: {}",
+                    e
+                ))
+            })?;
+
+            let timeout_duration = std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS);
+            let status = tokio::select! {
+                result = tokio::time::timeout(timeout_duration, child.wait()) => {
+                    match result {
+                        Ok(Ok(status)) => status,
+                        Ok(Err(e)) => {
+                            return Err(LauncherError::DownloadFailed(format!("NeoForge server installer wait error: {}", e)));
+                        }
+                        Err(_) => {
+                            log::warn!("NeoForge server installer timed out after {} seconds, killing process", JAVA_INSTALLER_TIMEOUT_SECS);
+                            let _ = child.kill().await;
+                            return Err(LauncherError::DownloadFailed(format!(
+                                "NeoForge server installer timed out after {} seconds - server may be slow or unresponsive",
+                                JAVA_INSTALLER_TIMEOUT_SECS
+                            )));
+                        }
+                    }
+                }
+                _ = cancel_token.cancelled() => {
+                    log::info!("NeoForge server installation cancelled by user, killing installer process");
+                    let _ = child.kill().await;
+                    return Err(LauncherError::OperationCancelled);
+                }
+            };
+
+            if !status.success() {
                 return Err(LauncherError::Archive(format!(
-                    "NeoForge installation failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
+                    "NeoForge server installation failed (exit code: {:?})",
+                    status.code()
                 )));
             }
 
@@ -726,14 +758,16 @@ impl NeoForgeInstaller {
             let profiles_content = serde_json::to_string_pretty(&launcher_profiles)?;
             tokio::fs::write(&launcher_profiles_path, profiles_content).await?;
 
-            // Запускаем установку клиента
+            // Запускаем установку клиента с поддержкой отмены
             log::info!("Running NeoForge installer for client...");
             let mut cmd = tokio::process::Command::new("java");
             cmd.arg("-jar")
                 .arg(&installer_path)
                 .arg("--installClient")
                 .arg(&instance_path)
-                .current_dir(&instance_path);
+                .current_dir(&instance_path)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
 
             #[cfg(windows)]
             cmd.creation_flags(CREATE_NO_WINDOW);
@@ -742,29 +776,72 @@ impl NeoForgeInstaller {
                 "Running NeoForge client installer (timeout: {}s)...",
                 JAVA_INSTALLER_TIMEOUT_SECS
             );
-            let output = tokio::time::timeout(
-                std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS),
-                cmd.output()
-            ).await
-                .map_err(|_| LauncherError::DownloadFailed(format!(
-                    "NeoForge client installer timed out after {} seconds - server may be slow or unresponsive",
-                    JAVA_INSTALLER_TIMEOUT_SECS
-                )))?
-                ?;
 
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let mut child = cmd.spawn().map_err(|e| {
+                LauncherError::DownloadFailed(format!(
+                    "Failed to start NeoForge client installer: {}",
+                    e
+                ))
+            })?;
+
+            // Читаем stdout/stderr перед wait
+            let stdout_handle = child.stdout.take();
+            let stderr_handle = child.stderr.take();
+
+            let timeout_duration = std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS);
+            let status = tokio::select! {
+                result = tokio::time::timeout(timeout_duration, child.wait()) => {
+                    match result {
+                        Ok(Ok(status)) => status,
+                        Ok(Err(e)) => {
+                            return Err(LauncherError::DownloadFailed(format!("NeoForge client installer wait error: {}", e)));
+                        }
+                        Err(_) => {
+                            log::warn!("NeoForge client installer timed out after {} seconds, killing process", JAVA_INSTALLER_TIMEOUT_SECS);
+                            let _ = child.kill().await;
+                            return Err(LauncherError::DownloadFailed(format!(
+                                "NeoForge client installer timed out after {} seconds - server may be slow or unresponsive",
+                                JAVA_INSTALLER_TIMEOUT_SECS
+                            )));
+                        }
+                    }
+                }
+                _ = cancel_token.cancelled() => {
+                    log::info!("NeoForge client installation cancelled by user, killing installer process");
+                    let _ = child.kill().await;
+                    return Err(LauncherError::OperationCancelled);
+                }
+            };
+
+            // Читаем вывод после завершения
+            let stdout = if let Some(mut stdout) = stdout_handle {
+                use tokio::io::AsyncReadExt;
+                let mut buf = String::new();
+                let _ = stdout.read_to_string(&mut buf).await;
+                buf
+            } else {
+                String::new()
+            };
+
+            let stderr = if let Some(mut stderr) = stderr_handle {
+                use tokio::io::AsyncReadExt;
+                let mut buf = String::new();
+                let _ = stderr.read_to_string(&mut buf).await;
+                buf
+            } else {
+                String::new()
+            };
 
             log::info!("NeoForge installer stdout: {}", stdout);
             if !stderr.is_empty() {
                 log::warn!("NeoForge installer stderr: {}", stderr);
             }
 
-            if !output.status.success() {
+            if !status.success() {
                 return Err(LauncherError::Archive(
                     format!(
                         "NeoForge client installation failed (exit code: {:?}):\nStdout: {}\nStderr: {}",
-                        output.status.code(),
+                        status.code(),
                         stdout,
                         stderr
                     )
@@ -887,7 +964,9 @@ impl NeoForgeInstaller {
 
             // Удаляем installer, логи и временный launcher_profiles.json
             tokio::fs::remove_file(&installer_path).await.ok();
-            tokio::fs::remove_file(instance_path.join("neoforge-installer.jar.log")).await.ok();
+            tokio::fs::remove_file(instance_path.join("neoforge-installer.jar.log"))
+                .await
+                .ok();
             tokio::fs::remove_file(&launcher_profiles_path).await.ok();
 
             // Ищем подходящий jar файл
@@ -1334,7 +1413,13 @@ impl ForgeInstaller {
         loader_version: Option<&str>,
         download_manager: &DownloadManager,
         is_server: bool,
+        cancel_token: &CancellationToken,
     ) -> Result<PathBuf> {
+        // Check cancellation before starting
+        if cancel_token.is_cancelled() {
+            return Err(LauncherError::OperationCancelled);
+        }
+
         // Handle empty string as None - use latest version
         let version = match loader_version {
             Some(v) if !v.is_empty() => v.to_string(),
@@ -1387,12 +1472,14 @@ impl ForgeInstaller {
                 );
             }
 
-            // Запускаем установку
+            // Запускаем установку с поддержкой отмены
             let mut cmd = tokio::process::Command::new("java");
             cmd.arg("-jar")
                 .arg(&installer_path)
                 .arg("--installServer")
-                .current_dir(&instance_path);
+                .current_dir(&instance_path)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
 
             #[cfg(windows)]
             cmd.creation_flags(CREATE_NO_WINDOW);
@@ -1401,20 +1488,43 @@ impl ForgeInstaller {
                 "Running Forge server installer (timeout: {}s)...",
                 JAVA_INSTALLER_TIMEOUT_SECS
             );
-            let output = tokio::time::timeout(
-                std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS),
-                cmd.output()
-            ).await
-                .map_err(|_| LauncherError::DownloadFailed(format!(
-                    "Forge server installer timed out after {} seconds - server may be slow or unresponsive",
-                    JAVA_INSTALLER_TIMEOUT_SECS
-                )))?
-                ?;
 
-            if !output.status.success() {
+            let mut child = cmd.spawn().map_err(|e| {
+                LauncherError::DownloadFailed(format!(
+                    "Failed to start Forge server installer: {}",
+                    e
+                ))
+            })?;
+
+            let timeout_duration = std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS);
+            let status = tokio::select! {
+                result = tokio::time::timeout(timeout_duration, child.wait()) => {
+                    match result {
+                        Ok(Ok(status)) => status,
+                        Ok(Err(e)) => {
+                            return Err(LauncherError::DownloadFailed(format!("Forge server installer wait error: {}", e)));
+                        }
+                        Err(_) => {
+                            log::warn!("Forge server installer timed out after {} seconds, killing process", JAVA_INSTALLER_TIMEOUT_SECS);
+                            let _ = child.kill().await;
+                            return Err(LauncherError::DownloadFailed(format!(
+                                "Forge server installer timed out after {} seconds - server may be slow or unresponsive",
+                                JAVA_INSTALLER_TIMEOUT_SECS
+                            )));
+                        }
+                    }
+                }
+                _ = cancel_token.cancelled() => {
+                    log::info!("Forge server installation cancelled by user, killing installer process");
+                    let _ = child.kill().await;
+                    return Err(LauncherError::OperationCancelled);
+                }
+            };
+
+            if !status.success() {
                 return Err(LauncherError::Archive(format!(
-                    "Forge installation failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
+                    "Forge server installation failed (exit code: {:?})",
+                    status.code()
                 )));
             }
 
@@ -1447,7 +1557,8 @@ impl ForgeInstaller {
 
             let jar_path = jar_path.ok_or_else(|| {
                 LauncherError::Archive(
-                    "Forge server jar not found. For Forge 1.17+ check for run.sh/run.bat".to_string()
+                    "Forge server jar not found. For Forge 1.17+ check for run.sh/run.bat"
+                        .to_string(),
                 )
             })?;
 
@@ -1813,20 +1924,34 @@ impl ForgeInstaller {
                 all_output
             });
 
-            // Ждём завершения процесса с таймаутом
-            let status = tokio::time::timeout(
-                std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS),
-                child.wait()
-            ).await
-                .map_err(|_| {
-                    // Убиваем процесс при таймауте
-                    let _ = child.start_kill();
-                    LauncherError::DownloadFailed(format!(
-                        "Forge client installer timed out after {} seconds - server may be slow or unresponsive",
-                        JAVA_INSTALLER_TIMEOUT_SECS
-                    ))
-                })?
-                .map_err(|e| LauncherError::DownloadFailed(format!("Forge installer wait error: {}", e)))?;
+            // Ждём завершения процесса с таймаутом И поддержкой отмены
+            let timeout_duration = std::time::Duration::from_secs(JAVA_INSTALLER_TIMEOUT_SECS);
+            let status = tokio::select! {
+                // Вариант 1: Процесс завершился
+                result = tokio::time::timeout(timeout_duration, child.wait()) => {
+                    match result {
+                        Ok(Ok(status)) => status,
+                        Ok(Err(e)) => {
+                            return Err(LauncherError::DownloadFailed(format!("Forge installer wait error: {}", e)));
+                        }
+                        Err(_) => {
+                            // Таймаут - убиваем процесс
+                            log::warn!("Forge installer timed out after {} seconds, killing process", JAVA_INSTALLER_TIMEOUT_SECS);
+                            let _ = child.kill().await;
+                            return Err(LauncherError::DownloadFailed(format!(
+                                "Forge client installer timed out after {} seconds - server may be slow or unresponsive",
+                                JAVA_INSTALLER_TIMEOUT_SECS
+                            )));
+                        }
+                    }
+                }
+                // Вариант 2: Операция отменена пользователем
+                _ = cancel_token.cancelled() => {
+                    log::info!("Forge installation cancelled by user, killing installer process");
+                    let _ = child.kill().await;
+                    return Err(LauncherError::OperationCancelled);
+                }
+            };
 
             // Собираем вывод
             let stdout = stdout_task.await.unwrap_or_default();
@@ -2063,7 +2188,13 @@ impl LoaderManager {
         loader_version: Option<&str>,
         is_server: bool,
         download_manager: &DownloadManager,
+        cancel_token: &CancellationToken,
     ) -> Result<PathBuf> {
+        // Check cancellation before starting
+        if cancel_token.is_cancelled() {
+            return Err(LauncherError::OperationCancelled);
+        }
+
         match loader {
             LoaderType::Vanilla => {
                 // Для Vanilla просто возвращаем путь к minecraft jar
@@ -2099,6 +2230,7 @@ impl LoaderManager {
                     loader_version,
                     download_manager,
                     is_server,
+                    cancel_token,
                 )
                 .await
             }
@@ -2109,6 +2241,7 @@ impl LoaderManager {
                     loader_version,
                     download_manager,
                     is_server,
+                    cancel_token,
                 )
                 .await
             }

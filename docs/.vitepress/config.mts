@@ -22,7 +22,9 @@ export default defineConfig({
     ['meta', { name: 'theme-color', content: '#2563eb' }],
     ['meta', { name: 'robots', content: 'index, follow' }],
     ['meta', { name: 'author', content: 'SibXoDev' }],
-    ['link', { rel: 'canonical', href: SITE_URL }],
+    // NOTE: Static canonical REMOVED - it was pointing ALL pages to homepage!
+    // VitePress generates proper canonical URLs automatically via sitemap.
+    // Google was showing "Вариант страницы с тегом canonical" error because of this.
 
     // Ключевые слова на русском и английском для лучшего SEO
     ['meta', {

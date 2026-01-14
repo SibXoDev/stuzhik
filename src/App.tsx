@@ -3,19 +3,20 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit, UnlistenFn } from "@tauri-apps/api/event";
 import { TitleBar, AppBackground, DevConsole, ErrorReporter, LogAnalyzer, QuickPlay, DownloadsPanel, ConnectPanel, ToastProvider, UIKit, DevTests, DragDropOverlay } from "./shared/components";
-import { initDownloadListener, useDownloads } from "./shared/hooks";
+import { initDownloadListener, useDownloads, useDeveloperMode } from "./shared/hooks";
 import AutoUpdater from "./shared/components/AutoUpdater";
 import { ModalWrapper, Dropdown } from "./shared/ui";
-import { initModInstallTracking, initDragDrop, cleanupDragDrop } from "./shared/stores";
+import { initModInstallTracking, initDragDrop, cleanupDragDrop, registerDropHandler, filterByExtensions, triggerSearch } from "./shared/stores";
 import { InstanceList, CreateInstanceForm, InstallProgressModal, EditInstanceDialog, useInstances, ImportServerDialog } from "./features/instances";
 import { Settings, SettingsSyncDialog } from "./features/settings";
-import { ModpackBrowser, ModpackProjectList, ModpackEditor } from "./features/modpacks";
+import { ModpackBrowser, ModpackProjectList, ModpackEditor, LauncherImportDialog } from "./features/modpacks";
 import { DocumentationPage, ChangelogModal, SourceCodePage } from "./features/docs";
 import { I18nProvider, useI18n, type Language } from "./shared/i18n";
 import type { Instance, ModpackProject, Settings as AppSettings } from "./shared/types";
 
 function AppContent() {
   const { t } = useI18n();
+  const { developerMode } = useDeveloperMode();
   const {
     instances,
     loading,
@@ -36,6 +37,7 @@ function AppContent() {
   const [showSettingsSync, setShowSettingsSync] = createSignal(false);
   const [showExternalLogAnalyzer, setShowExternalLogAnalyzer] = createSignal(false);
   const [showImportServer, setShowImportServer] = createSignal(false);
+  const [showImportLauncher, setShowImportLauncher] = createSignal(false);
   const [showToolsMenu, setShowToolsMenu] = createSignal(false);
   const [showConnect, setShowConnect] = createSignal(false);
   const [showUIKit, setShowUIKit] = createSignal(false);
@@ -50,9 +52,14 @@ function AppContent() {
   const [consoleDetached, setConsoleDetached] = createSignal(false);
   const [detailViewOpen, setDetailViewOpen] = createSignal(false);
 
+  // Drag & drop: pending modpack file to install
+  const [pendingModpackFile, setPendingModpackFile] = createSignal<string | null>(null);
+
   // Listen for console detach/attach events
   let unlistenDetach: UnlistenFn | undefined;
   let unlistenAttach: UnlistenFn | undefined;
+  let unlistenOpenModpack: UnlistenFn | undefined;
+  let unlistenJoinInvite: UnlistenFn | undefined;
 
   onMount(async () => {
     unlistenDetach = await listen("console-detached", () => {
@@ -62,6 +69,25 @@ function AppContent() {
 
     unlistenAttach = await listen("console-attached", () => {
       setConsoleDetached(false);
+    });
+
+    // Listen for modpack file open events (from file association / deep link / second instance)
+    unlistenOpenModpack = await listen<string>("open-modpack-file", (event) => {
+      const filePath = event.payload;
+      if (import.meta.env.DEV) console.log("Opening modpack file:", filePath);
+      // Set the pending modpack file and open the browser
+      setPendingModpackFile(filePath);
+      setShowModpackBrowser(true);
+    });
+
+    // Listen for server invite join events (from deep link: stuzhik://join/CODE)
+    unlistenJoinInvite = await listen<string>("join-server-invite", (event) => {
+      const inviteCode = event.payload;
+      if (import.meta.env.DEV) console.log("Joining server with invite:", inviteCode);
+      // Open ConnectPanel and trigger join
+      setShowConnect(true);
+      // Emit event for ConnectPanel to handle
+      emit("connect-join-invite", inviteCode);
     });
 
     // Keyboard shortcuts
@@ -80,6 +106,16 @@ function AppContent() {
           setShowDocs(false);
           return;
         }
+      }
+      // Ctrl+F - trigger custom search (prevents browser's find dialog)
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyF" && !e.shiftKey && !e.altKey) {
+        // Try to trigger registered search handler
+        if (triggerSearch()) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        // If no handlers, let browser handle it (or prevent if you want)
       }
       // Ctrl+Shift+D для открытия/закрытия консоли
       if (e.ctrlKey && e.shiftKey && e.code === "KeyD") {
@@ -109,7 +145,109 @@ function AppContent() {
   onCleanup(() => {
     unlistenDetach?.();
     unlistenAttach?.();
+    unlistenOpenModpack?.();
+    unlistenJoinInvite?.();
   });
+
+  // Register global drag & drop handler for modpack files
+  onMount(() => {
+    const cleanup = registerDropHandler({
+      accept: (files) => {
+        // Accept modpack files (.stzhk, .mrpack, .zip)
+        const modpackFiles = filterByExtensions(files, ["stzhk", "mrpack", "zip"]);
+        return modpackFiles.length > 0;
+      },
+      onDrop: async (files) => {
+        const modpackFiles = filterByExtensions(files, ["stzhk", "mrpack", "zip"]);
+        if (modpackFiles.length > 0) {
+          // Take the first modpack file and open ModpackBrowser with it
+          setPendingModpackFile(modpackFiles[0].path);
+          setShowModpackBrowser(true);
+        }
+      },
+      priority: 5, // Lower than mods (10) but still reasonably high
+    });
+
+    onCleanup(cleanup);
+  });
+
+  // Register handler for manifest.json / modrinth.index.json files
+  onMount(() => {
+    const cleanup = registerDropHandler({
+      accept: (files) => {
+        // Accept manifest JSON files
+        return files.some(
+          (f) =>
+            f.extension === "json" &&
+            (f.name.toLowerCase() === "manifest.json" ||
+              f.name.toLowerCase() === "modrinth.index.json")
+        );
+      },
+      onDrop: async (files) => {
+        const manifestFile = files.find(
+          (f) =>
+            f.extension === "json" &&
+            (f.name.toLowerCase() === "manifest.json" ||
+              f.name.toLowerCase() === "modrinth.index.json")
+        );
+        if (!manifestFile) return;
+
+        try {
+          // Preview manifest to get info
+          const preview = await invoke<{
+            format: string;
+            name: string;
+            minecraft_version: string;
+            loader: string;
+            mods_count: number;
+          }>("preview_manifest_file", { filePath: manifestFile.path });
+
+          // Use modpack name as instance name
+          const instanceName = preview.name || "Imported Modpack";
+
+          // Start installation
+          const { addToast } = await import("./shared/components/Toast");
+          addToast({
+            type: "info",
+            title: `Импорт ${preview.format === "modrinth" ? "Modrinth" : "CurseForge"} модпака`,
+            message: `${instanceName} (${preview.mods_count} модов)`,
+            duration: 5000,
+          });
+
+          const instanceId = await invoke<string>("install_modpack_from_manifest", {
+            filePath: manifestFile.path,
+            instanceName,
+          });
+
+          // Show progress modal
+          setInstallingInstance({ id: instanceId, name: instanceName });
+
+          addToast({
+            type: "success",
+            title: "Модпак импортирован",
+            message: `${instanceName} создан успешно`,
+            duration: 5000,
+          });
+
+          // Refresh instances
+          load();
+        } catch (e) {
+          console.error("Failed to import manifest:", e);
+          const { addToast } = await import("./shared/components/Toast");
+          addToast({
+            type: "error",
+            title: "Ошибка импорта",
+            message: String(e),
+            duration: 8000,
+          });
+        }
+      },
+      priority: 8, // Higher than modpack archives but lower than mods
+    });
+
+    onCleanup(cleanup);
+  });
+
   const [editingProject, setEditingProject] = createSignal<ModpackProject | null>(null);
   const [editingInstance, setEditingInstance] = createSignal<Instance | null>(null);
   const [installingInstance, setInstallingInstance] = createSignal<{
@@ -174,6 +312,8 @@ function AppContent() {
     setShowSettingsSync(false);
     setShowExternalLogAnalyzer(false);
     setShowModpackBrowser(false);
+    setShowImportServer(false);
+    setShowImportLauncher(false);
     setShowDocs(false);
     setShowChangelog(false);
     // Don't close: showCreateForm, showModpackEditor (with editingProject), installingInstance, editingInstance - have unsaved data
@@ -191,6 +331,7 @@ function AppContent() {
   const openExternalLogAnalyzer = () => { closeOtherModals(); setShowExternalLogAnalyzer(true); };
   const openCreateForm = () => { closeOtherModals(); setShowCreateForm(true); };
   const openImportServer = () => { closeOtherModals(); setShowImportServer(true); };
+  const openImportLauncher = () => { closeOtherModals(); setShowImportLauncher(true); };
   const openChangelog = () => { closeOtherModals(); setShowChangelog(true); };
   const openSourceCode = (path?: string, line?: number) => {
     setSourceCodePath(path);
@@ -203,7 +344,7 @@ function AppContent() {
   const hasModal = () => showSettings() || showModpackBrowser() || showModpackEditor() ||
     showCreateForm() || installingInstance() || editingInstance() || showSettingsSync() ||
     showDownloadsPanel() || showExternalLogAnalyzer() || showUIKit() || showImportServer() ||
-    showChangelog();
+    showImportLauncher() || showChangelog();
 
   return (
     <div class="h-screen flex flex-col text-gray-200 overflow-hidden">
@@ -211,31 +352,60 @@ function AppContent() {
 
       {/* Custom TitleBar - always on top */}
       <TitleBar
-        onSettingsClick={openSettings}
+        onSettingsClick={() => {
+          // Toggle: if already open, close; otherwise open with closeOtherModals
+          if (showSettings()) {
+            setShowSettings(false);
+            setSettingsScrollTo(undefined);
+          } else {
+            openSettings();
+          }
+        }}
         onConnectClick={() => setShowConnect(!showConnect())}
-        onConsoleClick={() => {
+        // Console button - only in developer mode
+        onConsoleClick={developerMode() ? () => {
           // If console is detached, don't toggle - it's in separate window
           if (!consoleDetached()) {
             setShowConsole(!showConsole());
           }
-        }}
+        } : undefined}
         onDocsClick={() => {
-          setShowSourceCode(false);
-          setSourceCodePath(undefined);
-          setSourceCodeLine(undefined);
-          setShowDocs(true);
+          // Toggle: if already open, close; otherwise open
+          if (showDocs()) {
+            setShowDocs(false);
+          } else {
+            setShowSourceCode(false);
+            setSourceCodePath(undefined);
+            setSourceCodeLine(undefined);
+            setShowDocs(true);
+          }
         }}
-        onChangelogClick={() => setShowChangelog(true)}
-        onSourceCodeClick={() => {
-          setShowDocs(false);
-          setShowSourceCode(true);
+        onChangelogClick={() => {
+          // Toggle: if already open, close; otherwise open with closeOtherModals
+          if (showChangelog()) {
+            setShowChangelog(false);
+          } else {
+            openChangelog();
+          }
         }}
+        // Source Code button - only in developer mode
+        onSourceCodeClick={developerMode() ? () => {
+          // Toggle: if already open, close; otherwise open
+          if (showSourceCode()) {
+            setShowSourceCode(false);
+            setSourceCodePath(undefined);
+            setSourceCodeLine(undefined);
+          } else {
+            setShowDocs(false);
+            setShowSourceCode(true);
+          }
+        } : undefined}
       />
 
       {/* Main row: content + console (right position) */}
       <div class="flex-1 flex overflow-hidden min-h-0 pt-[var(--titlebar-height)]">
         {/* Main Content Area */}
-        <main class="flex-1 flex flex-col min-h-0">
+        <main class="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
           {/* Source Code Page (replaces normal content) */}
           <Show when={showSourceCode()}>
             <SourceCodePage
@@ -260,7 +430,7 @@ function AppContent() {
 
           {/* Normal content */}
           <Show when={!showSourceCode() && !showDocs()}>
-          <div class="max-w-7xl mx-auto p-4 w-full flex-1 flex flex-col min-h-0">
+          <div class="max-w-7xl mx-auto p-4 w-full flex-1 flex flex-col min-h-0 min-w-0">
             {/* Header */}
             <header class="mb-6 flex items-center justify-between">
               <p class="text-sm text-gray-500">
@@ -339,7 +509,7 @@ function AppContent() {
               </Show>
 
             {/* Instance List - flex container when detail view open, scrollable otherwise */}
-            <div class={`flex-1 min-h-0 ${detailViewOpen() ? "flex flex-col" : "overflow-y-auto"}`}>
+            <div class={`flex-1 min-h-0 min-w-0 ${detailViewOpen() ? "flex flex-col" : "overflow-y-auto"}`}>
               <Show
                 when={!loading()}
                 fallback={
@@ -359,6 +529,7 @@ function AppContent() {
                   onCreateClick={openCreateForm}
                   onModpackClick={openModpackBrowser}
                   onImportServer={openImportServer}
+                  onImportLauncher={openImportLauncher}
                   onDetailViewChange={setDetailViewOpen}
                 />
               </Show>
@@ -451,9 +622,13 @@ function AppContent() {
       <Show when={showModpackBrowser()}>
         <ModalWrapper maxWidth="max-w-6xl">
           <ModpackBrowser
-            onClose={() => setShowModpackBrowser(false)}
+            onClose={() => {
+              setShowModpackBrowser(false);
+              setPendingModpackFile(null);
+            }}
             onInstalled={handleModpackInstalled}
             instances={instances()}
+            initialFile={pendingModpackFile()}
           />
         </ModalWrapper>
       </Show>
@@ -532,6 +707,18 @@ function AppContent() {
           onClose={() => setShowImportServer(false)}
           onImported={() => {
             setShowImportServer(false);
+            load(); // Refresh instance list
+          }}
+        />
+      </Show>
+
+      {/* Import from Launcher Dialog */}
+      <Show when={showImportLauncher()}>
+        <LauncherImportDialog
+          isOpen={showImportLauncher()}
+          onClose={() => setShowImportLauncher(false)}
+          onImported={() => {
+            setShowImportLauncher(false);
             load(); // Refresh instance list
           }}
         />
@@ -620,7 +807,7 @@ function App() {
     initDownloadListener();
 
     // Initialize drag & drop listener (global file drop handler)
-    initDragDrop();
+    await initDragDrop();
 
     // Load language from settings
     try {

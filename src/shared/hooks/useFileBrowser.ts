@@ -1,82 +1,63 @@
 import { createSignal } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import type { FileEntry } from "../types";
+import { createAsyncState, runAsync, isValidInstanceId } from "./useAsyncUtils";
+
+const LOG_PREFIX = "[FileBrowser]";
 
 export function useFileBrowser(instanceId: () => string) {
   const [files, setFiles] = createSignal<FileEntry[]>([]);
   const [currentPath, setCurrentPath] = createSignal<string>("");
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
+  const { loading, setLoading, error, setError } = createAsyncState();
 
   async function browse(subpath: string = "") {
-    if (!instanceId()) return;
+    const id = instanceId();
+    if (!isValidInstanceId(id)) return;
 
-    try {
-      setLoading(true);
-      setError(null);
-      const entries = await invoke<FileEntry[]>("browse_instance_files", {
-        instanceId: instanceId(),
-        subpath,
-      });
-      setFiles(entries);
-      setCurrentPath(subpath);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to browse files:", e);
-    } finally {
-      setLoading(false);
-    }
+    await runAsync(
+      () => invoke<FileEntry[]>("browse_instance_files", { instanceId: id, subpath }),
+      {
+        setLoading,
+        setError,
+        logPrefix: LOG_PREFIX,
+        onSuccess: (entries) => {
+          setFiles(entries);
+          setCurrentPath(subpath);
+        },
+      }
+    );
   }
 
   async function readFile(relativePath: string): Promise<string | null> {
-    try {
-      setError(null);
-      return await invoke<string>("read_instance_file", {
-        instanceId: instanceId(),
-        relativePath,
-      });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to read file:", e);
-      return null;
-    }
+    const id = instanceId();
+    if (!isValidInstanceId(id)) return null;
+
+    return runAsync(
+      () => invoke<string>("read_instance_file", { instanceId: id, relativePath }),
+      { setError, logPrefix: LOG_PREFIX }
+    );
   }
 
   async function writeFile(relativePath: string, content: string): Promise<boolean> {
-    try {
-      setError(null);
-      await invoke("write_instance_file", {
-        instanceId: instanceId(),
-        relativePath,
-        content,
-      });
-      return true;
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to write file:", e);
-      return false;
-    }
+    const id = instanceId();
+    if (!isValidInstanceId(id)) return false;
+
+    const result = await runAsync(
+      () => invoke<void>("write_instance_file", { instanceId: id, relativePath, content }),
+      { setError, logPrefix: LOG_PREFIX }
+    );
+    return result !== null;
   }
 
   async function deleteFile(relativePath: string): Promise<boolean> {
-    try {
-      setError(null);
-      await invoke("delete_instance_file", {
-        instanceId: instanceId(),
-        relativePath,
-      });
-      // Refresh current directory
-      await browse(currentPath());
-      return true;
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      console.error("Failed to delete file:", e);
-      return false;
-    }
+    const id = instanceId();
+    if (!isValidInstanceId(id)) return false;
+
+    const result = await runAsync(
+      () => invoke<void>("delete_instance_file", { instanceId: id, relativePath }),
+      { setError, logPrefix: LOG_PREFIX, onSuccess: () => browse(currentPath()) }
+    );
+    return result !== null;
   }
 
   return {

@@ -12,7 +12,7 @@ use tokio::sync::RwLock;
 use tokio::time::interval;
 use tokio_util::sync::CancellationToken;
 
-use super::protocol::{*, generate_peer_id, generate_short_code};
+use super::protocol::{generate_peer_id, generate_short_code, *};
 use super::settings::{ConnectSettings, Visibility};
 
 /// Интервал отправки broadcast (секунды)
@@ -114,7 +114,8 @@ impl Discovery {
                     if port != base_port {
                         log::warn!(
                             "UDP port {} was busy, using alternative port {}",
-                            base_port, port
+                            base_port,
+                            port
                         );
                     }
                     break;
@@ -284,11 +285,9 @@ impl Discovery {
     }
 
     /// Подключиться к пиру по короткому коду
+    /// NOTE: This function creates its own UDP socket and doesn't depend on
+    /// the main discovery socket being active. Works even with Invisible visibility.
     pub async fn connect_by_code(&self, code: &str) -> Result<PeerInfo, String> {
-        if !*self.running.read().await {
-            return Err("Discovery not running".to_string());
-        }
-
         let normalized_code = normalize_short_code(code);
         log::info!("Attempting to connect by code: {}", normalized_code);
 
@@ -309,35 +308,45 @@ impl Discovery {
         let broadcast_addr = SocketAddrV4::new(Ipv4Addr::BROADCAST, self.settings.discovery_port);
 
         // Создаём временный сокет для отправки
-        let socket = UdpSocket::bind("0.0.0.0:0").await
+        let socket = UdpSocket::bind("0.0.0.0:0")
+            .await
             .map_err(|e| format!("Failed to create socket: {}", e))?;
-        socket.set_broadcast(true)
+        socket
+            .set_broadcast(true)
             .map_err(|e| format!("Failed to enable broadcast: {}", e))?;
 
-        socket.send_to(&data, broadcast_addr).await
+        socket
+            .send_to(&data, broadcast_addr)
+            .await
             .map_err(|e| format!("Failed to send connect request: {}", e))?;
 
         log::debug!("Sent connect by code request for {}", normalized_code);
 
         // Ждём ответ (timeout 5 секунд)
         let mut buf = vec![0u8; UDP_BUFFER_SIZE];
-        let timeout = tokio::time::timeout(
-            Duration::from_secs(5),
-            socket.recv_from(&mut buf)
-        ).await;
+        let timeout =
+            tokio::time::timeout(Duration::from_secs(5), socket.recv_from(&mut buf)).await;
 
         match timeout {
             Ok(Ok((len, _addr))) => {
                 let response = deserialize_message(&buf[..len])?;
                 match response {
-                    Message::ConnectByCodeResponse { code: resp_code, success, peer_info, error } => {
+                    Message::ConnectByCodeResponse {
+                        code: resp_code,
+                        success,
+                        peer_info,
+                        error,
+                    } => {
                         if resp_code != normalized_code {
                             return Err("Response code mismatch".to_string());
                         }
                         if success {
                             if let Some(peer) = peer_info {
                                 // Добавляем пира в список
-                                self.peers.write().await.insert(peer.id.clone(), peer.clone());
+                                self.peers
+                                    .write()
+                                    .await
+                                    .insert(peer.id.clone(), peer.clone());
                                 log::info!("Connected to peer by code: {:?}", peer.nickname);
                                 return Ok(peer);
                             }
@@ -409,7 +418,11 @@ async fn handle_incoming_message(
                 return Ok(());
             }
 
-            log::debug!("Received discovery from {} at {}", discovery.sender_id, addr);
+            log::debug!(
+                "Received discovery from {} at {}",
+                discovery.sender_id,
+                addr
+            );
 
             // Если мы видимы, отправляем ответ
             if settings.visibility != Visibility::Invisible {
@@ -487,13 +500,21 @@ async fn handle_incoming_message(
             socket.send_to(&pong_data, addr).await.ok();
         }
 
-        Message::ConnectByCode { code, requester_id, requester_nickname } => {
+        Message::ConnectByCode {
+            code,
+            requester_id,
+            requester_nickname,
+        } => {
             // Игнорируем свои собственные запросы
             if requester_id == our_peer_id {
                 return Ok(());
             }
 
-            log::debug!("Received connect by code request: {} from {}", code, requester_id);
+            log::debug!(
+                "Received connect by code request: {} from {}",
+                code,
+                requester_id
+            );
 
             // Проверяем совпадает ли код
             let normalized_code = normalize_short_code(&code);
@@ -555,7 +576,9 @@ async fn handle_incoming_message(
                     error: None,
                 };
                 let response_data = serialize_message(&response)?;
-                socket.send_to(&response_data, addr).await
+                socket
+                    .send_to(&response_data, addr)
+                    .await
                     .map_err(|e| format!("Failed to send connect response: {}", e))?;
             }
             // Если код не совпадает, просто игнорируем (не отвечаем)

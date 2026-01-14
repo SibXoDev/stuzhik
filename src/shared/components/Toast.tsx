@@ -49,7 +49,7 @@ const [toasts, setToasts] = createSignal<InternalToast[]>([]);
 const activeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export function addToast(toast: Omit<ToastData, "id">) {
-  const id = crypto.randomUUID();
+  const id = globalThis.crypto.randomUUID();
   setToasts(prev => [...prev, { ...toast, id, exiting: false }]);
 
   // Auto remove after duration
@@ -172,7 +172,7 @@ export function ToastProvider() {
             });
             break;
 
-          case "incoming_request":
+          case "incoming_request": {
             const session = data.session;
             if (session) {
               addToast({
@@ -183,6 +183,7 @@ export function ToastProvider() {
               });
             }
             break;
+          }
 
           case "friend_request":
             addToast({
@@ -199,6 +200,9 @@ export function ToastProvider() {
   onCleanup(() => {
     if (unlistenP2P) unlistenP2P();
     if (unlistenTransfer) unlistenTransfer();
+    // Clear all toast timers on unmount
+    activeTimers.forEach(timer => clearTimeout(timer));
+    activeTimers.clear();
   });
 
   return (

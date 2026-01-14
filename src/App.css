@@ -1290,6 +1290,13 @@ label.required::after {
   justify-content: center;
 }
 
+/* Pixelated rendering for Minecraft textures */
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
 /* ============================================
    CARDS & PANELS - Guaranteed Backgrounds
    ============================================ */
@@ -1546,21 +1553,23 @@ label.required::after {
    CODE VIEWER (Shiki)
    ============================================ */
 
-/* Shiki syntax highlighting - global styles */
-.shiki {
+/* Syntax highlighting - global styles */
+/* Theme is imported from highlight.js/styles/github-dark.css in highlighter.ts */
+.shiki,
+.hljs {
   margin: 0;
   padding: 0.75rem 1rem;
-  background-color: transparent !important;
   border: none !important; /* Override global pre border */
   border-radius: 0 !important;
   overflow-x: auto;
   font-family: "Cascadia Code", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
-.shiki code {
+.shiki code,
+.hljs code {
   display: block;
   font-size: 0.8125rem;
-  line-height: 1.5;
+  line-height: 1.4;
   tab-size: 2;
   white-space: pre;
   border: none; /* Override global code border */
@@ -1569,21 +1578,25 @@ label.required::after {
   color: inherit;
 }
 
-/* Each line in Shiki output */
-.shiki code .line {
-  display: inline;
+/* Each line in code output */
+.shiki code .line,
+.hljs code .line {
+  display: block;
   border: none;
   background: transparent;
   box-shadow: none;
   outline: none;
+  min-height: 1.4em; /* Match line-height for empty lines */
 }
 
 /* Line numbers - applied via .line-numbers wrapper */
-.line-numbers .shiki code {
+.line-numbers .shiki code,
+.line-numbers .hljs code {
   counter-reset: line;
 }
 
-.line-numbers .shiki code .line::before {
+.line-numbers .shiki code .line::before,
+.line-numbers .hljs code .line::before {
   counter-increment: line;
   content: counter(line);
   display: inline-block;
@@ -1596,21 +1609,25 @@ label.required::after {
   border-right: 1px solid var(--color-border);
 }
 
-/* Scrollbar for shiki */
-.shiki::-webkit-scrollbar {
+/* Scrollbar for code blocks */
+.shiki::-webkit-scrollbar,
+.hljs::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.shiki::-webkit-scrollbar-track {
+.shiki::-webkit-scrollbar-track,
+.hljs::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.shiki::-webkit-scrollbar-thumb {
+.shiki::-webkit-scrollbar-thumb,
+.hljs::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 4px;
 }
 
-.shiki::-webkit-scrollbar-thumb:hover {
+.shiki::-webkit-scrollbar-thumb:hover,
+.hljs::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-light);
 }

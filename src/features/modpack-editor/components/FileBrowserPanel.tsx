@@ -1,21 +1,36 @@
 import { Show, For, createSignal, createEffect, createMemo } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useFileBrowser } from "../../../shared/hooks";
 import type { FileEntry } from "../../../shared/types";
 import { createConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { addToast } from "../../../shared/components/Toast";
-import { MonacoEditor } from "../../../shared/components";
+import CodeViewer from "../../../shared/components/CodeViewer";
 import { formatRelativeTime, formatFullDateTime } from "../../../shared/utils/date-formatter";
+import { useI18n } from "../../../shared/i18n";
+
+// Decode Unicode escape sequences like \u0027, \u0026
+function decodeUnicodeEscapes(str: string): string {
+  return str.replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+}
+
+// Normalize path separators for cross-platform compatibility
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
 
 interface FileBrowserPanelProps {
   instanceId: string;
 }
 
 export function FileBrowserPanel(props: FileBrowserPanelProps) {
+  const { t } = useI18n();
   const browser = useFileBrowser(() => props.instanceId);
   const [selectedFile, setSelectedFile] = createSignal<FileEntry | null>(null);
   const [fileContent, setFileContent] = createSignal<string | null>(null);
-  const [editedContent, setEditedContent] = createSignal("");
+  const [_editedContent, setEditedContent] = createSignal("");
   const [showHidden, setShowHidden] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
   const [showRenameDialog, setShowRenameDialog] = createSignal(false);
@@ -27,6 +42,9 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
   const [searchLoading, setSearchLoading] = createSignal(false);
   const { confirm, ConfirmDialogComponent } = createConfirmDialog();
 
+  // Ref for code preview container to reset scroll
+  let codeContainerRef: HTMLDivElement | undefined;
+
   createEffect(() => {
     if (props.instanceId) {
       browser.browse("");
@@ -35,7 +53,9 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
   const handleNavigate = (entry: FileEntry) => {
     if (entry.is_dir) {
-      browser.browse(entry.path);
+      // Normalize path for Windows
+      const normalizedPath = entry.path.replace(/\\/g, "/");
+      browser.browse(normalizedPath);
       setSelectedFile(null);
       setFileContent(null);
     } else {
@@ -46,10 +66,17 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
   const handleSelectFile = async (entry: FileEntry) => {
     setSelectedFile(entry);
 
+    // Reset scroll position when opening new file
+    if (codeContainerRef) {
+      codeContainerRef.scrollTop = 0;
+    }
+
     // Try to load text files
     if (entry.size < 1024 * 1024 && isTextFile(entry.name)) {
-      const content = await browser.readFile(entry.path);
-      if (content) {
+      const rawContent = await browser.readFile(entry.path);
+      if (rawContent) {
+        // Decode Unicode escape sequences for display
+        const content = decodeUnicodeEscapes(rawContent);
         setFileContent(content);
         setEditedContent(content);
       } else {
@@ -66,9 +93,15 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
     const currentPath = browser.currentPath();
     if (!currentPath) return;
 
-    const parts = currentPath.split("/").filter(Boolean);
+    // Normalize path separators and split
+    const normalizedPath = currentPath.replace(/\\/g, "/");
+    const parts = normalizedPath.split("/").filter(Boolean);
+
+    if (parts.length === 0) return; // Already at root
+
     parts.pop();
-    browser.browse(parts.join("/"));
+    const parentPath = parts.join("/");
+    browser.browse(parentPath);
     setSelectedFile(null);
     setFileContent(null);
   };
@@ -138,13 +171,44 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
   const handleOpenInExplorer = async () => {
     try {
-      const currentPath = browser.currentPath();
+      // Use backend command which has proper permissions
+      const currentSubPath = browser.currentPath();
       await invoke("open_instance_folder", {
         id: props.instanceId,
-        subfolder: currentPath || null,
+        subfolder: currentSubPath || null,
       });
     } catch (e) {
-      console.error("Failed to open folder:", e);
+      if (import.meta.env.DEV) console.error("Failed to open folder:", e);
+      addToast({
+        type: "error",
+        title: "Ошибка",
+        message: "Не удалось открыть папку в проводнике",
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleShowFileInExplorer = async () => {
+    const file = selectedFile();
+    if (!file) return;
+
+    try {
+      const instance = await invoke<{ dir: string }>("get_instance", {
+        id: props.instanceId,
+      });
+      // Normalize paths to use consistent forward slashes
+      const basePath = normalizePath(instance.dir);
+      const filePath = normalizePath(file.path);
+      const fullPath = `${basePath}/${filePath}`;
+      await revealItemInDir(fullPath);
+    } catch (e) {
+      if (import.meta.env.DEV) console.error("Failed to reveal file:", e);
+      addToast({
+        type: "error",
+        title: "Ошибка",
+        message: "Не удалось показать файл в проводнике",
+        duration: 3000,
+      });
     }
   };
 
@@ -226,29 +290,6 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
     }
   };
 
-  const handleSave = async () => {
-    const file = selectedFile();
-    if (!file) return;
-
-    const success = await browser.writeFile(file.path, editedContent());
-    if (success) {
-      setFileContent(editedContent());
-      addToast({
-        type: "success",
-        title: "Файл сохранён",
-        message: `${file.name} успешно сохранён`,
-        duration: 3000,
-      });
-    } else {
-      addToast({
-        type: "error",
-        title: "Ошибка сохранения",
-        message: "Не удалось сохранить файл",
-        duration: 5000,
-      });
-    }
-  };
-
   const getFileLanguage = (filename: string):
     "toml" | "json" | "jsonc" | "properties" | "yaml" | "txt" |
     "javascript" | "typescript" | "java" | "python" |
@@ -259,17 +300,20 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
     // Special cases based on filename
     if (name === "dockerfile") return "dockerfile";
+    if (name === "makefile") return "shell";
     if (name === "build.gradle" || name.endsWith(".gradle")) return "gradle";
     if (name.endsWith(".mcfunction")) return "shell"; // Minecraft functions
 
     // Extension-based detection
     switch (ext) {
       // Config files
-      case "json": return "json";
+      case "json": case "mcmeta": return "json";
       case "jsonc": case "json5": return "jsonc"; // JSON with Comments
       case "toml": return "toml";
       case "yaml": case "yml": return "yaml";
-      case "properties": case "cfg": case "conf": case "ini": return "properties";
+      case "properties": case "cfg": case "conf": case "ini":
+      case "launchproperties": case "option": case "server":
+        return "properties";
       case "xml": return "xml";
 
       // Programming languages
@@ -293,6 +337,24 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
       // KubeJS & CraftTweaker
       case "zs": return "java"; // CraftTweaker uses ZenScript (Java-like)
+
+      // Minecraft specific
+      case "snbt": return "json"; // SNBT is JSON-like
+      case "lang": return "properties"; // Legacy lang files use key=value
+      case "accesswidener": return "txt"; // Fabric access wideners
+      case "list": return "txt"; // List files
+      case "disabled": case "bak": case "old":
+        // For disabled/backup files, try to detect from the base filename
+        const baseName = filename.replace(/\.(disabled|bak|old)$/i, "");
+        if (baseName.endsWith(".json")) return "json";
+        if (baseName.endsWith(".toml")) return "toml";
+        if (baseName.endsWith(".properties") || baseName.endsWith(".cfg")) return "properties";
+        return "txt";
+
+      // Dev config files
+      case "env": case "gitignore": case "gitattributes": case "gitmodules":
+      case "editorconfig": case "prettierrc": case "eslintrc":
+        return "properties";
 
       default: return "txt";
     }
@@ -369,9 +431,29 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
       ".md", ".markdown",
       // Minecraft specific
       ".mcfunction", // Datapack functions
+      ".snbt", // Stringified NBT (JSON-like)
+      ".lang", // Legacy language files
+      ".accesswidener", // Fabric access wideners
+      ".list", // Forge/generic list files
+      ".launchproperties", // Launcher properties
+      ".server", // Server info files
+      ".option", // Options files
+      ".disabled", // Disabled mods/configs
+      ".bak", ".old", // Backup files (often text)
+      // Generic dev files
+      ".env", ".env.local", ".env.example",
+      ".gitignore", ".gitattributes", ".gitmodules",
+      ".editorconfig", ".prettierrc", ".eslintrc",
     ];
 
-    return textExtensions.some((ext) => filename.toLowerCase().endsWith(ext));
+    // Also match files without extension that are known text files
+    const lowerName = filename.toLowerCase();
+    const knownTextFiles = ["dockerfile", "makefile", "readme", "license", "changelog", "eula"];
+    if (knownTextFiles.some(f => lowerName === f || lowerName.startsWith(f + "."))) {
+      return true;
+    }
+
+    return textExtensions.some((ext) => lowerName.endsWith(ext));
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -443,7 +525,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
             <i class="i-hugeicons-search-01 w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               type="text"
-              placeholder={useGlobalSearch() ? "Глобальный поиск..." : "Поиск файлов..."}
+              placeholder={useGlobalSearch() ? t().ui.placeholders.globalSearch : t().ui.placeholders.searchFiles}
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
               class="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -581,17 +663,17 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
       </div>
 
       {/* Right Panel - Preview */}
-      <div class="flex-1 flex flex-col gap-3 min-w-0">
+      <div class="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
         <Show when={!selectedFile()}>
-          <div class="card flex-1 flex-col-center text-center">
+          <div class="card flex-1 flex-col-center text-center p-8">
             <i class="i-hugeicons-folder-search w-16 h-16 text-gray-600 mb-4" />
             <h3 class="text-lg font-semibold mb-2">Браузер файлов</h3>
             <p class="text-muted text-sm max-w-md">
-              Навигация по файлам instance. Выберите файл для предпросмотра
+              Навигация по файлам экземпляра. Выберите файл для предпросмотра
             </p>
-            <div class="mt-6 flex gap-2">
-              <div class="px-3 py-2 rounded bg-gray-800 text-xs">
-                <i class="i-hugeicons-mouse-left-click-02 w-4 h-4 inline mr-1" />
+            <div class="mt-6 flex gap-2 flex-wrap justify-center">
+              <div class="px-3 py-2 rounded bg-gray-800 text-xs flex items-center gap-1">
+                <i class="i-hugeicons-mouse-left-click-02 w-4 h-4" />
                 Открыть папку / файл
               </div>
             </div>
@@ -600,52 +682,66 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
         <Show when={selectedFile()}>
           {/* Header */}
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <i class={`${getFileIcon(selectedFile()!)} w-5 h-5 text-gray-500`} />
-              <div>
-                <h3 class="font-semibold">{selectedFile()!.name}</h3>
-                <p class="text-xs text-muted">
-                  {formatFileSize(selectedFile()!.size)} • <span title={formatFullDateTime(selectedFile()!.modified)}>{formatRelativeTime(selectedFile()!.modified)}</span>
-                </p>
+          <div class="flex flex-col gap-2 flex-shrink-0">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-3 min-w-0">
+                <i class={`${getFileIcon(selectedFile()!)} w-5 h-5 text-gray-500 flex-shrink-0`} />
+                <div class="min-w-0">
+                  <h3 class="font-semibold truncate" title={selectedFile()!.name}>{selectedFile()!.name}</h3>
+                  <p class="text-xs text-muted">
+                    {formatFileSize(selectedFile()!.size)} • <span title={formatFullDateTime(selectedFile()!.modified)}>{formatRelativeTime(selectedFile()!.modified)}</span>
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div class="flex gap-2">
-              <button
-                class="btn-secondary btn-sm"
-                onClick={handleRename}
-              >
-                <i class="i-hugeicons-edit-02 w-4 h-4" />
-                Переименовать
-              </button>
-              <button
-                class="btn-secondary btn-sm"
-                onClick={handleCopy}
-              >
-                <i class="i-hugeicons-copy-01 w-4 h-4" />
-                Копировать
-              </button>
-              <button
-                class="btn-secondary btn-sm text-red-400 hover:text-red-300"
-                onClick={handleDelete}
-              >
-                <i class="i-hugeicons-delete-02 w-4 h-4" />
-                Удалить
-              </button>
+              <div class="flex gap-1 flex-shrink-0">
+                <button
+                  class="btn-ghost btn-sm p-1.5"
+                  onClick={handleShowFileInExplorer}
+                  title="Показать файл в проводнике"
+                >
+                  <i class="i-hugeicons-folder-search w-4 h-4" />
+                </button>
+                <button
+                  class="btn-ghost btn-sm p-1.5"
+                  onClick={handleRename}
+                  title="Переименовать файл"
+                >
+                  <i class="i-hugeicons-edit-02 w-4 h-4" />
+                </button>
+                <button
+                  class="btn-ghost btn-sm p-1.5"
+                  onClick={handleCopy}
+                  title="Создать копию файла"
+                >
+                  <i class="i-hugeicons-copy-01 w-4 h-4" />
+                </button>
+                <button
+                  class="btn-ghost btn-sm p-1.5 text-red-400 hover:text-red-300"
+                  onClick={handleDelete}
+                  title="Удалить файл"
+                >
+                  <i class="i-hugeicons-delete-02 w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Monaco Editor - Only for text files */}
+          {/* Code Preview - Read only */}
           <Show when={selectedFile() && isTextFile(selectedFile()!.name)}>
             <Show when={fileContent()}>
-              <div class="flex-1 min-h-0">
-                <MonacoEditor
-                  value={editedContent()}
-                  onChange={setEditedContent}
-                  onSave={handleSave}
+              <div
+                ref={codeContainerRef}
+                class="flex-1 min-h-0 overflow-hidden"
+              >
+                <CodeViewer
+                  code={fileContent()!}
                   language={getFileLanguage(selectedFile()!.name)}
-                  fileName={selectedFile()!.path}
+                  filename={selectedFile()!.name}
+                  showLineNumbers={true}
+                  showHeader={true}
+                  maxHeight="100%"
+                  class="h-full"
                 />
               </div>
             </Show>
@@ -681,7 +777,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                 value={newName()}
                 onInput={(e) => setNewName(e.currentTarget.value)}
                 class="w-full"
-                placeholder="Введите новое имя..."
+                placeholder={t().ui.placeholders.enterNewName}
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
                     confirmRename();
@@ -720,7 +816,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                 value={newName()}
                 onInput={(e) => setNewName(e.currentTarget.value)}
                 class="w-full"
-                placeholder="Введите имя копии..."
+                placeholder={t().ui.placeholders.enterCopyName}
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
                     confirmCopy();

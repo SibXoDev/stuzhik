@@ -207,7 +207,7 @@ const ModRecommendations: Component<Props> = (props) => {
 
   // Фильтруем уже установленные
   const filteredRecommendations = () => {
-    return recommendations.recommendations().filter(r => !isInstalled(r.slug));
+    return recommendations.recommendations().filter((r: ModRecommendation) => !isInstalled(r.slug));
   };
 
   return (

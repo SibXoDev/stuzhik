@@ -2,7 +2,7 @@ import { createSignal, Show, For, JSX, onMount, onCleanup, createEffect, createM
 import type { ProjectInfo, ProjectType, VersionChangelog } from "../types/common.types";
 import { useI18n } from "../i18n";
 import { sanitizeImageUrl } from "../utils/url-validator";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { MarkdownRenderer, HtmlRenderer } from "./MarkdownRenderer";
 import { ModalWrapper } from "../ui";
 
@@ -21,6 +21,8 @@ export interface ProjectInfoDialogProps {
   actions?: () => JSX.Element;
   /** Category click handler (for search/filter) */
   onCategoryClick?: (category: string) => void;
+  /** Full file path for "Open in Explorer" feature */
+  filePath?: string;
 
   // === Version Selector Props (for catalog mode) ===
   /** Available versions with changelog data */
@@ -211,9 +213,27 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                 {/* Links in header */}
                 <div class="flex items-center gap-2 flex-wrap">
                   <Show when={props.project.source && props.project.source !== "local"}>
-                    <span class={`badge ${props.project.source === "modrinth" ? "badge-success" : "bg-orange-600/20 text-orange-400 border-orange-600/30"}`}>
-                      {props.project.source === "modrinth" ? "Modrinth" : "CurseForge"}
-                    </span>
+                    <Show when={props.project.links?.project}
+                      fallback={
+                        <span class={`badge ${props.project.source === "modrinth" ? "badge-success" : "bg-orange-600/20 text-orange-400 border-orange-600/30"}`}>
+                          {props.project.source === "modrinth" ? "Modrinth" : "CurseForge"}
+                        </span>
+                      }
+                    >
+                      <button
+                        class={`flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs transition-colors ${
+                          props.project.source === "modrinth"
+                            ? "bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30"
+                            : "bg-orange-600/20 text-orange-400 border border-orange-600/30 hover:bg-orange-600/30"
+                        }`}
+                        onClick={() => handleOpenExternal(props.project.links!.project!)}
+                        title={t().wiki?.openOnPlatform ?? "Open on platform"}
+                      >
+                        <i class={props.project.source === "modrinth" ? "i-simple-icons-modrinth w-3.5 h-3.5" : "i-simple-icons-curseforge w-3.5 h-3.5"} />
+                        {props.project.source === "modrinth" ? "Modrinth" : "CurseForge"}
+                        <i class="i-hugeicons-arrow-up-right-01 w-3 h-3" />
+                      </button>
+                    </Show>
                   </Show>
                   <Show when={props.project.links?.source}>
                     <button
@@ -271,7 +291,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
               </Show>
               <Show when={props.project.followers}>
                 <span class="badge badge-gray">
-                  <i class="i-hugeicons:user-love-01 w-3 h-3" />
+                  <i class="i-hugeicons-user-love-01 w-3 h-3" />
                   {formatCount(props.project.followers)} подписчиков
                 </span>
               </Show>
@@ -545,9 +565,18 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                   </div>
                 </Show>
                 <Show when={props.project.file_name}>
-                  <div>
+                  <div class="flex items-center gap-2">
                     <span class="text-gray-500">{t().wiki?.file ?? "File"}:</span>
                     <span class="text-white ml-2 font-mono text-xs">{props.project.file_name}</span>
+                    <Show when={props.filePath}>
+                      <button
+                        class="p-1 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                        onClick={() => props.filePath && revealItemInDir(props.filePath)}
+                        title={t().wiki?.openInExplorer ?? "Open in Explorer"}
+                      >
+                        <i class="i-hugeicons-folder-01 w-4 h-4" />
+                      </button>
+                    </Show>
                   </div>
                 </Show>
                 <Show when={props.project.file_size}>

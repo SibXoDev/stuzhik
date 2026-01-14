@@ -32,23 +32,62 @@ pub const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024;
 
 /// Разрешённые расширения файлов для передачи
 pub const ALLOWED_EXTENSIONS: &[&str] = &[
-    "jar", "json", "toml", "cfg", "properties", "txt", "md",
-    "png", "jpg", "jpeg", "gif", "zip", "gz", "nbt", "dat",
-    "mcmeta", "lang", "ogg", "wav", "fsh", "vsh", "glsl",
+    "jar",
+    "json",
+    "toml",
+    "cfg",
+    "properties",
+    "txt",
+    "md",
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "zip",
+    "gz",
+    "nbt",
+    "dat",
+    "mcmeta",
+    "lang",
+    "ogg",
+    "wav",
+    "fsh",
+    "vsh",
+    "glsl",
 ];
 
 /// Запрещённые паттерны в путях
 const FORBIDDEN_PATH_PATTERNS: &[&str] = &[
-    "..", "~", "$", "%", "\\\\", "//",
-    ".git", ".svn", ".env", "node_modules",
-    "id_rsa", "id_ed25519", "known_hosts",
-    "credentials", "secrets", "tokens",
+    "..",
+    "~",
+    "$",
+    "%",
+    "\\\\",
+    "//",
+    ".git",
+    ".svn",
+    ".env",
+    "node_modules",
+    "id_rsa",
+    "id_ed25519",
+    "known_hosts",
+    "credentials",
+    "secrets",
+    "tokens",
 ];
 
 /// Запрещённые директории (абсолютные пути)
 const FORBIDDEN_DIRECTORIES: &[&str] = &[
-    "/etc", "/usr", "/bin", "/sbin", "/var", "/root", "/home",
-    "C:\\Windows", "C:\\Program Files", "C:\\Users",
+    "/etc",
+    "/usr",
+    "/bin",
+    "/sbin",
+    "/var",
+    "/root",
+    "/home",
+    "C:\\Windows",
+    "C:\\Program Files",
+    "C:\\Users",
 ];
 
 /// Rate limiter для защиты от DoS
@@ -123,7 +162,9 @@ impl std::fmt::Display for ValidationError {
             Self::ForbiddenDirectory(dir) => write!(f, "Access to forbidden directory: {}", dir),
             Self::FileTooLarge(size) => write!(f, "File too large: {} bytes", size),
             Self::TooManyFiles(count) => write!(f, "Too many files: {}", count),
-            Self::TotalSizeTooLarge(size) => write!(f, "Total transfer size too large: {} bytes", size),
+            Self::TotalSizeTooLarge(size) => {
+                write!(f, "Total transfer size too large: {} bytes", size)
+            }
             Self::InvalidPeerId => write!(f, "Invalid peer ID format"),
             Self::InvalidModpackName => write!(f, "Invalid modpack name"),
         }
@@ -166,8 +207,16 @@ pub fn sanitize_path(path: &str, base_path: &Path) -> Result<PathBuf, Validation
 
         // Проверяем на недопустимые символы
         if component.contains(|c: char| {
-            c == '<' || c == '>' || c == ':' || c == '"' || c == '|' || c == '?' || c == '*'
-            || c == '\0' || c == '\n' || c == '\r'
+            c == '<'
+                || c == '>'
+                || c == ':'
+                || c == '"'
+                || c == '|'
+                || c == '?'
+                || c == '*'
+                || c == '\0'
+                || c == '\n'
+                || c == '\r'
         }) {
             return Err(ValidationError::InvalidCharacters(component.to_string()));
         }
@@ -180,7 +229,9 @@ pub fn sanitize_path(path: &str, base_path: &Path) -> Result<PathBuf, Validation
     }
 
     // Финальная проверка - путь должен быть внутри base_path
-    let canonical_base = base_path.canonicalize().unwrap_or_else(|_| base_path.to_path_buf());
+    let canonical_base = base_path
+        .canonicalize()
+        .unwrap_or_else(|_| base_path.to_path_buf());
 
     // Проверяем что результирующий путь начинается с base_path
     // (canonicalize может не работать для несуществующих путей, поэтому проверяем prefix)
@@ -232,7 +283,10 @@ pub fn validate_peer_id(peer_id: &str) -> Result<(), ValidationError> {
     }
 
     // Разрешаем только буквы, цифры, дефисы и точки
-    if !peer_id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '_') {
+    if !peer_id
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '-' || c == '.' || c == '_')
+    {
         return Err(ValidationError::InvalidPeerId);
     }
 

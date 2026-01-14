@@ -437,6 +437,69 @@ pub async fn update_instance(id: String, updates: serde_json::Value) -> Result<I
             index += 1;
         }
 
+        // java_args: JVM arguments
+        if let Some(java_args) = updates.get("java_args").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", java_args = ?{}", index));
+            params.push(Box::new(java_args.to_string()));
+            index += 1;
+        }
+
+        // game_args: Minecraft game arguments
+        if let Some(game_args) = updates.get("game_args").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", game_args = ?{}", index));
+            params.push(Box::new(game_args.to_string()));
+            index += 1;
+        }
+
+        // username: player username
+        if let Some(username) = updates.get("username").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", username = ?{}", index));
+            params.push(Box::new(username.to_string()));
+            index += 1;
+        }
+
+        // notes: instance notes/description
+        if let Some(notes) = updates.get("notes").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", notes = ?{}", index));
+            params.push(Box::new(notes.to_string()));
+            index += 1;
+        }
+
+        // port: server port (for server instances)
+        if let Some(port) = updates.get("port").and_then(|v| v.as_i64()) {
+            sql.push_str(&format!(", port = ?{}", index));
+            params.push(Box::new(port as i32));
+            index += 1;
+        }
+
+        // java_path: path to Java executable
+        if let Some(java_path) = updates.get("java_path").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", java_path = ?{}", index));
+            params.push(Box::new(java_path.to_string()));
+            index += 1;
+        }
+
+        // version: Minecraft version
+        if let Some(version) = updates.get("version").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", version = ?{}", index));
+            params.push(Box::new(version.to_string()));
+            index += 1;
+        }
+
+        // loader: modloader type (forge/fabric/quilt/neoforge/vanilla)
+        if let Some(loader) = updates.get("loader").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", loader = ?{}", index));
+            params.push(Box::new(loader.to_string()));
+            index += 1;
+        }
+
+        // loader_version: version of the modloader
+        if let Some(loader_version) = updates.get("loader_version").and_then(|v| v.as_str()) {
+            sql.push_str(&format!(", loader_version = ?{}", index));
+            params.push(Box::new(loader_version.to_string()));
+            index += 1;
+        }
+
         sql.push_str(&format!(" WHERE id = ?{}", index));
         params.push(Box::new(id.clone()));
 

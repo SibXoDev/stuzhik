@@ -119,7 +119,12 @@ impl ConsentManager {
     }
 
     /// Ответить на запрос согласия
-    pub async fn respond(&self, request_id: &str, approved: bool, remember: bool) -> Result<(), String> {
+    pub async fn respond(
+        &self,
+        request_id: &str,
+        approved: bool,
+        remember: bool,
+    ) -> Result<(), String> {
         let pending = self.pending.write().await.remove(request_id);
 
         match pending {
@@ -131,13 +136,18 @@ impl ConsentManager {
 
                 log::info!(
                     "Consent response for {}: approved={}, remember={}",
-                    request_id, approved, remember
+                    request_id,
+                    approved,
+                    remember
                 );
 
                 Ok(())
             }
             None => {
-                log::warn!("Consent request {} not found or already expired", request_id);
+                log::warn!(
+                    "Consent request {} not found or already expired",
+                    request_id
+                );
                 Err(format!("Consent request {} not found", request_id))
             }
         }
@@ -155,7 +165,10 @@ impl ConsentManager {
                 None
             }
             Err(_) => {
-                log::warn!("Consent request timed out after {} seconds", self.timeout_secs);
+                log::warn!(
+                    "Consent request timed out after {} seconds",
+                    self.timeout_secs
+                );
                 None
             }
         }
@@ -236,7 +249,10 @@ mod tests {
         assert_eq!(pending[0].request_id, request.request_id);
 
         // Отвечаем на запрос
-        manager.respond(&request.request_id, true, false).await.unwrap();
+        manager
+            .respond(&request.request_id, true, false)
+            .await
+            .unwrap();
 
         // Получаем ответ
         let response = rx.await.unwrap();

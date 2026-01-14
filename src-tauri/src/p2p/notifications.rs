@@ -58,9 +58,7 @@ pub struct UpdateNotification {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NotificationEvent {
     /// Новое уведомление об обновлении
-    NewUpdate {
-        notification: UpdateNotification,
-    },
+    NewUpdate { notification: UpdateNotification },
     /// Версия модпака у пира изменилась
     PeerVersionChanged {
         peer_id: String,
@@ -116,7 +114,10 @@ impl UpdateNotificationManager {
 
     /// Добавить модпак в отслеживаемые
     pub async fn track_modpack(&self, modpack_name: &str) {
-        self.tracked_modpacks.write().await.insert(modpack_name.to_string());
+        self.tracked_modpacks
+            .write()
+            .await
+            .insert(modpack_name.to_string());
     }
 
     /// Удалить модпак из отслеживаемых
@@ -192,7 +193,8 @@ impl UpdateNotificationManager {
             }
 
             // Проверяем нужно ли создать уведомление
-            self.check_and_notify(&peer_id, &modpack_name, &new_version).await;
+            self.check_and_notify(&peer_id, &modpack_name, &new_version)
+                .await;
         }
     }
 
@@ -212,17 +214,12 @@ impl UpdateNotificationManager {
         // Если версии разные - создаём уведомление
         if local_version != peer_version {
             // Проверяем нет ли уже такого уведомления
-            let exists = self
-                .notifications
-                .read()
-                .await
-                .iter()
-                .any(|n| {
-                    n.peer_id == peer_id
-                        && n.modpack_name == modpack_name
-                        && n.peer_version == peer_version
-                        && !n.dismissed
-                });
+            let exists = self.notifications.read().await.iter().any(|n| {
+                n.peer_id == peer_id
+                    && n.modpack_name == modpack_name
+                    && n.peer_version == peer_version
+                    && !n.dismissed
+            });
 
             if exists {
                 return;
@@ -279,7 +276,8 @@ impl UpdateNotificationManager {
         for (peer_id, modpacks) in peer_versions.iter() {
             if let Some(info) = modpacks.get(modpack_name) {
                 if info.version != local_version {
-                    self.check_and_notify(peer_id, modpack_name, &info.version).await;
+                    self.check_and_notify(peer_id, modpack_name, &info.version)
+                        .await;
                 }
             }
         }
@@ -381,7 +379,10 @@ impl UpdateNotificationManager {
     }
 
     /// Получить уведомления для конкретного модпака
-    pub async fn get_notifications_for_modpack(&self, modpack_name: &str) -> Vec<UpdateNotification> {
+    pub async fn get_notifications_for_modpack(
+        &self,
+        modpack_name: &str,
+    ) -> Vec<UpdateNotification> {
         self.notifications
             .read()
             .await

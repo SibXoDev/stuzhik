@@ -66,6 +66,7 @@ pub fn init_db(db_path: &str) -> rusqlite::Result<()> {
 
             -- Идентификация
             slug TEXT NOT NULL,                 -- уникальный slug (fabric-api, jei, sodium, etc)
+            mod_id TEXT,                        -- mod ID из JAR файла (fabric.mod.json/mods.toml)
             name TEXT NOT NULL,
             version TEXT NOT NULL,
             minecraft_version TEXT NOT NULL,    -- для какой версии MC этот мод
@@ -106,6 +107,7 @@ pub fn init_db(db_path: &str) -> rusqlite::Result<()> {
             dependency_slug TEXT NOT NULL,
             dependency_type TEXT NOT NULL,      -- required/optional/incompatible
             version_requirement TEXT,           -- например: ">=1.0.0", "[1.0.0,2.0.0)"
+            dependency_name TEXT,               -- Human-readable name for display
 
             FOREIGN KEY(mod_id) REFERENCES mods(id) ON DELETE CASCADE
         );

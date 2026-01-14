@@ -91,12 +91,14 @@ fn build_patterns_internal() -> Vec<ErrorPattern> {
                 },
             },
 
-            // Отсутствует зависимость Fabric
+            // ============ FABRIC DEPENDENCY PATTERNS ============
+
+            // Fabric: "Mod 'X' (Display Name) requires mod 'Y'" - standard format
             ErrorPattern {
                 pattern: Regex::new(r"Mod '([^']+)' \(([^)]+)\) requires.*mod '([^']+)'").unwrap(),
                 handler: |caps, line, line_num| {
-                    let mod_name = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
-                    let mod_id = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+                    let mod_name = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
                     let required = caps.get(3).map(|m| m.as_str()).unwrap_or("unknown");
 
                     Some(DetectedProblem {
@@ -130,6 +132,149 @@ fn build_patterns_internal() -> Vec<ErrorPattern> {
                         ],
                         docs_links: vec![],
                         related_mods: vec![mod_name.to_string()],
+                    })
+                },
+            },
+
+            // Fabric: "requires any version of mod X, which is missing!"
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)requires\s+(?:any\s+version\s+of\s+)?mod\s+([a-z0-9_-]+)(?:,\s+which\s+is\s+missing)?").unwrap(),
+                handler: |caps, line, line_num| {
+                    let required = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    // Skip common false positives
+                    if ["java", "minecraft", "fabric", "forge", "fabricloader"].contains(&required) {
+                        return None;
+                    }
+
+                    Some(DetectedProblem {
+                        id: format!("fabric_missing_{}", line_num),
+                        title: format!("Отсутствует мод: {}", required),
+                        description: format!("Мод '{}' требуется, но не установлен", required),
+                        severity: Severity::Critical,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: format!("Установить {}", required),
+                                description: format!("Скачайте '{}' с Modrinth или CurseForge", required),
+                                auto_fix: Some(AutoFix::DownloadMod {
+                                    name: required.to_string(),
+                                    source: "modrinth".into(),
+                                    project_id: required.to_string(),
+                                }),
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 95,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![required.to_string()],
+                    })
+                },
+            },
+
+            // Fabric FormattedException: "Mod resolution encountered an incompatible mod set!"
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:FormattedException|ModResolutionException).*(?:incompatible|unmet|missing)").unwrap(),
+                handler: |_, line, line_num| {
+                    Some(DetectedProblem {
+                        id: format!("fabric_resolution_error_{}", line_num),
+                        title: "Конфликт зависимостей Fabric".into(),
+                        description: "Fabric не может загрузить моды из-за несовместимых или отсутствующих зависимостей. Проверьте следующие строки лога для деталей.".into(),
+                        severity: Severity::Critical,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: "Проверить список модов".into(),
+                                description: "Откройте вкладку 'Моды' для просмотра конфликтов зависимостей".into(),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 80,
+                            },
+                        ],
+                        docs_links: vec!["https://fabricmc.net/wiki/tutorial:dependencies".into()],
+                        related_mods: vec![],
+                    })
+                },
+            },
+
+            // Fabric: "- Mod 'X' (Name) ..." bullet point format in exception message
+            ErrorPattern {
+                pattern: Regex::new(r"^\s*-\s*Mod\s+'([a-z0-9_-]+)'\s+\(([^)]+)\)").unwrap(),
+                handler: |caps, line, line_num| {
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+                    let mod_name = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    // Only trigger if line indicates a problem
+                    let line_lower = line.to_lowercase();
+                    if !line_lower.contains("requires") && !line_lower.contains("missing")
+                       && !line_lower.contains("depends") && !line_lower.contains("incompatible") {
+                        return None;
+                    }
+
+                    Some(DetectedProblem {
+                        id: format!("fabric_mod_issue_{}_{}", mod_id, line_num),
+                        title: format!("Проблема с модом: {}", mod_name),
+                        description: format!("Мод '{}' ({}) имеет проблему с зависимостями", mod_name, mod_id),
+                        severity: Severity::Error,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: "Проверить зависимости".into(),
+                                description: format!("Убедитесь что все зависимости мода '{}' установлены", mod_name),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Medium,
+                                success_rate: 75,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![mod_id.to_string()],
+                    })
+                },
+            },
+
+            // Quilt: Similar to Fabric but with Quilt-specific messages
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:quilt|qsl).*(?:requires|depends on|needs)\s+([a-z0-9_-]+)").unwrap(),
+                handler: |caps, line, line_num| {
+                    let required = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    if ["java", "minecraft", "quilt", "quilted_fabric_api"].contains(&required) {
+                        return None;
+                    }
+
+                    Some(DetectedProblem {
+                        id: format!("quilt_missing_{}", line_num),
+                        title: format!("Quilt: Отсутствует {}", required),
+                        description: format!("Мод требует '{}', который не установлен", required),
+                        severity: Severity::Error,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: format!("Установить {}", required),
+                                description: format!("Скачайте '{}' с Modrinth", required),
+                                auto_fix: Some(AutoFix::DownloadMod {
+                                    name: required.to_string(),
+                                    source: "modrinth".into(),
+                                    project_id: required.to_string(),
+                                }),
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 90,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![required.to_string()],
                     })
                 },
             },
@@ -205,6 +350,88 @@ fn build_patterns_internal() -> Vec<ErrorPattern> {
                                 }),
                                 difficulty: SolutionDifficulty::Easy,
                                 success_rate: 90,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![mod_id.to_string()],
+                    })
+                },
+            },
+
+            // NeoForge: "Mod X requires mod Y" alternative format
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:neoforge|fml).*mod\s+([a-z0-9_]+)\s+requires\s+(?:mod\s+)?([a-z0-9_]+)").unwrap(),
+                handler: |caps, line, line_num| {
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+                    let required = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    if ["minecraft", "neoforge", "forge", "fml"].contains(&required) {
+                        return None;
+                    }
+
+                    Some(DetectedProblem {
+                        id: format!("neoforge_missing_{}_{}", required, line_num),
+                        title: format!("NeoForge: Отсутствует {}", required),
+                        description: format!("Мод '{}' требует '{}', который не установлен", mod_id, required),
+                        severity: Severity::Critical,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: format!("Установить {}", required),
+                                description: format!("Скачайте '{}' с Modrinth или CurseForge", required),
+                                auto_fix: Some(AutoFix::DownloadMod {
+                                    name: required.to_string(),
+                                    source: "modrinth".into(),
+                                    project_id: required.to_string(),
+                                }),
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 90,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![mod_id.to_string(), required.to_string()],
+                    })
+                },
+            },
+
+            // Forge/NeoForge: "Waiting for mod X" during loading
+            ErrorPattern {
+                pattern: Regex::new(r#"(?i)(?:waiting\s+for|depends\s+on|requires)\s+(?:mod\s+)?['"]?([a-z0-9_-]+)['"]?"#).unwrap(),
+                handler: |caps, line, line_num| {
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    // Skip common false positives
+                    if ["minecraft", "forge", "neoforge", "fml", "java", "server", "client", "common"].contains(&mod_id) {
+                        return None;
+                    }
+
+                    // Only trigger if this is in an error context
+                    let line_lower = line.to_lowercase();
+                    if !line_lower.contains("error") && !line_lower.contains("missing")
+                       && !line_lower.contains("failed") && !line_lower.contains("exception")
+                       && !line_lower.contains("timeout") {
+                        return None;
+                    }
+
+                    Some(DetectedProblem {
+                        id: format!("waiting_for_mod_{}_{}", mod_id, line_num),
+                        title: format!("Ожидание мода: {}", mod_id),
+                        description: format!("Загрузчик ожидает мод '{}', который возможно не установлен", mod_id),
+                        severity: Severity::Warning,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: format!("Проверить наличие {}", mod_id),
+                                description: format!("Убедитесь что '{}' установлен и включён", mod_id),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 70,
                             },
                         ],
                         docs_links: vec![],
@@ -4111,6 +4338,272 @@ fn build_patterns_internal() -> Vec<ErrorPattern> {
                                 auto_fix: None,
                                 difficulty: SolutionDifficulty::Medium,
                                 success_rate: 80,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![],
+                    })
+                },
+            },
+
+            // ========== ИЗВЕСТНЫЕ КОНФЛИКТЫ МОДОВ ==========
+
+            // OptiFine + Sodium conflict
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:optifine|optifabric).*(?:sodium|iris)|(?:sodium|iris).*(?:optifine|optifabric)").unwrap(),
+                handler: |_caps, line, line_num| {
+                    Some(DetectedProblem {
+                        id: format!("optifine_sodium_conflict_{}", line_num),
+                        title: "Конфликт OptiFine и Sodium".into(),
+                        description: "OptiFine несовместим с Sodium/Iris. Эти моды выполняют одну функцию и конфликтуют.".into(),
+                        severity: Severity::Critical,
+                        category: ProblemCategory::ModConflict,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: "Удалить OptiFine".into(),
+                                description: "Sodium + Iris обеспечивают лучшую производительность и поддержку шейдеров".into(),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 100,
+                            },
+                            Solution {
+                                title: "Удалить Sodium".into(),
+                                description: "Если вам нужен OptiFine для специфических функций (zoom, cape)".into(),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 100,
+                            },
+                        ],
+                        docs_links: vec!["https://github.com/CaffeineMC/sodium-fabric/wiki/FAQ".into()],
+                        related_mods: vec!["optifine".into(), "sodium".into(), "iris".into()],
+                    })
+                },
+            },
+
+            // Explicit "Missing mod" message (common pattern)
+            ErrorPattern {
+                pattern: Regex::new(r#"(?i)(?:missing|not found|requires).*\bmod\b[:\s]+['"]?([a-z0-9_-]+)['"]?"#).unwrap(),
+                handler: |caps, line, line_num| {
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    // Filter out false positives
+                    if mod_id.len() < 3 || mod_id == "unknown" || mod_id == "mod" {
+                        return None;
+                    }
+
+                    Some(DetectedProblem {
+                        id: format!("missing_mod_{}_{}", mod_id, line_num),
+                        title: format!("Отсутствует мод: {}", mod_id),
+                        description: format!("Игра не может найти мод '{}'. Он либо не установлен, либо несовместим с текущей версией.", mod_id),
+                        severity: Severity::Critical,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: format!("Установить {}", mod_id),
+                                description: format!("Скачайте и установите мод '{}' с Modrinth или CurseForge", mod_id),
+                                auto_fix: None, // Manual search required - no project_id available
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 85,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![mod_id.to_string()],
+                    })
+                },
+            },
+
+            // Unknown item/block in registry (modid:name format)
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:unknown|missing|invalid|unregistered).*(?:item|block|fluid|tag|recipe)[:\s]+([a-z0-9_]+):([a-z0-9_/]+)").unwrap(),
+                handler: |caps, line, line_num| {
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+                    let item_name = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    // Skip minecraft namespace
+                    if mod_id == "minecraft" {
+                        return None;
+                    }
+
+                    Some(DetectedProblem {
+                        id: format!("unknown_registry_{}_{}", mod_id, line_num),
+                        title: format!("Неизвестный предмет: {}:{}", mod_id, item_name),
+                        description: format!("Не найден предмет '{}:{}'. Возможно, мод '{}' не установлен или обновился и удалил этот предмет.", mod_id, item_name, mod_id),
+                        severity: Severity::Error,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: format!("Проверить мод {}", mod_id),
+                                description: format!("Убедитесь что мод '{}' установлен и совместим с вашей версией игры", mod_id),
+                                auto_fix: None, // Manual search required - no project_id available
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 70,
+                            },
+                            Solution {
+                                title: "Проверить конфиги/скрипты".into(),
+                                description: "Если вы используете KubeJS/CraftTweaker, проверьте скрипты на устаревшие ID предметов".into(),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Medium,
+                                success_rate: 60,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![mod_id.to_string()],
+                    })
+                },
+            },
+
+            // Datapack function not found
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:unknown|missing|cannot find|failed to load).*function[:\s]+([a-z0-9_]+):([a-z0-9_/]+)").unwrap(),
+                handler: |caps, line, line_num| {
+                    let namespace = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+                    let path = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    Some(DetectedProblem {
+                        id: format!("unknown_function_{}_{}", namespace, line_num),
+                        title: format!("Не найдена функция датапака: {}:{}", namespace, path),
+                        description: format!("Датапак или скрипт вызывает функцию '{}:{}', которая не существует.", namespace, path),
+                        severity: Severity::Warning,
+                        category: ProblemCategory::ConfigError,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: "Проверить датапаки".into(),
+                                description: format!("Убедитесь что датапак '{}' правильно установлен в папке datapacks", namespace),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Medium,
+                                success_rate: 60,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![namespace.to_string()],
+                    })
+                },
+            },
+
+            // Client-only mod on server
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:environment|side)[:\s]+(?:client|CLIENT).*(?:server|SERVER)|mod.*only.*client|client.?only.*server").unwrap(),
+                handler: |_caps, line, line_num| {
+                    Some(DetectedProblem {
+                        id: format!("client_mod_on_server_{}", line_num),
+                        title: "Клиентский мод на сервере".into(),
+                        description: "Обнаружен мод, предназначенный только для клиента. На сервере он вызовет краш.".into(),
+                        severity: Severity::Critical,
+                        category: ProblemCategory::ModConflict,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: "Удалить клиентский мод".into(),
+                                description: "Удалите мод с сервера. Он нужен только на клиенте.".into(),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 100,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![],
+                    })
+                },
+            },
+
+            // Recipe parsing error with mod reference
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:error|failed).*(?:parsing|loading|reading).*recipe.*([a-z0-9_]+):([a-z0-9_/]+)").unwrap(),
+                handler: |caps, line, line_num| {
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+                    let recipe_name = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    Some(DetectedProblem {
+                        id: format!("recipe_error_{}_{}", mod_id, line_num),
+                        title: format!("Ошибка рецепта: {}:{}", mod_id, recipe_name),
+                        description: format!("Ошибка при загрузке рецепта '{}:{}'. Возможно, рецепт ссылается на несуществующие предметы.", mod_id, recipe_name),
+                        severity: Severity::Warning,
+                        category: ProblemCategory::ConfigError,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: "Проверить зависимости рецепта".into(),
+                                description: "Рецепт может требовать предметы из модов, которые не установлены".into(),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Medium,
+                                success_rate: 60,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![mod_id.to_string()],
+                    })
+                },
+            },
+
+            // Forge/NeoForge explicit dependency error
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)Missing or unsupported mandatory dependencies.*Mod ID:\s*'([^']+)'.*depends on\s*'([^']+)'").unwrap(),
+                handler: |caps, line, line_num| {
+                    let mod_id = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+                    let required = caps.get(2).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    Some(DetectedProblem {
+                        id: format!("forge_missing_dep_{}_{}", mod_id, line_num),
+                        title: format!("Отсутствует зависимость для {}", mod_id),
+                        description: format!("Мод '{}' требует мод '{}', который не установлен или несовместим.", mod_id, required),
+                        severity: Severity::Critical,
+                        category: ProblemCategory::MissingDependency,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: format!("Установить {}", required),
+                                description: format!("Скачайте и установите мод '{}' для корректной работы '{}'", required, mod_id),
+                                auto_fix: None, // Manual search required - no project_id available
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 90,
+                            },
+                        ],
+                        docs_links: vec![],
+                        related_mods: vec![mod_id.to_string(), required.to_string()],
+                    })
+                },
+            },
+
+            // Quilt/Fabric loader version mismatch
+            ErrorPattern {
+                pattern: Regex::new(r"(?i)(?:requires|needs)\s+(?:fabric|quilt)\s*(?:loader|api)?\s*(?:version)?\s*([0-9.x><=]+)").unwrap(),
+                handler: |caps, line, line_num| {
+                    let version_req = caps.get(1).map(|m| m.as_str()).unwrap_or("unknown");
+
+                    Some(DetectedProblem {
+                        id: format!("loader_version_{}", line_num),
+                        title: "Несовместимая версия загрузчика".into(),
+                        description: format!("Мод требует версию Fabric/Quilt Loader {}. Обновите загрузчик.", version_req),
+                        severity: Severity::Error,
+                        category: ProblemCategory::VersionMismatch,
+                        status: ProblemStatus::Detected,
+                        log_line: Some(line.to_string()),
+                        line_number: Some(line_num),
+                        solutions: vec![
+                            Solution {
+                                title: "Обновить загрузчик".into(),
+                                description: "Обновите Fabric/Quilt Loader до последней версии".into(),
+                                auto_fix: None,
+                                difficulty: SolutionDifficulty::Easy,
+                                success_rate: 85,
                             },
                         ],
                         docs_links: vec![],

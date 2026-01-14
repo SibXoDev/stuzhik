@@ -83,6 +83,8 @@ interface RippleGridProps {
   fadeDistance?: number;
   vignetteStrength?: number;
   glowIntensity?: number;
+  /** Preview mode - reduces framerate to ~24fps for better performance in settings */
+  previewMode?: boolean;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -205,8 +207,18 @@ const RippleGrid = (props: RippleGridProps) => {
     resize();
 
     const start = performance.now();
+    // Preview mode: throttle to ~24fps (42ms interval) for better performance
+    const frameInterval = props.previewMode ? 42 : 0;
+    let lastFrameTime = 0;
 
-    const render = () => {
+    const render = (currentTime: number) => {
+      // Throttle frames in preview mode
+      if (frameInterval > 0 && currentTime - lastFrameTime < frameInterval) {
+        frameId = requestAnimationFrame(render);
+        return;
+      }
+      lastFrameTime = currentTime;
+
       const time = (performance.now() - start) / 1000;
 
       const [r, g, b] = hexToRgb(props.gridColor ?? "#4f46e5");
@@ -226,7 +238,7 @@ const RippleGrid = (props: RippleGridProps) => {
       frameId = requestAnimationFrame(render);
     };
 
-    render();
+    frameId = requestAnimationFrame(render);
 
     onCleanup(() => {
       cancelAnimationFrame(frameId);

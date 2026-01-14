@@ -5,6 +5,66 @@ import { useI18n } from "../../../shared/i18n";
 import VersionSelector from "../../../shared/components/VersionSelector";
 import LoaderVersionSelector from "../../../shared/components/LoaderVersionSelector";
 import LoaderSelector from "../../../shared/components/LoaderSelector";
+import { RangeSlider } from "../../../shared/ui";
+
+/**
+ * Get memory step based on total memory
+ */
+function getMemoryStep(maxMemory: number): number {
+  return maxMemory <= 8192 ? 512 : 1024;
+}
+
+/**
+ * Generate memory markers for RangeSlider based on total memory
+ * @param maxMemory - Maximum available memory in MB
+ * @returns Array of memory values in MB for tick marks
+ */
+function generateMemoryMarkers(maxMemory: number): number[] {
+  const markers: number[] = [];
+  const step = maxMemory <= 8192 ? 512 : 1024; // 512MB step for <=8GB, 1GB step for >8GB
+
+  // Generate all ticks from step to maxMemory
+  for (let i = step; i <= maxMemory; i += step) {
+    markers.push(i);
+  }
+
+  // Always add max value as last marker if not already there
+  if (markers.length > 0 && markers[markers.length - 1] !== maxMemory) {
+    markers.push(maxMemory);
+  }
+
+  return markers;
+}
+
+/**
+ * Generate filtered ticks for labels - only multiples of 2GB to avoid clutter
+ * Always includes first and last tick
+ * @param allTicks - All tick values
+ * @returns Filtered array for labels (multiples of 2048 MB)
+ */
+function generateLabelTicks(allTicks: number[]): number[] {
+  if (allTicks.length <= 8) return allTicks; // Show all if few ticks
+
+  const result: number[] = [allTicks[0]]; // Always include first
+
+  // Only show values that are multiples of 2048 (2 GB)
+  for (const tick of allTicks) {
+    if (tick % 2048 === 0 && tick !== allTicks[0] && tick !== allTicks[allTicks.length - 1]) {
+      result.push(tick);
+    }
+  }
+
+  result.push(allTicks[allTicks.length - 1]); // Always include last
+  return result;
+}
+
+/**
+ * Format memory value for labels (MB to GB with 1 decimal, hide .0)
+ */
+function formatMemoryLabel(mb: number): string {
+  const gb = mb / 1024;
+  return gb % 1 === 0 ? `${gb.toFixed(0)} GB` : `${gb.toFixed(1)} GB`;
+}
 
 export interface CreateInstanceFormProps {
   onCreate: (request: CreateInstanceRequest) => Promise<Instance | null>;
@@ -291,16 +351,19 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
                 <div>
                   <div class="flex items-center justify-between mb-2">
                     <label class="text-sm font-medium">{t().instances.edit.allocateMemory}</label>
-                    <span class="text-sm text-gray-400">{memoryMax()} MB</span>
+                    <span class="text-sm text-gray-400">{memoryMax()} MB ({(memoryMax() / 1024).toFixed(1)} GB)</span>
                   </div>
-                  <input
-                    type="range"
-                    min="512"
-                    max={totalMemory()}
-                    step="128"
+                  <RangeSlider
                     value={memoryMax()}
-                    onInput={(e) => setMemoryMax(Number(e.currentTarget.value))}
-                    class="w-full"
+                    onChange={setMemoryMax}
+                    min={getMemoryStep(totalMemory())}
+                    max={totalMemory()}
+                    step={getMemoryStep(totalMemory())}
+                    showTicks
+                    showLabels
+                    ticks={generateMemoryMarkers(totalMemory())}
+                    labelTicks={generateLabelTicks(generateMemoryMarkers(totalMemory()))}
+                    formatLabel={formatMemoryLabel}
                   />
                   <p class="text-xs text-gray-400 mt-1">
                     {t().instances.edit.memoryHint}
@@ -314,44 +377,48 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
                   <div>
                     <div class="flex items-center justify-between mb-2">
                       <label class="text-sm font-medium">{t().instances.edit.minMemory}</label>
-                      <span class="text-sm text-gray-400">{memoryMin()} MB</span>
+                      <span class="text-sm text-gray-400">{memoryMin()} MB ({(memoryMin() / 1024).toFixed(1)} GB)</span>
                     </div>
-                    <input
-                      type="range"
-                      min="512"
-                      max={Math.min(memoryMax(), totalMemory())}
-                      step="128"
+                    <RangeSlider
                       value={memoryMin()}
-                      onInput={(e) => {
-                        const val = Number(e.currentTarget.value);
+                      onChange={(val) => {
                         setMemoryMin(val);
                         if (val > memoryMax()) {
                           setMemoryMax(val);
                         }
                       }}
-                      class="w-full"
+                      min={512}
+                      max={Math.min(memoryMax(), totalMemory())}
+                      step={getMemoryStep(Math.min(memoryMax(), totalMemory()))}
+                      showTicks
+                      showLabels
+                      ticks={generateMemoryMarkers(Math.min(memoryMax(), totalMemory()))}
+                      labelTicks={generateLabelTicks(generateMemoryMarkers(Math.min(memoryMax(), totalMemory())))}
+                      formatLabel={formatMemoryLabel}
                     />
                   </div>
 
                   <div>
                     <div class="flex items-center justify-between mb-2">
                       <label class="text-sm font-medium">{t().instances.edit.maxMemory}</label>
-                      <span class="text-sm text-gray-400">{memoryMax()} MB</span>
+                      <span class="text-sm text-gray-400">{memoryMax()} MB ({(memoryMax() / 1024).toFixed(1)} GB)</span>
                     </div>
-                    <input
-                      type="range"
-                      min={Math.max(512, memoryMin())}
-                      max={totalMemory()}
-                      step="128"
+                    <RangeSlider
                       value={memoryMax()}
-                      onInput={(e) => {
-                        const val = Number(e.currentTarget.value);
+                      onChange={(val) => {
                         setMemoryMax(val);
                         if (val < memoryMin()) {
                           setMemoryMin(val);
                         }
                       }}
-                      class="w-full"
+                      min={Math.max(512, memoryMin())}
+                      max={totalMemory()}
+                      step={getMemoryStep(totalMemory())}
+                      showTicks
+                      showLabels
+                      ticks={generateMemoryMarkers(totalMemory())}
+                      labelTicks={generateLabelTicks(generateMemoryMarkers(totalMemory()))}
+                      formatLabel={formatMemoryLabel}
                     />
                   </div>
 

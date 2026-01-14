@@ -4,6 +4,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { Toggle } from "../../../shared/ui";
 import { ModalWrapper } from "../../../shared/ui/ModalWrapper";
+import { useI18n } from "../../../shared/i18n";
 
 interface StzhkExportDialogProps {
   instanceId: string;
@@ -37,12 +38,16 @@ interface ExportModInfo {
   modrinth_project_id: string | null;
 }
 
+type OverrideCategory = "config" | "scripts" | "resources" | "generated" | "game_settings" | "other";
+
 interface ExportOverrideInfo {
   name: string;
   path: string;
   size: number;
   file_count: number;
   is_file: boolean;
+  category: OverrideCategory;
+  hint: string | null;
 }
 
 interface ExportPreview {
@@ -67,6 +72,7 @@ function formatSize(bytes: number): string {
 }
 
 export function StzhkExportDialog(props: StzhkExportDialogProps) {
+  const { t } = useI18n();
   // Load saved metadata from localStorage
   const savedMetadata = localStorage.getItem(`modpack-export-${props.instanceId}`);
   const initialMetadata = savedMetadata ? JSON.parse(savedMetadata) : {};
@@ -213,8 +219,16 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
       const resultPath = await invoke<string>("export_stzhk", {
         instanceId: props.instanceId,
         outputPath: outputDir,
-        embedMods: embedMods(),
-        includeOverrides: includeOverrides(),
+        options: {
+          name: modpackName(),
+          version: modpackVersion(),
+          author: modpackAuthor(),
+          description: modpackDescription() || null,
+          embedMods: embedMods(),
+          includeOverrides: includeOverrides(),
+          excludedMods: Array.from(excludedMods()),
+          excludedOverrides: Array.from(excludedOverrides()),
+        },
       });
       setSuccess(resultPath);
     } catch (e) {
@@ -276,7 +290,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   type="text"
                   value={modpackName()}
                   onInput={(e) => setModpackName(e.currentTarget.value)}
-                  placeholder="Название модпака"
+                  placeholder={t().ui.placeholders.modpackName}
                   disabled={exporting()}
                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50"
                 />
@@ -287,7 +301,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   type="text"
                   value={modpackVersion()}
                   onInput={(e) => setModpackVersion(e.currentTarget.value)}
-                  placeholder="1.0.0"
+                  placeholder={t().ui.placeholders.versionNumber}
                   disabled={exporting()}
                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50"
                 />
@@ -298,7 +312,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   type="text"
                   value={modpackAuthor()}
                   onInput={(e) => setModpackAuthor(e.currentTarget.value)}
-                  placeholder="Ваше имя или ник"
+                  placeholder={t().ui.placeholders.yourNameOrNick}
                   disabled={exporting()}
                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50"
                 />
@@ -308,7 +322,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 <textarea
                   value={modpackDescription()}
                   onInput={(e) => setModpackDescription(e.currentTarget.value)}
-                  placeholder="Краткое описание модпака (опционально)"
+                  placeholder={t().ui.placeholders.shortDescription}
                   disabled={exporting()}
                   rows={2}
                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 resize-none"
@@ -548,7 +562,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 <div>
                   <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-medium text-muted">
-                      Конфиги и ресурсы ({preview()!.overrides.length - excludedOverrides().size} / {preview()!.overrides.length})
+                      Файлы экземпляра ({preview()!.overrides.length - excludedOverrides().size} / {preview()!.overrides.length})
                     </h3>
                     <div class="flex gap-2">
                       <button
@@ -565,28 +579,64 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                       </button>
                     </div>
                   </div>
-                  <div class="space-y-1 max-h-32 overflow-y-auto">
+                  <div class="space-y-1 max-h-48 overflow-y-auto">
                     <For each={preview()!.overrides}>
-                      {(override) => (
-                        <div class={`flex items-center gap-3 rounded-lg px-3 py-2 ${
-                          excludedOverrides().has(override.path) ? "bg-gray-800/10 opacity-50" : "bg-gray-800/30"
-                        }`}>
-                          <input
-                            type="checkbox"
-                            checked={!excludedOverrides().has(override.path)}
-                            onChange={() => toggleOverrideExclusion(override.path)}
-                            class="w-4 h-4 rounded cursor-pointer"
-                          />
-                          <i class={`w-4 h-4 text-muted ${override.is_file ? "i-hugeicons-file-01" : "i-hugeicons-folder-01"}`} />
-                          <span class="flex-1 font-medium truncate">{override.name}</span>
-                          <Show when={!override.is_file}>
-                            <span class="text-xs text-muted">{override.file_count} файлов</span>
-                          </Show>
-                          <span class="text-xs text-muted">{formatSize(override.size)}</span>
-                        </div>
-                      )}
+                      {(override) => {
+                        const categoryIcon = () => {
+                          switch (override.category) {
+                            case "config": return "i-hugeicons-settings-02";
+                            case "scripts": return "i-hugeicons-terminal";
+                            case "resources": return "i-hugeicons-image-01";
+                            case "generated": return "i-hugeicons-refresh";
+                            case "game_settings": return "i-hugeicons-menu-02";
+                            default: return override.is_file ? "i-hugeicons-file-01" : "i-hugeicons-folder-01";
+                          }
+                        };
+                        const categoryColor = () => {
+                          switch (override.category) {
+                            case "config": return "text-blue-400";
+                            case "scripts": return "text-green-400";
+                            case "resources": return "text-purple-400";
+                            case "generated": return "text-amber-400";
+                            case "game_settings": return "text-cyan-400";
+                            default: return "text-muted";
+                          }
+                        };
+                        return (
+                          <div class={`flex items-center gap-3 rounded-lg px-3 py-2 ${
+                            excludedOverrides().has(override.path) ? "bg-gray-800/10 opacity-50" : "bg-gray-800/30"
+                          }`}>
+                            <input
+                              type="checkbox"
+                              checked={!excludedOverrides().has(override.path)}
+                              onChange={() => toggleOverrideExclusion(override.path)}
+                              class="w-4 h-4 rounded cursor-pointer"
+                            />
+                            <i class={`w-4 h-4 ${categoryIcon()} ${categoryColor()}`} />
+                            <span class="flex-1 font-medium truncate">{override.name}</span>
+                            <Show when={override.category === "generated"}>
+                              <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
+                                генерируемые
+                              </span>
+                            </Show>
+                            <Show when={!override.is_file}>
+                              <span class="text-xs text-muted">{override.file_count} файлов</span>
+                            </Show>
+                            <span class="text-xs text-muted">{formatSize(override.size)}</span>
+                          </div>
+                        );
+                      }}
                     </For>
                   </div>
+                  {/* Hint about generated files */}
+                  <Show when={preview()!.overrides.some(o => o.category === "generated" && !excludedOverrides().has(o.path))}>
+                    <div class="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <p class="text-xs text-amber-400">
+                        <i class="i-hugeicons-information-circle w-3 h-3 inline-block mr-1" />
+                        Генерируемые данные (миры, скриншоты) можно исключить для уменьшения размера архива.
+                      </p>
+                    </div>
+                  </Show>
                 </div>
               </Show>
             </div>
@@ -617,16 +667,16 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
           </Show>
         </Show>
 
-        {/* Warning about exclusions */}
+        {/* Info about exclusions */}
         <Show when={!success() && (excludedMods().size > 0 || excludedOverrides().size > 0)}>
-          <div class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 flex items-start gap-3 flex-shrink-0">
-            <i class="i-hugeicons-information-circle w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-3 flex-shrink-0">
+            <i class="i-hugeicons-filter w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <div class="text-sm">
-              <p class="text-blue-400 font-medium">Примечание о фильтрах</p>
+              <p class="text-amber-400 font-medium">Выбранные элементы</p>
               <p class="text-muted mt-1">
-                Чекбоксы помогают планировать экспорт. Backend поддержка исключения конкретных файлов будет добавлена в следующем обновлении.
-                {excludedMods().size > 0 && ` Выбрано модов: ${preview()!.mods.length - excludedMods().size}/${preview()!.mods.length}`}
-                {excludedOverrides().size > 0 && ` Выбрано файлов: ${preview()!.overrides.length - excludedOverrides().size}/${preview()!.overrides.length}`}
+                {excludedMods().size > 0 && `Моды: ${preview()!.mods.length - excludedMods().size}/${preview()!.mods.length}. `}
+                {excludedOverrides().size > 0 && `Файлы: ${preview()!.overrides.length - excludedOverrides().size}/${preview()!.overrides.length}. `}
+                Исключённые элементы не будут включены в архив.
               </p>
             </div>
           </div>

@@ -19,7 +19,7 @@ pub const LIBRARY_PACKAGES: &[&str] = &[
     "org.apache.",
     "org.slf4j.",
     "org.log4j.",
-    "com.google.",
+    "com.google.", // gson, guava, etc.
     "io.netty.",
     "com.electronwill.",
     "org.objectweb.",
@@ -27,10 +27,63 @@ pub const LIBRARY_PACKAGES: &[&str] = &[
     "it.unimi.dsi.",
     "org.spongepowered.asm.",
     "org.spongepowered.mixin.",
-    // Системные
+    "com.twelvemonkeys.", // Image library
+    "org.jctools.",
+    "com.github.benmanes.", // Caffeine cache
+    "com.luciad.", // WebP support
+    "com.madgag.", // GIF support
+    // Mod libraries (not actual mods)
+    "com.tterrag.registrate.", // Create's Registrate
+    "software.bernie.", // GeckoLib and all software.bernie namespace (includes eliotlash)
+    "team.lodestar.lodestone.", // Visual effects library
+    "net.mehvahdjukaar.moonlight.", // Supplementaries lib
+    "com.illusivesoulworks.", // Curios/Caelus API
+    "dev.architectury.", // Architectury API internals
+    // Системные mod loader пакеты (НЕ моды!)
     "cpw.mods.",
     "fml.",
     "net.minecraftforge.fml.",
+    "net.minecraftforge.eventbus.",
+    "net.minecraftforge.common.",
+    "net.minecraftforge.client.",
+    "net.minecraftforge.server.",
+    "net.neoforged.fml.",
+    "net.neoforged.neoforge.",
+    "net.neoforged.bus.",
+    "net.fabricmc.loader.",
+    "net.fabricmc.api.",
+    "org.quiltmc.loader.",
+];
+
+/// Framework пакеты - это инфраструктура, НЕ виновники крашей
+/// Эти пакеты пропускаются при поиске реального виновника в stacktrace
+pub const FRAMEWORK_PACKAGES: &[&str] = &[
+    // Mod loaders core
+    "net.minecraftforge.fml.",
+    "net.minecraftforge.eventbus.",
+    "net.minecraftforge.common.ForgeHooks",
+    "net.minecraftforge.client.ForgeHooksClient",
+    "net.neoforged.fml.",
+    "net.neoforged.bus.",
+    "net.fabricmc.loader.",
+    "org.quiltmc.loader.",
+    // Mod launcher infrastructure
+    "cpw.mods.modlauncher.",
+    "cpw.mods.bootstraplauncher.",
+    "cpw.mods.cl.",
+    // Event systems
+    "net.minecraftforge.eventbus.",
+    "net.neoforged.bus.",
+    // Mixin infrastructure
+    "org.spongepowered.asm.",
+    "org.spongepowered.mixin.",
+    // Reflection/method handles
+    "java.lang.reflect.",
+    "java.lang.invoke.",
+    "jdk.internal.reflect.",
+    // Iterators
+    "java.util.Iterator",
+    "java.lang.Iterable",
 ];
 
 /// Известные маппинги пакетов на mod ID
@@ -46,7 +99,7 @@ pub const KNOWN_PACKAGE_MAPPINGS: &[(&[&str], &str)] = &[
     // === Create и экосистема ===
     (&["com", "simibubi", "create"], "create"),
     (&["com", "jozufozu", "flywheel"], "flywheel"),
-    (&["com", "tterrag", "registrate"], "registrate"),
+    (&["com", "tterrag", "registrate"], "__library_registrate__"), // Library, не мод!
     (&["com", "railwayteam", "railways"], "railways"),
     (&["net", "createmod", "catnip"], "createcatnip"),
     (

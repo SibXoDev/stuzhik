@@ -39,24 +39,30 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 
+pub use consent::{
+    get_consent_manager, ConsentManager, ConsentRequest, ConsentResponse, ConsentType,
+};
 pub use discovery::Discovery;
 pub use groups::{PeerGroup, PeerGroupManager};
-pub use history::{HistoryStats, TransferDirection, TransferHistory, TransferHistoryEntry, TransferResult};
-pub use notifications::{NotificationEvent, PeerModpackVersion, UpdateNotification, UpdateNotificationManager};
+pub use history::{
+    HistoryStats, TransferDirection, TransferHistory, TransferHistoryEntry, TransferResult,
+};
+pub use network::{FirewallResult, NetworkDiagnostics, NetworkRecommendation};
+pub use notifications::{
+    NotificationEvent, PeerModpackVersion, UpdateNotification, UpdateNotificationManager,
+};
 pub use protocol::*;
 pub use queue::{QueueStatus, QueuedTransfer, TransferPriority, TransferQueue};
 pub use server::{BroadcastResult, TransferEvent, TransferServer, TransferSession};
+pub use server_sync::{
+    get_server_sync_manager, PublishedServer, QuickJoinRequest, QuickJoinResult, QuickJoinStatus,
+    ServerInvite, ServerSyncConfig, ServerSyncManager, ServerVisibility, SyncSource,
+};
 pub use settings::*;
 pub use watch::{
     ChangeType, FileChangeEvent, SelectiveSyncConfig, SelectiveSyncManager, SyncRequest,
     WatchConfig, WatchEvent, WatchManager,
 };
-pub use server_sync::{
-    get_server_sync_manager, PublishedServer, QuickJoinRequest, QuickJoinResult, QuickJoinStatus,
-    ServerInvite, ServerSyncConfig, ServerSyncManager, ServerVisibility, SyncSource,
-};
-pub use network::{FirewallResult, NetworkDiagnostics, NetworkRecommendation};
-pub use consent::{get_consent_manager, ConsentManager, ConsentRequest, ConsentResponse, ConsentType};
 
 /// Глобальное состояние P2P сервиса
 pub struct ConnectService {
@@ -218,7 +224,11 @@ impl ConnectService {
     }
 
     /// Запросить синхронизацию модпака у пира
-    pub async fn request_modpack_sync(&self, peer_id: &str, modpack_name: &str) -> Result<(), String> {
+    pub async fn request_modpack_sync(
+        &self,
+        peer_id: &str,
+        modpack_name: &str,
+    ) -> Result<(), String> {
         let discovery_guard = self.discovery.read().await;
         if let Some(ref discovery) = *discovery_guard {
             // Находим пира
@@ -295,7 +305,12 @@ impl ConnectService {
     }
 
     /// Отправить запрос в друзья
-    pub async fn send_friend_request(&self, peer_id: &str, nickname: &str, public_key: &str) -> Result<(), String> {
+    pub async fn send_friend_request(
+        &self,
+        peer_id: &str,
+        nickname: &str,
+        public_key: &str,
+    ) -> Result<(), String> {
         // Находим адрес пира
         let peers = self.peers.read().await;
         let peer = peers
@@ -309,7 +324,9 @@ impl ConnectService {
         );
 
         if let Some(ref server) = *self.transfer_server.read().await {
-            server.send_friend_request(peer_addr, nickname, public_key).await
+            server
+                .send_friend_request(peer_addr, nickname, public_key)
+                .await
         } else {
             Err("P2P not enabled".to_string())
         }
@@ -356,7 +373,9 @@ impl ConnectService {
         let mut results = not_found;
 
         if let Some(ref server) = *server_guard {
-            let sync_results = server.broadcast_sync(peer_addrs.clone(), modpack_name, manifest).await;
+            let sync_results = server
+                .broadcast_sync(peer_addrs.clone(), modpack_name, manifest)
+                .await;
 
             for ((_, peer_id), result) in peer_addrs.into_iter().zip(sync_results) {
                 results.push(BroadcastResult {
@@ -637,8 +656,14 @@ impl ConnectService {
     }
 
     /// Удалить пира из группы
-    pub async fn remove_peer_from_group(&self, group_id: &str, peer_id: &str) -> Result<(), String> {
-        self.peer_groups.remove_peer_from_group(group_id, peer_id).await
+    pub async fn remove_peer_from_group(
+        &self,
+        group_id: &str,
+        peer_id: &str,
+    ) -> Result<(), String> {
+        self.peer_groups
+            .remove_peer_from_group(group_id, peer_id)
+            .await
     }
 
     /// Получить группы для пира
@@ -660,12 +685,16 @@ impl ConnectService {
 
     /// Установить локальную версию модпака (для сравнения)
     pub async fn set_local_modpack_version(&self, modpack_name: &str, version: &str) {
-        self.update_notifications.set_local_version(modpack_name, version).await;
+        self.update_notifications
+            .set_local_version(modpack_name, version)
+            .await;
     }
 
     /// Обновить версию модпака у пира
     pub async fn update_peer_modpack_version(&self, version_info: PeerModpackVersion) {
-        self.update_notifications.update_peer_version(version_info).await;
+        self.update_notifications
+            .update_peer_version(version_info)
+            .await;
     }
 
     /// Получить уведомления об обновлениях
@@ -710,12 +739,16 @@ impl ConnectService {
 
     /// Перестать отслеживать модпак
     pub async fn untrack_modpack_updates(&self, modpack_name: &str) {
-        self.update_notifications.untrack_modpack(modpack_name).await;
+        self.update_notifications
+            .untrack_modpack(modpack_name)
+            .await;
     }
 
     /// Получить пиров с конкретным модпаком
     pub async fn get_peers_with_modpack(&self, modpack_name: &str) -> Vec<PeerModpackVersion> {
-        self.update_notifications.get_peers_with_modpack(modpack_name).await
+        self.update_notifications
+            .get_peers_with_modpack(modpack_name)
+            .await
     }
 }
 

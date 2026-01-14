@@ -84,7 +84,7 @@ export default function QuickPlay(props: Props) {
         // Restore saved values from existing instance
         setSelectedVersion(existingInstance.version);
         setSelectedLoader(existingInstance.loader as LoaderType);
-        console.log("[QuickPlay] Restored from existing instance:", existingInstance.version, existingInstance.loader);
+        if (import.meta.env.DEV) console.log("[QuickPlay] Restored from existing instance:", existingInstance.version, existingInstance.loader);
       } else if (releases.length > 0) {
         // Set latest version as default only if no instance exists
         setSelectedVersion(releases[0].id);

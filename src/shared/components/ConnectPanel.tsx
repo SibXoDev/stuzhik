@@ -912,15 +912,15 @@ export function ConnectPanel(props: ConnectPanelProps) {
                     <span class="text-xs text-gray-500">Введите код друга или приглашение</span>
                   </div>
                   <div class="flex gap-2">
-                    <div class="flex-1 flex items-center bg-gray-900 rounded-lg border border-gray-700 focus-within:border-blue-500">
-                      <span class="pl-3 pr-1 text-gray-500 font-mono text-sm">STUZHIK-</span>
+                    <div class="flex-1 flex items-center bg-gray-900 rounded-xl border border-gray-700 focus-within:border-blue-500">
+                      <span class="pl-3 pr-1 text-gray-500 font-mono text-sm select-none">STUZHIK-</span>
                       <input
                         type="text"
-                        placeholder="XXXX или XXXX-XXXX"
+                        placeholder="XXXX-XXXX"
                         value={friendCode()}
                         onInput={(e) => handleCodeInput(e.currentTarget.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleConnectByCode()}
-                        class="flex-1 bg-transparent py-2 pr-3 text-sm font-mono tracking-wider placeholder:text-gray-600 focus:outline-none"
+                        class="flex-1 bg-transparent py-1 px-1 text-sm font-mono tracking-wider placeholder:text-gray-600 focus:outline-none border-none"
                         maxLength={9}
                         disabled={connectingByCode()}
                       />
@@ -1058,7 +1058,7 @@ export function ConnectPanel(props: ConnectPanelProps) {
                                 {peer.nickname || t().connect.anonymous}
                               </span>
                               <Show when={isFriend(peer.id)}>
-                                <i class="i-hugeicons:user-check-01 w-3.5 h-3.5 text-green-400" title={t().connect.settings.trustedFriends} />
+                                <i class="i-hugeicons-user-check-01 w-3.5 h-3.5 text-green-400" title={t().connect.settings.trustedFriends} />
                               </Show>
                               <span class={`w-2 h-2 rounded-full ${
                                 peer.status === "in_game" ? "bg-green-500" :
@@ -1141,7 +1141,7 @@ export function ConnectPanel(props: ConnectPanelProps) {
                                       class="w-full px-3 py-2 text-left text-sm text-green-400 hover:bg-gray-700 hover:text-green-300 flex items-center gap-2"
                                       onClick={() => handleSendFriendRequest(peer)}
                                     >
-                                      <i class="i-hugeicons:user-add-01 w-4 h-4" />
+                                      <i class="i-hugeicons-user-add-01 w-4 h-4" />
                                       {t().connect.addFriend}
                                     </button>
                                   </Show>
@@ -1561,7 +1561,7 @@ export function ConnectPanel(props: ConnectPanelProps) {
                       }`}
                       onClick={() => handleVisibilityChange("friends_only")}
                     >
-                      <i class="i-hugeicons:user-multiple w-4 h-4" />
+                      <i class="i-hugeicons-user-multiple w-4 h-4" />
                     </button>
                     <button
                       title={t().connect.settings.visibilityAll}
@@ -1779,7 +1779,7 @@ export function ConnectPanel(props: ConnectPanelProps) {
             setShowJoinDialog(false);
             setFriendCode(""); // Clear input after success
             // Optionally navigate to the instance or show success message
-            console.log("Joined server, created instance:", instanceId);
+            if (import.meta.env.DEV) console.log("Joined server, created instance:", instanceId);
           }}
           initialCode={friendCode().includes("-") ? `STUZHIK-${friendCode()}` : undefined}
         />

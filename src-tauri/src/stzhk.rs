@@ -809,27 +809,61 @@ impl StzhkManager {
         let file = std::fs::File::open(path).ok()?;
         let mut archive = ZipArchive::new(file).ok()?;
 
-        // Проверяем fabric.mod.json
+        // 1. Fabric/Quilt: fabric.mod.json
         if let Ok(mut entry) = archive.by_name("fabric.mod.json") {
             let mut content = String::new();
             entry.read_to_string(&mut content).ok()?;
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
                 if let Some(name) = json.get("name").and_then(|v| v.as_str()) {
-                    return Some(name.to_string());
+                    if !name.is_empty() {
+                        return Some(name.to_string());
+                    }
                 }
             }
         }
 
-        // Проверяем mods.toml (Forge/NeoForge)
+        // 2. Forge/NeoForge 1.13+: META-INF/mods.toml (proper TOML parsing)
         if let Ok(mut entry) = archive.by_name("META-INF/mods.toml") {
             let mut content = String::new();
             entry.read_to_string(&mut content).ok()?;
-            // Простой парсинг TOML для извлечения displayName
-            for line in content.lines() {
-                if line.trim().starts_with("displayName") {
-                    if let Some(name) = line.split('=').nth(1) {
-                        let name = name.trim().trim_matches('"');
-                        return Some(name.to_string());
+            if let Ok(toml_value) = content.parse::<toml::Value>() {
+                // mods.toml has [[mods]] array with displayName
+                if let Some(mods) = toml_value.get("mods").and_then(|v| v.as_array()) {
+                    if let Some(first_mod) = mods.first() {
+                        if let Some(name) = first_mod.get("displayName").and_then(|v| v.as_str()) {
+                            if !name.is_empty() {
+                                return Some(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Legacy Forge (pre-1.13): mcmod.info (JSON array)
+        if let Ok(mut entry) = archive.by_name("mcmod.info") {
+            let mut content = String::new();
+            entry.read_to_string(&mut content).ok()?;
+            // mcmod.info can be array or object with modList
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                // Direct array format: [{...}, {...}]
+                if let Some(arr) = json.as_array() {
+                    if let Some(first) = arr.first() {
+                        if let Some(name) = first.get("name").and_then(|v| v.as_str()) {
+                            if !name.is_empty() {
+                                return Some(name.to_string());
+                            }
+                        }
+                    }
+                }
+                // Object with modList: { modList: [...] }
+                if let Some(mod_list) = json.get("modList").and_then(|v| v.as_array()) {
+                    if let Some(first) = mod_list.first() {
+                        if let Some(name) = first.get("name").and_then(|v| v.as_str()) {
+                            if !name.is_empty() {
+                                return Some(name.to_string());
+                            }
+                        }
                     }
                 }
             }
@@ -1494,28 +1528,42 @@ impl StzhkManager {
     pub async fn export_instance(
         instance_id: &str,
         output_path: &Path,
-        embed_mods: bool,
-        include_overrides: bool,
+        options: &ExportOptions,
         app_handle: &tauri::AppHandle,
     ) -> Result<PathBuf> {
         let conn = crate::db::get_db_conn()?;
 
         // Получаем информацию об экземпляре
-        let (name, version, loader, loader_version): (String, String, String, Option<String>) =
-            conn.query_row(
-                "SELECT name, version, loader, loader_version FROM instances WHERE id = ?1",
+        let (mc_version, loader, loader_version): (String, String, Option<String>) = conn
+            .query_row(
+                "SELECT version, loader, loader_version FROM instances WHERE id = ?1",
                 [instance_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )?;
 
         let instance_path = instances_dir().join(instance_id);
         let mods_path = instance_path.join("mods");
 
+        // Convert excluded lists to HashSet for O(1) lookup
+        let excluded_mods: std::collections::HashSet<&str> =
+            options.excluded_mods.iter().map(|s| s.as_str()).collect();
+        let excluded_overrides: std::collections::HashSet<&str> = options
+            .excluded_overrides
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
+
+        log::info!(
+            "Export with {} excluded mods and {} excluded overrides",
+            excluded_mods.len(),
+            excluded_overrides.len()
+        );
+
         // Try to use cached data from preview, otherwise scan fresh
-        let mods = {
+        let all_mods = {
             let cached = PREVIEW_CACHE.lock().ok().and_then(|cache| {
                 cache.as_ref().and_then(|(cached_id, cached_embed, data)| {
-                    if cached_id == instance_id && *cached_embed == embed_mods {
+                    if cached_id == instance_id && *cached_embed == options.embed_mods {
                         log::info!("Using cached preview data for export ({} mods)", data.len());
                         Some(data.clone())
                     } else {
@@ -1542,26 +1590,34 @@ impl StzhkManager {
                     .collect()
             } else {
                 log::info!("No cache found, scanning mods fresh");
-                Self::scan_mods_for_export(&mods_path, embed_mods).await?
+                Self::scan_mods_for_export(&mods_path, options.embed_mods).await?
             }
         };
 
-        // Create manifest
+        // Filter out excluded mods
+        let mods: Vec<ModEntry> = all_mods
+            .into_iter()
+            .filter(|m| !excluded_mods.contains(m.filename.as_str()))
+            .collect();
+
+        log::info!("Exporting {} mods (after filtering)", mods.len());
+
+        // Create manifest with user-provided metadata
         let mut manifest = StzhkManifest {
             format_version: FORMAT_VERSION,
             modpack: ModpackMeta {
                 id: uuid::Uuid::new_v4().to_string(),
-                name: name.clone(),
-                version: "1.0.0".into(),
-                author: "User".into(),
-                description: None,
+                name: options.name.clone(),
+                version: options.version.clone(),
+                author: options.author.clone(),
+                description: options.description.clone(),
                 url: None,
                 icon: None,
                 created_at: chrono::Utc::now().to_rfc3339(),
                 updated_at: None,
             },
             requirements: GameRequirements {
-                minecraft_version: version,
+                minecraft_version: mc_version,
                 loader,
                 loader_version,
                 min_ram_mb: Some(4096),
@@ -1576,35 +1632,33 @@ impl StzhkManager {
 
         // Collect overrides directories if requested
         // Include ALL common directories that may contain user data, configs, assets, images
-        let override_dirs: Vec<(&str, PathBuf)> = if include_overrides {
+        let override_dirs: Vec<(&str, PathBuf)> = if options.include_overrides {
             let dirs = vec![
-                // Core configs and settings
+                // === Конфигурация ===
                 ("config", instance_path.join("config")),
-                ("options.txt", instance_path.join("options.txt")),
-                ("servers.dat", instance_path.join("servers.dat")),
-                // Resource packs and shaders
+                ("defaultconfigs", instance_path.join("defaultconfigs")),
+                // === Скрипты ===
+                ("kubejs", instance_path.join("kubejs")),
+                ("scripts", instance_path.join("scripts")),
+                ("openloader", instance_path.join("openloader")),
+                ("packmode", instance_path.join("packmode")),
+                // === Ресурсы ===
                 ("resourcepacks", instance_path.join("resourcepacks")),
                 ("shaderpacks", instance_path.join("shaderpacks")),
-                // Screenshots and schematics
-                ("screenshots", instance_path.join("screenshots")),
-                ("schematics", instance_path.join("schematics")),
-                // KubeJS (scripts, assets, data)
-                ("kubejs", instance_path.join("kubejs")),
-                // Custom resources and assets
                 ("resources", instance_path.join("resources")),
                 ("assets", instance_path.join("assets")),
-                // Patchouli custom books
                 ("patchouli_books", instance_path.join("patchouli_books")),
-                // OpenLoader
-                ("openloader", instance_path.join("openloader")),
-                // Global packs
                 ("global_packs", instance_path.join("global_packs")),
-                // Default configs
-                ("defaultconfigs", instance_path.join("defaultconfigs")),
-                // Scripts (CraftTweaker, etc)
-                ("scripts", instance_path.join("scripts")),
-                // Local resources
                 ("local", instance_path.join("local")),
+                // === Настройки игры ===
+                ("options.txt", instance_path.join("options.txt")),
+                ("servers.dat", instance_path.join("servers.dat")),
+                // === Генерируемые данные (можно исключить для экономии места) ===
+                ("saves", instance_path.join("saves")),
+                ("screenshots", instance_path.join("screenshots")),
+                ("schematics", instance_path.join("schematics")),
+                ("replay_recordings", instance_path.join("replay_recordings")),
+                ("worldedit", instance_path.join("worldedit")),
             ];
 
             // Log what directories exist
@@ -1617,10 +1671,13 @@ impl StzhkManager {
                 );
             }
 
-            // Filter to only existing paths
-            let filtered: Vec<_> = dirs.into_iter().filter(|(_, path)| path.exists()).collect();
+            // Filter to only existing paths AND not excluded
+            let filtered: Vec<_> = dirs
+                .into_iter()
+                .filter(|(name, path)| path.exists() && !excluded_overrides.contains(*name))
+                .collect();
             log::info!(
-                "Found {} override directories/files to include",
+                "Found {} override directories/files to include (after exclusions)",
                 filtered.len()
             );
             filtered
@@ -1661,7 +1718,7 @@ impl StzhkManager {
             &output_file,
             &manifest,
             &mods_path,
-            embed_mods,
+            options.embed_mods,
             &override_dirs,
             app_handle,
         )
@@ -2196,11 +2253,31 @@ impl StzhkManager {
 
         if include_overrides {
             let override_items = vec![
+                // === Конфигурация ===
                 ("config", instance_path.join("config")),
+                ("defaultconfigs", instance_path.join("defaultconfigs")),
+                // === Скрипты ===
+                ("kubejs", instance_path.join("kubejs")),
+                ("scripts", instance_path.join("scripts")),
+                ("openloader", instance_path.join("openloader")),
+                ("packmode", instance_path.join("packmode")),
+                // === Ресурсы ===
                 ("resourcepacks", instance_path.join("resourcepacks")),
                 ("shaderpacks", instance_path.join("shaderpacks")),
+                ("resources", instance_path.join("resources")),
+                ("assets", instance_path.join("assets")),
+                ("patchouli_books", instance_path.join("patchouli_books")),
+                ("global_packs", instance_path.join("global_packs")),
+                ("local", instance_path.join("local")),
+                // === Настройки игры ===
                 ("options.txt", instance_path.join("options.txt")),
                 ("servers.dat", instance_path.join("servers.dat")),
+                // === Генерируемые данные (можно исключить для экономии места) ===
+                ("saves", instance_path.join("saves")),
+                ("screenshots", instance_path.join("screenshots")),
+                ("schematics", instance_path.join("schematics")),
+                ("replay_recordings", instance_path.join("replay_recordings")),
+                ("worldedit", instance_path.join("worldedit")),
             ];
 
             for (name, path) in override_items {
@@ -2222,12 +2299,17 @@ impl StzhkManager {
 
                 overrides_size += size;
 
+                let category = OverrideCategory::from_name(name);
+                let hint = category.hint().map(|s| s.to_string());
+
                 overrides_info.push(ExportOverrideInfo {
                     name: name.to_string(),
                     path: path.to_string_lossy().to_string(),
                     size,
                     file_count,
                     is_file,
+                    category,
+                    hint,
                 });
             }
         }
@@ -2305,6 +2387,24 @@ pub struct ExportModInfo {
     pub modrinth_project_id: Option<String>,
 }
 
+/// Категория override файла для подсказок в UI
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum OverrideCategory {
+    /// Конфигурация модов (config, defaultconfigs)
+    Config,
+    /// Скрипты (kubejs, scripts, openloader)
+    Scripts,
+    /// Ресурсы (resourcepacks, shaderpacks)
+    Resources,
+    /// Генерируемые данные (миры, логи, кэш) - можно исключить
+    Generated,
+    /// Настройки игры (options.txt, servers.dat)
+    GameSettings,
+    /// Прочее
+    Other,
+}
+
 /// Информация об оверрайдах для предпросмотра
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportOverrideInfo {
@@ -2318,6 +2418,45 @@ pub struct ExportOverrideInfo {
     pub file_count: u32,
     /// Это файл или директория
     pub is_file: bool,
+    /// Категория для подсказок в UI
+    pub category: OverrideCategory,
+    /// Подсказка для пользователя (локализуется на фронте)
+    pub hint: Option<String>,
+}
+
+impl OverrideCategory {
+    /// Определить категорию по имени папки/файла
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            // Конфигурация
+            "config" | "defaultconfigs" => Self::Config,
+            // Скрипты
+            "kubejs" | "scripts" | "openloader" | "packmode" => Self::Scripts,
+            // Ресурсы
+            "resourcepacks" | "shaderpacks" | "texturepacks" => Self::Resources,
+            // Настройки игры
+            "options.txt" | "servers.dat" | "usercache.json" | "usernamecache.json" => {
+                Self::GameSettings
+            }
+            // Генерируемые (можно исключить для экономии места)
+            "saves" | "logs" | "crash-reports" | ".fabric" | ".mixin.out" | "cache" | ".cache"
+            | "replay_recordings" | "screenshots" | "schematics" | "worldedit" => Self::Generated,
+            // Прочее
+            _ => Self::Other,
+        }
+    }
+
+    /// Получить подсказку для категории
+    pub fn hint(&self) -> Option<&'static str> {
+        match self {
+            Self::Config => Some("mod_configs"),
+            Self::Scripts => Some("modpack_scripts"),
+            Self::Resources => Some("resource_files"),
+            Self::GameSettings => Some("game_settings"),
+            Self::Generated => Some("generated_data"),
+            Self::Other => None,
+        }
+    }
 }
 
 /// Результат предпросмотра экспорта
@@ -2380,20 +2519,42 @@ pub async fn install_stzhk(
     .await
 }
 
+/// Параметры экспорта в STZHK
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportOptions {
+    /// Название модпака
+    pub name: String,
+    /// Версия модпака
+    pub version: String,
+    /// Автор модпака
+    pub author: String,
+    /// Описание модпака
+    pub description: Option<String>,
+    /// Встраивать моды в архив (иначе только ссылки)
+    pub embed_mods: bool,
+    /// Включать overrides (конфиги, ресурспаки и т.д.)
+    pub include_overrides: bool,
+    /// Исключённые моды (по filename)
+    #[serde(default)]
+    pub excluded_mods: Vec<String>,
+    /// Исключённые overrides (по имени папки/файла)
+    #[serde(default)]
+    pub excluded_overrides: Vec<String>,
+}
+
 /// Экспортировать экземпляр в STZHK
 #[tauri::command]
 pub async fn export_stzhk(
     instance_id: String,
     output_path: String,
-    embed_mods: bool,
-    include_overrides: bool,
+    options: ExportOptions,
     app_handle: tauri::AppHandle,
 ) -> Result<String> {
     let path = StzhkManager::export_instance(
         &instance_id,
         &PathBuf::from(output_path),
-        embed_mods,
-        include_overrides,
+        &options,
         &app_handle,
     )
     .await?;
@@ -2557,4 +2718,296 @@ pub async fn verify_stzhk_instance(
 ) -> Result<VerificationResult> {
     let manifest = StzhkManager::read_manifest(&PathBuf::from(manifest_path)).await?;
     StzhkManager::verify_instance(&instance_id, &manifest).await
+}
+
+// ========== Export to .mrpack (Modrinth format) ==========
+
+use crate::modpacks::types::{
+    ModrinthModpackDependencies, ModrinthModpackEnv, ModrinthModpackFile, ModrinthModpackHashes,
+    ModrinthModpackIndex,
+};
+
+/// Options for .mrpack export
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MrpackExportOptions {
+    pub name: String,
+    pub version: String,
+    pub summary: Option<String>,
+    #[serde(default)]
+    pub include_overrides: bool,
+    #[serde(default)]
+    pub excluded_mods: Vec<String>,
+    #[serde(default)]
+    pub excluded_overrides: Vec<String>,
+}
+
+/// Export instance to .mrpack (Modrinth modpack format)
+/// Compatible with Prism Launcher, Modrinth App, etc.
+#[tauri::command]
+pub async fn export_mrpack(
+    instance_id: String,
+    output_path: String,
+    options: MrpackExportOptions,
+    app_handle: tauri::AppHandle,
+) -> Result<String> {
+    use crate::db::get_db_conn;
+    use crate::instances;
+    use crate::paths::instance_mods_dir;
+    use std::io::Write as IoWriteTrait;
+    use tauri::Emitter;
+    use zip::write::SimpleFileOptions as ZipOptions;
+
+    log::info!(
+        "Exporting instance {} to .mrpack: {:?}",
+        instance_id,
+        output_path
+    );
+
+    // Get instance details
+    let instance = instances::lifecycle::get_instance(instance_id.clone()).await?;
+
+    // Emit progress
+    let _ = app_handle.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "preparing",
+            "progress": 0,
+            "message": "Preparing export..."
+        }),
+    );
+
+    // Get installed mods (sync block to ensure conn is dropped before any await)
+    let mods_dir = instance_mods_dir(&instance_id);
+    let mods_rows: Vec<(String, String, String, String, Option<String>, bool)> = {
+        let conn = get_db_conn()?;
+        let mut rows = Vec::new();
+        {
+            let mut stmt = conn.prepare(
+                "SELECT slug, name, file_name, source, source_id, enabled
+                 FROM mods WHERE instance_id = ?1",
+            )?;
+            let mut query_rows = stmt.query([&instance_id])?;
+            while let Some(row) = query_rows.next()? {
+                rows.push((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, bool>(5)?,
+                ));
+            }
+        }
+        rows
+    }; // conn dropped here, before any await
+
+    // Collect mod files and their hashes
+    let mut mrpack_files: Vec<ModrinthModpackFile> = Vec::new();
+    let mut override_mods: Vec<(String, Vec<u8>)> = Vec::new(); // filename, content
+
+    let total_mods = mods_rows.len();
+    let mut processed = 0;
+
+    for (slug, name, file_name, source, source_id, enabled) in &mods_rows {
+        // Skip excluded mods
+        if options.excluded_mods.contains(file_name) {
+            continue;
+        }
+
+        // Skip disabled mods
+        if !enabled {
+            continue;
+        }
+
+        let mod_path = mods_dir.join(file_name);
+        if !mod_path.exists() {
+            log::warn!("Mod file not found: {:?}", mod_path);
+            continue;
+        }
+
+        // Calculate hashes
+        let content = tokio::fs::read(&mod_path).await?;
+        let sha1 = format!("{:x}", sha1::Sha1::digest(&content));
+        let sha512 = format!("{:x}", Sha512::digest(&content));
+        let file_size = content.len() as u64;
+
+        processed += 1;
+        let _ = app_handle.emit(
+            "export-progress",
+            serde_json::json!({
+                "stage": "processing_mods",
+                "progress": (processed * 50) / total_mods,
+                "message": format!("Processing mod: {}", name)
+            }),
+        );
+
+        // If mod is from Modrinth, use CDN URL
+        if source == "modrinth" {
+            if let Some(version_id) = source_id {
+                // Get download URL from Modrinth API
+                let download_url = format!(
+                    "https://cdn.modrinth.com/data/{}/versions/{}/{}",
+                    slug, version_id, file_name
+                );
+
+                mrpack_files.push(ModrinthModpackFile {
+                    path: format!("mods/{}", file_name),
+                    hashes: ModrinthModpackHashes {
+                        sha1,
+                        sha512: Some(sha512),
+                    },
+                    env: Some(ModrinthModpackEnv {
+                        client: Some("required".to_string()),
+                        server: Some("required".to_string()),
+                    }),
+                    downloads: vec![download_url],
+                    file_size,
+                });
+                continue;
+            }
+        }
+
+        // For CurseForge and local mods, add to overrides
+        override_mods.push((file_name.clone(), content));
+    }
+
+    // Build dependencies
+    let loader = instance.loader.as_str();
+    let dependencies = ModrinthModpackDependencies {
+        minecraft: instance.version.clone(),
+        fabric_loader: if loader == "fabric" {
+            instance.loader_version.clone()
+        } else {
+            None
+        },
+        quilt_loader: if loader == "quilt" {
+            instance.loader_version.clone()
+        } else {
+            None
+        },
+        forge: if loader == "forge" {
+            instance.loader_version.clone()
+        } else {
+            None
+        },
+        neoforge: if loader == "neoforge" {
+            instance.loader_version.clone()
+        } else {
+            None
+        },
+    };
+
+    // Build manifest
+    let manifest = ModrinthModpackIndex {
+        format_version: 1,
+        game: "minecraft".to_string(),
+        version_id: options.version.clone(),
+        name: options.name.clone(),
+        summary: options.summary.clone(),
+        files: mrpack_files,
+        dependencies,
+    };
+
+    // Collect override files (configs, etc.)
+    let mut override_files: Vec<(String, Vec<u8>)> = Vec::new();
+
+    if options.include_overrides {
+        let instance_path = instances_dir().join(&instance_id);
+
+        // Directories to include in overrides
+        let override_dirs = ["config", "kubejs", "scripts", "defaultconfigs"];
+
+        for dir_name in override_dirs {
+            if options.excluded_overrides.contains(&dir_name.to_string()) {
+                continue;
+            }
+
+            let dir_path = instance_path.join(dir_name);
+            if dir_path.exists() && dir_path.is_dir() {
+                collect_override_files(&dir_path, dir_name, &mut override_files).await?;
+            }
+        }
+    }
+
+    let _ = app_handle.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "writing_archive",
+            "progress": 75,
+            "message": "Writing .mrpack archive..."
+        }),
+    );
+
+    // Write .mrpack file (sync operation)
+    let output = PathBuf::from(&output_path);
+    let manifest_json = serde_json::to_string_pretty(&manifest)?;
+
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let file = std::fs::File::create(&output)?;
+        let mut zip = ZipWriter::new(file);
+        let options = ZipOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated)
+            .compression_level(Some(6));
+
+        // Write modrinth.index.json
+        zip.start_file("modrinth.index.json", options)?;
+        zip.write_all(manifest_json.as_bytes())?;
+
+        // Write override mods
+        for (filename, content) in override_mods {
+            let path = format!("overrides/mods/{}", filename);
+            zip.start_file(&path, options)?;
+            zip.write_all(&content)?;
+        }
+
+        // Write other overrides
+        for (path, content) in override_files {
+            let archive_path = format!("overrides/{}", path);
+            zip.start_file(&archive_path, options)?;
+            zip.write_all(&content)?;
+        }
+
+        zip.finish()?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| LauncherError::Join(e.to_string()))??;
+
+    let _ = app_handle.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "complete",
+            "progress": 100,
+            "message": "Export complete!"
+        }),
+    );
+
+    log::info!("Successfully exported to {}", output_path);
+    Ok(output_path)
+}
+
+/// Recursively collect files from a directory for overrides
+async fn collect_override_files(
+    dir: &Path,
+    base_path: &str,
+    files: &mut Vec<(String, Vec<u8>)>,
+) -> Result<()> {
+    let mut entries = tokio::fs::read_dir(dir).await?;
+
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        let relative_path = format!("{}/{}", base_path, name);
+
+        if path.is_dir() {
+            // Recursively collect subdirectory
+            Box::pin(collect_override_files(&path, &relative_path, files)).await?;
+        } else if path.is_file() {
+            // Read file content
+            let content = tokio::fs::read(&path).await?;
+            files.push((relative_path, content));
+        }
+    }
+
+    Ok(())
 }

@@ -119,6 +119,7 @@ function parseCraftTweakerRecipes(content: string): ParsedRecipe[] {
     const patternStr = match[3];
 
     // Parse pattern - crude but works for basic cases
+    // eslint-disable-next-line no-useless-escape
     const rows = patternStr.split("],").map((r) => r.replace(/[\[\]]/g, "").trim());
     const inputs = new Set<string>();
     const pattern: string[] = [];

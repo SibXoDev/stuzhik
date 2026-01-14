@@ -2,6 +2,7 @@ use chrono::Utc;
 use rusqlite::params;
 use std::path::PathBuf;
 use std::process::Command;
+use tauri_plugin_opener::OpenerExt;
 
 use crate::db::get_db_conn;
 use crate::error::{LauncherError, Result};
@@ -107,9 +108,7 @@ pub(super) fn is_process_running(pid: u32) -> bool {
 fn kill_process_by_pid(pid: u32) -> bool {
     #[cfg(unix)]
     {
-        let result = Command::new("kill")
-            .args(["-9", &pid.to_string()])
-            .output();
+        let result = Command::new("kill").args(["-9", &pid.to_string()]).output();
         matches!(result, Ok(output) if output.status.success())
     }
 
@@ -128,7 +127,11 @@ fn kill_process_by_pid(pid: u32) -> bool {
 
 /// Открытие папки экземпляра в файловом менеджере
 #[tauri::command]
-pub async fn open_instance_folder(id: String, subfolder: Option<String>) -> Result<()> {
+pub async fn open_instance_folder(
+    app: tauri::AppHandle,
+    id: String,
+    subfolder: Option<String>,
+) -> Result<()> {
     // Проверяем что экземпляр существует
     let instance = get_instance(id.clone()).await?;
 
@@ -166,34 +169,58 @@ pub async fn open_instance_folder(id: String, subfolder: Option<String>) -> Resu
         ));
     }
 
-    // Открываем папку в системном файловом менеджере
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(&path)
-            .spawn()
-            .map_err(|e| LauncherError::Io(e))?;
+    // Открываем папку через tauri-plugin-opener (кроссплатформенно)
+    app.opener()
+        .open_path(canonical_path.to_string_lossy(), None::<&str>)
+        .map_err(|e| LauncherError::ApiError(e.to_string()))?;
+
+    Ok(())
+}
+
+/// Показать файл в файловом менеджере (с выделением)
+#[tauri::command]
+pub async fn reveal_instance_file(
+    app: tauri::AppHandle,
+    instance_id: String,
+    relative_path: String,
+) -> Result<()> {
+    // Проверяем что экземпляр существует
+    let instance = get_instance(instance_id.clone()).await?;
+
+    // Path traversal protection
+    if relative_path.contains("..") {
+        return Err(LauncherError::InvalidConfig(
+            "Invalid file path: path traversal detected".to_string(),
+        ));
     }
 
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(&path)
-            .spawn()
-            .map_err(|e| LauncherError::Io(e))?;
+    let mut path = PathBuf::from(&instance.dir);
+    path.push(&relative_path);
+
+    // Проверяем что файл существует
+    if !path.exists() {
+        return Err(LauncherError::NotFound(format!(
+            "File not found: {}",
+            path.display()
+        )));
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
+    // Проверяем что путь находится внутри директории экземпляра
+    let canonical_path = path.canonicalize().map_err(|e| LauncherError::Io(e))?;
+    let canonical_instance_dir = PathBuf::from(&instance.dir)
+        .canonicalize()
+        .map_err(|e| LauncherError::Io(e))?;
 
-        Command::new("explorer")
-            .arg(&path)
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| LauncherError::Io(e))?;
+    if !canonical_path.starts_with(&canonical_instance_dir) {
+        return Err(LauncherError::InvalidConfig(
+            "Path is outside instance directory".to_string(),
+        ));
     }
+
+    // Показываем файл через tauri-plugin-opener (кроссплатформенно)
+    app.opener()
+        .reveal_item_in_dir(canonical_path)
+        .map_err(|e| LauncherError::ApiError(e.to_string()))?;
 
     Ok(())
 }

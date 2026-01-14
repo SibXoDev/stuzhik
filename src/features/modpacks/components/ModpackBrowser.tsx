@@ -6,17 +6,21 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { ModpackSearchResult, ModpackSearchResponse, ModpackInstallProgress, ModpackFilePreview, ModpackInstallSummary, Instance, InstallProgress, DownloadProgress, ModpackVersionInfo, ModpackDetails, VersionChangelog, ProjectInfo } from "../../../shared/types";
 import { ProjectInfoDialog } from "../../../shared/components/ProjectInfoDialog";
 import ModpackCompareDialog from "./ModpackCompareDialog";
+import ModpackImportPreview from "./ModpackImportPreview";
 import { Pagination } from "../../../shared/ui";
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import { useSafeTimers, useDebounce } from "../../../shared/hooks";
+import { useI18n } from "../../../shared/i18n";
 
 interface Props {
   onClose: () => void;
   onInstalled: (instanceId: string, instanceName: string) => void;
   instances?: Instance[];
+  initialFile?: string | null;
 }
 
 const ModpackBrowser: Component<Props> = (props) => {
+  const { t } = useI18n();
   const [source, setSource] = createSignal<"modrinth" | "curseforge">("modrinth");
   const [searchQuery, setSearchQuery] = createSignal("");
   const [debouncedQuery, setDebouncedQuery] = createSignal("");
@@ -41,6 +45,9 @@ const ModpackBrowser: Component<Props> = (props) => {
   const [filePreview, setFilePreview] = createSignal<ModpackFilePreview | null>(null);
   const [filePreviewLoading, setFilePreviewLoading] = createSignal(false);
   const [filePreviewError, setFilePreviewError] = createSignal<string | null>(null);
+
+  // Detailed import preview
+  const [showDetailedPreview, setShowDetailedPreview] = createSignal(false);
 
   // URL install
   const [showUrlInstall, setShowUrlInstall] = createSignal(false);
@@ -100,6 +107,41 @@ const ModpackBrowser: Component<Props> = (props) => {
     const parsed = JSON.parse(key);
 
     search(parsed.query, parsed.source, parsed.page);
+  });
+
+  // Handle initial file from drag & drop
+  createEffect(() => {
+    const initialPath = props.initialFile;
+    if (initialPath) {
+      // Switch to file install mode and load preview
+      setShowFileInstall(true);
+      setShowUrlInstall(false);
+      setFilePath(initialPath);
+      setFilePreview(null);
+      setFilePreviewError(null);
+      setFilePreviewLoading(true);
+
+      // Load file preview
+      invoke<ModpackFilePreview>("preview_modpack_file", { filePath: initialPath })
+        .then((preview) => {
+          setFilePreview(preview);
+          if (!fileInstanceName()) {
+            setFileInstanceName(preview.name);
+          }
+        })
+        .catch((e) => {
+          setFilePreviewError(String(e));
+          // Fallback: extract name from filename
+          const fileName = initialPath.split(/[/\\]/).pop() || "";
+          const nameWithoutExt = fileName.replace(/\.(mrpack|zip|stzhk)$/i, "");
+          if (nameWithoutExt && !fileInstanceName()) {
+            setFileInstanceName(nameWithoutExt);
+          }
+        })
+        .finally(() => {
+          setFilePreviewLoading(false);
+        });
+    }
   });
 
   // Setup event listeners on mount (NOT in createEffect to avoid duplicates!)
@@ -794,7 +836,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                 value={instanceName()}
                 onInput={(e) => setInstanceName(e.currentTarget.value)}
                 class="w-full"
-                placeholder="Введите название"
+                placeholder={t().ui.placeholders.enterName}
               />
             </label>
 
@@ -969,18 +1011,29 @@ const ModpackBrowser: Component<Props> = (props) => {
               value={fileInstanceName()}
               onInput={(e) => setFileInstanceName(e.currentTarget.value)}
               class="w-full"
-              placeholder="Мой модпак"
+              placeholder={t().ui.placeholders.myModpack}
             />
           </label>
 
-          <button
-            class="btn-primary w-full"
-            onClick={handleFileInstall}
-            disabled={!filePath() || !fileInstanceName() || installing() || filePreviewLoading()}
-          >
-            <i class="i-hugeicons-download-02 w-4 h-4" />
-            Установить из файла
-          </button>
+          <div class="flex gap-2">
+            <button
+              class="btn-secondary flex-1"
+              onClick={() => setShowDetailedPreview(true)}
+              disabled={!filePath() || installing() || filePreviewLoading()}
+              title="Просмотреть содержимое модпака"
+            >
+              <i class="i-hugeicons-view w-4 h-4" />
+              Подробнее
+            </button>
+            <button
+              class="btn-primary flex-1"
+              onClick={handleFileInstall}
+              disabled={!filePath() || !fileInstanceName() || installing() || filePreviewLoading()}
+            >
+              <i class="i-hugeicons-download-02 w-4 h-4" />
+              Установить
+            </button>
+          </div>
         </div>
       </Show>
 
@@ -1017,7 +1070,7 @@ const ModpackBrowser: Component<Props> = (props) => {
               value={urlInput()}
               onInput={(e) => setUrlInput(e.currentTarget.value)}
               class="w-full"
-              placeholder="https://disk.yandex.ru/d/... или https://drive.google.com/..."
+              placeholder={t().ui.placeholders.cloudStorageUrl}
             />
           </label>
 
@@ -1028,7 +1081,7 @@ const ModpackBrowser: Component<Props> = (props) => {
               value={urlInstanceName()}
               onInput={(e) => setUrlInstanceName(e.currentTarget.value)}
               class="w-full"
-              placeholder="Мой модпак"
+              placeholder={t().ui.placeholders.myModpack}
             />
           </label>
 
@@ -1075,7 +1128,7 @@ const ModpackBrowser: Component<Props> = (props) => {
             type="text"
             value={searchQuery()}
             onInput={(e) => setSearchQuery(e.currentTarget.value)}
-            placeholder="Поиск модпаков..."
+            placeholder={t().ui.placeholders.searchModpacks}
             class="w-full pl-10"
           />
           <i class="i-hugeicons-search-01 absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
@@ -1196,10 +1249,26 @@ const ModpackBrowser: Component<Props> = (props) => {
                 value={previewInstanceName()}
                 onInput={(e) => setPreviewInstanceName(e.currentTarget.value)}
                 class="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-xl text-sm w-48"
-                placeholder="Введите название"
+                placeholder={t().ui.placeholders.enterName}
               />
             </div>
           )}
+        />
+      </Show>
+
+      {/* Detailed Import Preview Dialog */}
+      <Show when={showDetailedPreview() && filePath()}>
+        <ModpackImportPreview
+          filePath={filePath()}
+          onClose={() => setShowDetailedPreview(false)}
+          onImport={(name, _excludedMods, _excludedOverrides) => {
+            // For now, we use the standard import without selective filtering
+            // TODO: Add backend support for excluded_mods and excluded_overrides
+            setFileInstanceName(name);
+            setShowDetailedPreview(false);
+            handleFileInstall();
+          }}
+          importing={installing()}
         />
       </Show>
     </div>

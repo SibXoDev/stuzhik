@@ -11,6 +11,7 @@ import type {
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import { addToast } from "../../../shared/components/Toast";
 import { Tabs } from "../../../shared/ui";
+import { useI18n } from "../../../shared/i18n";
 
 interface Props {
   project: ModpackProject;
@@ -46,6 +47,7 @@ interface ExportProgress {
 }
 
 export default function ModpackEditor(props: Props) {
+  const { t } = useI18n();
   const [projectFull, setProjectFull] = createSignal<ModpackProjectFull | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
@@ -473,7 +475,7 @@ export default function ModpackEditor(props: Props) {
                   <input
                     type="text"
                     class="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
-                    placeholder={`Поиск модов на ${searchSource() === "modrinth" ? "Modrinth" : "CurseForge"}...`}
+                    placeholder={t().ui.placeholders.searchModsOn.replace("{source}", searchSource() === "modrinth" ? "Modrinth" : "CurseForge")}
                     value={searchQuery()}
                     onInput={(e) => setSearchQuery(e.currentTarget.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -677,7 +679,7 @@ export default function ModpackEditor(props: Props) {
                 <input
                   type="text"
                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
-                  placeholder="1.0.0"
+                  placeholder={t().ui.placeholders.versionNumber}
                   value={editVersion()}
                   onInput={(e) => setEditVersion(e.currentTarget.value)}
                 />
@@ -688,7 +690,7 @@ export default function ModpackEditor(props: Props) {
                 <input
                   type="text"
                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
-                  placeholder="Ваше имя"
+                  placeholder={t().ui.placeholders.yourName}
                   value={editAuthor()}
                   onInput={(e) => setEditAuthor(e.currentTarget.value)}
                 />
@@ -699,7 +701,7 @@ export default function ModpackEditor(props: Props) {
                 <textarea
                   class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none resize-none"
                   rows={4}
-                  placeholder="Описание вашего модпака..."
+                  placeholder={t().ui.placeholders.modpackDescriptionLong}
                   value={editDescription()}
                   onInput={(e) => setEditDescription(e.currentTarget.value)}
                 />

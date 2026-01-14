@@ -89,8 +89,8 @@ impl TransferHistory {
             .await
             .map_err(|e| format!("Failed to read history file: {}", e))?;
 
-        let entries: Vec<TransferHistoryEntry> = serde_json::from_str(&data)
-            .map_err(|e| format!("Failed to parse history: {}", e))?;
+        let entries: Vec<TransferHistoryEntry> =
+            serde_json::from_str(&data).map_err(|e| format!("Failed to parse history: {}", e))?;
 
         let mut guard = self.entries.write().await;
         *guard = VecDeque::from(entries);
@@ -229,8 +229,14 @@ impl TransferHistory {
         let guard = self.entries.read().await;
 
         let total_transfers = guard.len();
-        let successful = guard.iter().filter(|e| e.result == TransferResult::Success).count();
-        let failed = guard.iter().filter(|e| e.result == TransferResult::Failed).count();
+        let successful = guard
+            .iter()
+            .filter(|e| e.result == TransferResult::Success)
+            .count();
+        let failed = guard
+            .iter()
+            .filter(|e| e.result == TransferResult::Failed)
+            .count();
         let total_bytes_sent: u64 = guard
             .iter()
             .filter(|e| e.direction == TransferDirection::Upload)
