@@ -2,6 +2,7 @@ import { createSignal, Show, For, onMount } from "solid-js";
 import { useBackups } from "../../../shared/hooks";
 import { useI18n } from "../../../shared/i18n";
 import { createConfirmDialog } from "../../../shared/components/ConfirmDialog";
+import { formatSize } from "../../../shared/utils/format-size";
 import type { Instance, BackupRecord, BackupModStatus } from "../../../shared/types";
 
 interface Props {
@@ -24,14 +25,8 @@ export default function BackupManager(props: Props) {
   const [creating, setCreating] = createSignal(false);
   const [restoring, setRestoring] = createSignal<string | null>(null);
 
-  // Форматирование размера
-  const formatSize = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-  };
+  // Localized size formatter
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   // Форматирование даты
   const formatDate = (dateStr: string): string => {
@@ -125,6 +120,7 @@ export default function BackupManager(props: Props) {
           <button
             class="btn-close"
             onClick={props.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
           >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
@@ -243,7 +239,7 @@ export default function BackupManager(props: Props) {
                       <div class="flex items-center gap-2 mt-1 text-xs text-gray-400">
                         <span>{formatDate(backup.created_at)}</span>
                         <span>•</span>
-                        <span>{formatSize(backup.size)}</span>
+                        <span>{fmtSize(backup.size)}</span>
                       </div>
                       <div class="mt-1">
                         <span class="text-xs px-2 py-0.5 bg-gray-600/50 rounded">

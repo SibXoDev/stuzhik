@@ -4,6 +4,7 @@ import type { MetadataFile, PackMcmeta, PackFormatInfo } from "../../../shared/t
 import { PACK_FORMATS } from "../../../shared/types";
 import { ModalWrapper } from "../../../shared/ui";
 import { addToast } from "../../../shared/components/Toast";
+import { useI18n } from "../../../shared/i18n";
 
 interface MetadataEditorProps {
   instanceId: string;
@@ -11,6 +12,7 @@ interface MetadataEditorProps {
 }
 
 export function MetadataEditor(props: MetadataEditorProps) {
+  const { t } = useI18n();
   const [metadataFiles, setMetadataFiles] = createSignal<MetadataFile[]>([]);
   const [selectedFile, setSelectedFile] = createSignal<MetadataFile | null>(null);
   const [loading, setLoading] = createSignal(true);
@@ -33,10 +35,12 @@ export function MetadataEditor(props: MetadataEditorProps) {
         selectFile(files[0]);
       }
     } catch (e) {
-      console.error("Failed to load metadata files:", e);
+      if (import.meta.env.DEV) {
+        console.error("Failed to load metadata files:", e);
+      }
       addToast({
         type: "error",
-        title: "Failed to load metadata",
+        title: t().editor?.metadataEditor?.toast?.failedToLoad || "Failed to load metadata",
         message: String(e),
         duration: 5000,
       });
@@ -98,15 +102,17 @@ export function MetadataEditor(props: MetadataEditorProps) {
 
       addToast({
         type: "success",
-        title: "Saved",
-        message: `${file.path.split("/").pop()} saved`,
+        title: t().editor?.metadataEditor?.toast?.saved || "Saved",
+        message: (t().editor?.metadataEditor?.toast?.savedMessage || "{file} saved").replace("{file}", file.path.split("/").pop() || ""),
         duration: 2000,
       });
     } catch (e) {
-      console.error("Failed to save:", e);
+      if (import.meta.env.DEV) {
+        console.error("Failed to save:", e);
+      }
       addToast({
         type: "error",
-        title: "Failed to save",
+        title: t().editor?.metadataEditor?.toast?.failedToSave || "Failed to save",
         message: String(e),
         duration: 5000,
       });
@@ -119,7 +125,7 @@ export function MetadataEditor(props: MetadataEditorProps) {
     <ModalWrapper maxWidth="max-w-4xl" backdrop onBackdropClick={props.onClose}>
       {/* Header */}
       <div class="flex items-center justify-between p-4 border-b border-gray-700">
-        <h2 class="text-lg font-semibold">Metadata Editor</h2>
+        <h2 class="text-lg font-semibold">{t().editor?.metadataEditor?.title || "Metadata Editor"}</h2>
         <button
           class="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white"
           onClick={props.onClose}
@@ -131,11 +137,11 @@ export function MetadataEditor(props: MetadataEditorProps) {
         {/* Sidebar - File list */}
         <div class="w-56 flex-shrink-0 border-r border-gray-700 pr-4">
           <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-medium">Metadata Files</span>
+            <span class="text-sm font-medium">{t().editor?.metadataEditor?.metadataFiles || "Metadata Files"}</span>
             <button
               class="p-1 rounded hover:bg-gray-700"
               onClick={() => setShowCreatePack(true)}
-              title="Create pack.mcmeta"
+              title={t().editor?.metadataEditor?.createPackMcmeta || "Create pack.mcmeta"}
             >
               <i class="i-hugeicons-add-01 w-4 h-4 text-green-400" />
             </button>
@@ -150,12 +156,12 @@ export function MetadataEditor(props: MetadataEditorProps) {
           <Show when={!loading() && metadataFiles().length === 0}>
             <div class="text-center py-8 text-gray-500 text-sm">
               <i class="i-hugeicons-file-search w-8 h-8 mx-auto mb-2" />
-              <p>No metadata files found</p>
+              <p>{t().editor?.metadataEditor?.noFilesFound || "No metadata files found"}</p>
               <button
                 class="btn-primary btn-sm mt-4"
                 onClick={() => setShowCreatePack(true)}
               >
-                Create pack.mcmeta
+                {t().editor?.metadataEditor?.createPackMcmeta || "Create pack.mcmeta"}
               </button>
             </div>
           </Show>
@@ -200,7 +206,7 @@ export function MetadataEditor(props: MetadataEditorProps) {
               <div class="flex-center h-full text-gray-500">
                 <div class="text-center">
                   <i class="i-hugeicons-file-edit w-12 h-12 mx-auto mb-3" />
-                  <p>Select a file to edit</p>
+                  <p>{t().editor?.metadataEditor?.selectFileToEdit || "Select a file to edit"}</p>
                 </div>
               </div>
             }
@@ -240,7 +246,7 @@ export function MetadataEditor(props: MetadataEditorProps) {
       {/* Actions */}
       <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-700">
         <button class="btn-secondary" onClick={props.onClose}>
-          Close
+          {t().editor?.metadataEditor?.close || "Close"}
         </button>
         <Show when={selectedFile()}>
           <button
@@ -248,9 +254,9 @@ export function MetadataEditor(props: MetadataEditorProps) {
             onClick={saveFile}
             disabled={saving()}
           >
-            <Show when={saving()} fallback="Save">
+            <Show when={saving()} fallback={t().editor?.metadataEditor?.save || "Save"}>
               <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-              Saving...
+              {t().editor?.metadataEditor?.saving || "Saving..."}
             </Show>
           </button>
         </Show>
@@ -281,6 +287,7 @@ interface PackMcmetaEditorProps {
 }
 
 function PackMcmetaEditor(props: PackMcmetaEditorProps) {
+  const { t } = useI18n();
   const formatInfo = (): PackFormatInfo | undefined => {
     return PACK_FORMATS.find((p) => p.format === props.packFormat);
   };
@@ -290,14 +297,14 @@ function PackMcmetaEditor(props: PackMcmetaEditorProps) {
       <div class="flex items-center gap-3 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg">
         <i class="i-hugeicons-package w-8 h-8 text-purple-400" />
         <div>
-          <div class="font-medium">Pack Metadata</div>
+          <div class="font-medium">{t().editor?.metadataEditor?.packMetadata || "Pack Metadata"}</div>
           <div class="text-sm text-gray-400">pack.mcmeta</div>
         </div>
       </div>
 
       {/* Pack Format */}
       <div>
-        <label class="block text-sm font-medium mb-2">Pack Format</label>
+        <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.packFormat || "Pack Format"}</label>
         <select
           value={props.packFormat}
           onChange={(e) => props.onPackFormatChange(parseInt(e.currentTarget.value))}
@@ -320,30 +327,30 @@ function PackMcmetaEditor(props: PackMcmetaEditorProps) {
         </select>
         <Show when={formatInfo()}>
           <p class="text-xs text-gray-500 mt-1">
-            Compatible with Minecraft {formatInfo()?.versions}
+            {(t().editor?.metadataEditor?.compatibleWith || "Compatible with Minecraft {versions}").replace("{versions}", formatInfo()?.versions || "")}
           </p>
         </Show>
       </div>
 
       {/* Description */}
       <div>
-        <label class="block text-sm font-medium mb-2">Description</label>
+        <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.description || "Description"}</label>
         <textarea
           value={props.description}
           onInput={(e) => props.onDescriptionChange(e.currentTarget.value)}
           rows={3}
           class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
-          placeholder="Pack description..."
+          placeholder={t().editor?.metadataEditor?.descriptionPlaceholder || "Pack description..."}
         />
         <p class="text-xs text-gray-500 mt-1">
-          Supports Minecraft formatting codes (e.g., \u00a7c for red)
+          {t().editor?.metadataEditor?.formattingHint || "Supports Minecraft formatting codes (e.g., §c for red)"}
         </p>
       </div>
 
       {/* Supported Formats */}
       <Show when={props.data.pack.supported_formats}>
         <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">Supported Formats</div>
+          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.supportedFormats || "Supported Formats"}</div>
           <code class="text-xs text-blue-400">
             {JSON.stringify(props.data.pack.supported_formats)}
           </code>
@@ -353,7 +360,7 @@ function PackMcmetaEditor(props: PackMcmetaEditorProps) {
       {/* Filter */}
       <Show when={props.data.filter}>
         <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">Filters</div>
+          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.filters || "Filters"}</div>
           <code class="text-xs text-gray-400">
             {JSON.stringify(props.data.filter, null, 2)}
           </code>
@@ -369,35 +376,36 @@ interface ModsTomlViewerProps {
 }
 
 function ModsTomlViewer(props: ModsTomlViewerProps) {
+  const { t } = useI18n();
   return (
     <div class="space-y-4">
       <div class="flex items-center gap-3 p-3 bg-orange-900/20 border border-orange-500/30 rounded-lg">
         <i class="i-hugeicons-settings-02 w-8 h-8 text-orange-400" />
         <div>
-          <div class="font-medium">Forge/NeoForge Mod Metadata</div>
+          <div class="font-medium">{t().editor?.metadataEditor?.forgeModMetadata || "Forge/NeoForge Mod Metadata"}</div>
           <div class="text-sm text-gray-400">mods.toml</div>
         </div>
       </div>
 
       <div class="grid gap-4">
         <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">Mod Loader</div>
+          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.modLoader || "Mod Loader"}</div>
           <div class="text-gray-300">{props.data.mod_loader}</div>
         </div>
 
         <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">Loader Version</div>
+          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.loaderVersion || "Loader Version"}</div>
           <div class="text-gray-300">{props.data.loader_version}</div>
         </div>
 
         <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">License</div>
+          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.license || "License"}</div>
           <div class="text-gray-300">{props.data.license}</div>
         </div>
 
         <Show when={props.data.mods?.length > 0}>
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-2">Mods ({props.data.mods.length})</div>
+            <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.mods || "Mods"} ({props.data.mods.length})</div>
             <For each={props.data.mods}>
               {(mod: any) => (
                 <div class="p-2 bg-gray-750 rounded mt-2">
@@ -415,7 +423,7 @@ function ModsTomlViewer(props: ModsTomlViewerProps) {
 
       <div class="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-lg text-sm text-yellow-300">
         <i class="i-hugeicons-information-circle w-4 h-4 inline mr-1" />
-        mods.toml editing is read-only. Use the source editor for changes.
+        {t().editor?.metadataEditor?.modsTomlReadOnly || "mods.toml editing is read-only. Use the source editor for changes."}
       </div>
     </div>
   );
@@ -427,12 +435,13 @@ interface FabricModJsonViewerProps {
 }
 
 function FabricModJsonViewer(props: FabricModJsonViewerProps) {
+  const { t } = useI18n();
   return (
     <div class="space-y-4">
       <div class="flex items-center gap-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
         <i class="i-hugeicons-code-square w-8 h-8 text-blue-400" />
         <div>
-          <div class="font-medium">Fabric Mod Metadata</div>
+          <div class="font-medium">{t().editor?.metadataEditor?.fabricModMetadata || "Fabric Mod Metadata"}</div>
           <div class="text-sm text-gray-400">fabric.mod.json</div>
         </div>
       </div>
@@ -440,32 +449,32 @@ function FabricModJsonViewer(props: FabricModJsonViewerProps) {
       <div class="grid gap-4">
         <div class="grid grid-cols-2 gap-4">
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">Mod ID</div>
+            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.modId || "Mod ID"}</div>
             <div class="text-gray-300 font-mono">{props.data.id}</div>
           </div>
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">Version</div>
+            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.version || "Version"}</div>
             <div class="text-gray-300">{props.data.version}</div>
           </div>
         </div>
 
         <Show when={props.data.name}>
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">Name</div>
+            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.name || "Name"}</div>
             <div class="text-gray-300">{props.data.name}</div>
           </div>
         </Show>
 
         <Show when={props.data.description}>
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">Description</div>
+            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.description || "Description"}</div>
             <div class="text-gray-300">{props.data.description}</div>
           </div>
         </Show>
 
         <Show when={props.data.authors?.length > 0}>
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">Authors</div>
+            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.authors || "Authors"}</div>
             <div class="flex flex-wrap gap-2">
               <For each={props.data.authors}>
                 {(author: any) => (
@@ -480,7 +489,7 @@ function FabricModJsonViewer(props: FabricModJsonViewerProps) {
 
         <Show when={props.data.depends && Object.keys(props.data.depends).length > 0}>
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-2">Dependencies</div>
+            <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.dependencies || "Dependencies"}</div>
             <div class="space-y-1">
               <For each={Object.entries(props.data.depends || {})}>
                 {([id, version]) => (
@@ -496,7 +505,7 @@ function FabricModJsonViewer(props: FabricModJsonViewerProps) {
 
         <Show when={props.data.environment}>
           <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">Environment</div>
+            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.environment || "Environment"}</div>
             <div class="text-gray-300 capitalize">{props.data.environment}</div>
           </div>
         </Show>
@@ -504,7 +513,7 @@ function FabricModJsonViewer(props: FabricModJsonViewerProps) {
 
       <div class="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-lg text-sm text-yellow-300">
         <i class="i-hugeicons-information-circle w-4 h-4 inline mr-1" />
-        fabric.mod.json editing is read-only. Use the source editor for changes.
+        {t().editor?.metadataEditor?.fabricReadOnly || "fabric.mod.json editing is read-only. Use the source editor for changes."}
       </div>
     </div>
   );
@@ -518,9 +527,10 @@ interface CreatePackMcmetaDialogProps {
 }
 
 function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
+  const { t } = useI18n();
   const [packPath, setPackPath] = createSignal("kubejs");
   const [packFormat, setPackFormat] = createSignal(15);
-  const [description, setDescription] = createSignal("A custom pack");
+  const [description, setDescription] = createSignal(t().editor?.metadataEditor?.defaultDescription || "A custom pack");
   const [creating, setCreating] = createSignal(false);
 
   const handleCreate = async () => {
@@ -535,17 +545,19 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
 
       addToast({
         type: "success",
-        title: "Created",
-        message: "pack.mcmeta created successfully",
+        title: t().editor?.metadataEditor?.toast?.created || "Created",
+        message: t().editor?.metadataEditor?.toast?.createdMessage || "pack.mcmeta created successfully",
         duration: 2000,
       });
 
       props.onCreated();
     } catch (e) {
-      console.error("Failed to create:", e);
+      if (import.meta.env.DEV) {
+        console.error("Failed to create:", e);
+      }
       addToast({
         type: "error",
-        title: "Failed to create",
+        title: t().editor?.metadataEditor?.toast?.failedToCreate || "Failed to create",
         message: String(e),
         duration: 5000,
       });
@@ -558,7 +570,7 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
     <ModalWrapper backdrop onBackdropClick={props.onClose}>
       {/* Header */}
       <div class="flex items-center justify-between p-4 border-b border-gray-700">
-        <h2 class="text-lg font-semibold">Create pack.mcmeta</h2>
+        <h2 class="text-lg font-semibold">{t().editor?.metadataEditor?.createPackMcmeta || "Create pack.mcmeta"}</h2>
         <button
           class="p-1.5 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white"
           onClick={props.onClose}
@@ -568,7 +580,7 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
       </div>
       <div class="p-4 space-y-4">
         <div>
-          <label class="block text-sm font-medium mb-2">Location</label>
+          <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.location || "Location"}</label>
           <select
             value={packPath()}
             onChange={(e) => setPackPath(e.currentTarget.value)}
@@ -581,7 +593,7 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-2">Pack Format</label>
+          <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.packFormat || "Pack Format"}</label>
           <select
             value={packFormat()}
             onChange={(e) => setPackFormat(parseInt(e.currentTarget.value))}
@@ -597,26 +609,26 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
         </div>
 
         <div>
-          <label class="block text-sm font-medium mb-2">Description</label>
+          <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.description || "Description"}</label>
           <input
             type="text"
             value={description()}
             onInput={(e) => setDescription(e.currentTarget.value)}
             class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-            placeholder="Pack description"
+            placeholder={t().editor?.metadataEditor?.descriptionPlaceholder || "Pack description..."}
           />
         </div>
 
         <div class="flex justify-end gap-3 pt-4">
           <button class="btn-secondary" onClick={props.onClose}>
-            Cancel
+            {t().editor?.metadataEditor?.cancel || "Cancel"}
           </button>
           <button
             class="btn-primary"
             onClick={handleCreate}
             disabled={creating()}
           >
-            <Show when={creating()} fallback="Create">
+            <Show when={creating()} fallback={t().editor?.metadataEditor?.create || "Create"}>
               <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
             </Show>
           </button>

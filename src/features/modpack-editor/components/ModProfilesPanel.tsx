@@ -7,12 +7,14 @@ import { addToast } from "../../../shared/components/Toast";
 import { invoke } from "@tauri-apps/api/core";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
+import { useI18n } from "../../../shared/i18n";
 
 interface ModProfilesPanelProps {
   instanceId: string;
 }
 
 export function ModProfilesPanel(props: ModProfilesPanelProps) {
+  const { t } = useI18n();
   const profiles = useModProfiles(() => props.instanceId);
   const mods = useMods(() => props.instanceId);
   const [profileName, setProfileName] = createSignal("");
@@ -33,8 +35,8 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
     if (!name) {
       addToast({
         type: "error",
-        title: "Ошибка",
-        message: "Введите название профиля",
+        title: t().editor?.modProfiles?.toast?.error || "Error",
+        message: t().editor?.modProfiles?.toast?.enterName || "Enter profile name",
         duration: 3000,
       });
       return;
@@ -46,10 +48,10 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
 
       if (enabledModIds.length === 0) {
         const confirmed = await confirm({
-          title: "Нет включённых модов",
-          message: "Вы уверены, что хотите сохранить профиль без включённых модов?",
+          title: t().editor?.modProfiles?.confirm?.noEnabledMods || "No enabled mods",
+          message: t().editor?.modProfiles?.confirm?.noEnabledModsMessage || "Are you sure you want to save a profile without enabled mods?",
           variant: "warning",
-          confirmText: "Сохранить",
+          confirmText: t().editor?.modProfiles?.confirm?.save || "Save",
         });
 
         if (!confirmed) {
@@ -69,8 +71,8 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
         setProfileDescription("");
         addToast({
           type: "success",
-          title: "Профиль сохранён",
-          message: `"${name}" успешно создан`,
+          title: t().editor?.modProfiles?.toast?.profileSaved || "Profile saved",
+          message: (t().editor?.modProfiles?.toast?.profileSavedMessage || "\"{name}\" successfully created").replace("{name}", name),
           duration: 3000,
         });
       }
@@ -81,10 +83,10 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
 
   const handleApplyProfile = async (profile: ModProfile) => {
     const confirmed = await confirm({
-      title: "Применить профиль?",
-      message: `Будут включены ${profile.enabled_mod_ids.length} модов, остальные будут отключены. Продолжить?`,
+      title: t().editor?.modProfiles?.confirm?.applyProfile || "Apply profile?",
+      message: (t().editor?.modProfiles?.confirm?.applyProfileMessage || "{count} mods will be enabled, the rest will be disabled. Continue?").replace("{count}", String(profile.enabled_mod_ids.length)),
       variant: "warning",
-      confirmText: "Применить",
+      confirmText: t().editor?.modProfiles?.confirm?.apply || "Apply",
     });
 
     if (!confirmed) return;
@@ -96,8 +98,8 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
         await mods.loadMods();
         addToast({
           type: "success",
-          title: "Профиль применён",
-          message: `"${profile.name}" успешно применён`,
+          title: t().editor?.modProfiles?.toast?.profileApplied || "Profile applied",
+          message: (t().editor?.modProfiles?.toast?.profileAppliedMessage || "\"{name}\" successfully applied").replace("{name}", profile.name),
           duration: 3000,
         });
       }
@@ -108,10 +110,10 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
 
   const handleDeleteProfile = async (profile: ModProfile) => {
     const confirmed = await confirm({
-      title: "Удалить профиль?",
-      message: `Профиль "${profile.name}" будет удалён. Это действие нельзя отменить.`,
+      title: t().editor?.modProfiles?.confirm?.deleteProfile || "Delete profile?",
+      message: (t().editor?.modProfiles?.confirm?.deleteProfileMessage || "Profile \"{name}\" will be deleted. This action cannot be undone.").replace("{name}", profile.name),
       variant: "danger",
-      confirmText: "Удалить",
+      confirmText: t().editor?.modProfiles?.confirm?.delete || "Delete",
     });
 
     if (!confirmed) return;
@@ -120,8 +122,8 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
     if (success) {
       addToast({
         type: "success",
-        title: "Профиль удалён",
-        message: `"${profile.name}" успешно удалён`,
+        title: t().editor?.modProfiles?.toast?.profileDeleted || "Profile deleted",
+        message: (t().editor?.modProfiles?.toast?.profileDeletedMessage || "\"{name}\" successfully deleted").replace("{name}", profile.name),
         duration: 3000,
       });
     }
@@ -142,15 +144,15 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
         await writeTextFile(filePath, jsonData);
         addToast({
           type: "success",
-          title: "Профиль экспортирован",
-          message: `"${profile.name}" сохранён в ${filePath}`,
+          title: t().editor?.modProfiles?.toast?.profileExported || "Profile exported",
+          message: (t().editor?.modProfiles?.toast?.profileExportedMessage || "\"{name}\" saved to {path}").replace("{name}", profile.name).replace("{path}", filePath),
           duration: 3000,
         });
       }
     } catch (err) {
       addToast({
         type: "error",
-        title: "Ошибка экспорта",
+        title: t().editor?.modProfiles?.toast?.exportError || "Export error",
         message: String(err),
         duration: 5000,
       });
@@ -176,14 +178,14 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
 
       addToast({
         type: "success",
-        title: "Профиль импортирован",
-        message: "Профиль успешно добавлен",
+        title: t().editor?.modProfiles?.toast?.profileImported || "Profile imported",
+        message: t().editor?.modProfiles?.toast?.profileImportedMessage || "Profile successfully added",
         duration: 3000,
       });
     } catch (err) {
       addToast({
         type: "error",
-        title: "Ошибка импорта",
+        title: t().editor?.modProfiles?.toast?.importError || "Import error",
         message: String(err),
         duration: 5000,
       });
@@ -219,12 +221,12 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
         <div class="card">
           <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
             <i class="i-hugeicons-add-circle w-5 h-5 text-blue-400" />
-            Создать профиль
+            {t().editor?.modProfiles?.title || "Create Profile"}
           </h3>
 
           <div class="flex flex-col gap-3">
             <div>
-              <label class="block text-sm font-medium mb-1">Название</label>
+              <label class="block text-sm font-medium mb-1">{t().editor?.modProfiles?.name || "Name"}</label>
               <input
                 type="text"
                 value={profileName()}
@@ -237,12 +239,12 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
 
             <div>
               <label class="block text-sm font-medium mb-1">
-                Описание <span class="text-gray-600">(опционально)</span>
+                {t().editor?.modProfiles?.description || "Description"} <span class="text-gray-600">{t().editor?.modProfiles?.descriptionOptional || "(optional)"}</span>
               </label>
               <textarea
                 value={profileDescription()}
                 onInput={(e) => setProfileDescription(e.currentTarget.value)}
-                placeholder="Описание профиля..."
+                placeholder={t().editor?.modProfiles?.descriptionPlaceholder || "Profile description..."}
                 class="w-full"
                 rows={3}
                 maxLength={200}
@@ -253,7 +255,7 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
               <div class="flex items-center gap-2 text-sm">
                 <i class="i-hugeicons-information-circle w-4 h-4 text-blue-400" />
                 <span class="text-blue-300">
-                  Профиль сохранит текущее состояние модов ({mods.mods().filter((m) => m.enabled).length} включено)
+                  {(t().editor?.modProfiles?.currentStateInfo || "Profile will save current mod state ({count} enabled)").replace("{count}", String(mods.mods().filter((m) => m.enabled).length))}
                 </span>
               </div>
             </div>
@@ -266,11 +268,11 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
               <Show when={saving()} fallback={
                 <>
                   <i class="i-hugeicons-floppy-disk w-4 h-4" />
-                  Сохранить профиль
+                  {t().editor?.modProfiles?.saveProfile || "Save Profile"}
                 </>
               }>
                 <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                Сохранение...
+                {t().editor?.modProfiles?.saving || "Saving..."}
               </Show>
             </button>
           </div>
@@ -278,19 +280,19 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
 
         {/* Quick Stats */}
         <div class="card">
-          <h4 class="text-sm font-semibold mb-2">Текущее состояние</h4>
+          <h4 class="text-sm font-semibold mb-2">{t().editor?.modProfiles?.currentState || "Current State"}</h4>
           <div class="flex gap-2">
             <div class="flex-1 p-2 rounded bg-green-600/20 border border-green-600/30">
               <div class="text-2xl font-bold text-green-400">
                 {mods.mods().filter((m) => m.enabled).length}
               </div>
-              <div class="text-xs text-green-300">Включено</div>
+              <div class="text-xs text-green-300">{t().editor?.modProfiles?.enabled || "Enabled"}</div>
             </div>
             <div class="flex-1 p-2 rounded bg-gray-600/20 border border-gray-600/30">
               <div class="text-2xl font-bold text-gray-400">
                 {mods.mods().filter((m) => !m.enabled).length}
               </div>
-              <div class="text-xs text-gray-300">Выключено</div>
+              <div class="text-xs text-gray-300">{t().editor?.modProfiles?.disabled || "Disabled"}</div>
             </div>
           </div>
         </div>
@@ -301,15 +303,15 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold flex items-center gap-2">
             <i class="i-hugeicons-layers-01 w-5 h-5 text-gray-500" />
-            Сохранённые профили ({profiles.profiles().length})
+            {t().editor?.modProfiles?.savedProfiles || "Saved Profiles"} ({profiles.profiles().length})
           </h3>
           <button
             class="btn-secondary btn-sm"
             onClick={handleImportProfile}
-            title="Импортировать профиль из файла"
+            title={t().editor?.modProfiles?.importTitle || "Import profile from file"}
           >
             <i class="i-hugeicons-upload-02 w-4 h-4" />
-            Импорт
+            {t().editor?.modProfiles?.import || "Import"}
           </button>
         </div>
 
@@ -324,9 +326,9 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
         <Show when={!profiles.loading() && profiles.profiles().length === 0}>
           <div class="card flex-1 flex-col-center text-center">
             <i class="i-hugeicons-layers-01 w-16 h-16 text-gray-600 mb-4" />
-            <h3 class="text-lg font-semibold mb-2">Нет сохранённых профилей</h3>
+            <h3 class="text-lg font-semibold mb-2">{t().editor?.modProfiles?.noProfiles || "No saved profiles"}</h3>
             <p class="text-muted text-sm max-w-md">
-              Создайте профиль, чтобы сохранить текущую конфигурацию модов и быстро переключаться между ними
+              {t().editor?.modProfiles?.noProfilesHint || "Create a profile to save current mod configuration and quickly switch between them"}
             </p>
           </div>
         </Show>
@@ -352,14 +354,14 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
                         <button
                           class="text-blue-400 hover:text-blue-300 p-1"
                           onClick={() => handleExportProfile(profile)}
-                          title="Экспортировать профиль"
+                          title={t().editor?.modProfiles?.exportTitle || "Export profile"}
                         >
                           <i class="i-hugeicons-download-02 w-4 h-4" />
                         </button>
                         <button
                           class="text-red-400 hover:text-red-300 p-1"
                           onClick={() => handleDeleteProfile(profile)}
-                          title="Удалить профиль"
+                          title={t().editor?.modProfiles?.deleteTitle || "Delete profile"}
                         >
                           <i class="i-hugeicons-delete-02 w-4 h-4" />
                         </button>
@@ -370,17 +372,17 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
                     <div class="flex gap-2 mb-3">
                       <div class="flex-1 p-2 rounded bg-gray-800">
                         <div class="text-sm font-medium text-green-400">{stats.enabledCount}</div>
-                        <div class="text-xs text-gray-500">Включено</div>
+                        <div class="text-xs text-gray-500">{t().editor?.modProfiles?.enabled || "Enabled"}</div>
                       </div>
                       <div class="flex-1 p-2 rounded bg-gray-800">
                         <div class="text-sm font-medium text-gray-400">{stats.disabledCount}</div>
-                        <div class="text-xs text-gray-500">Выключено</div>
+                        <div class="text-xs text-gray-500">{t().editor?.modProfiles?.disabled || "Disabled"}</div>
                       </div>
                     </div>
 
                     {/* Metadata */}
                     <div class="flex items-center justify-between text-xs text-muted mb-3">
-                      <span>Создан: {formatDate(profile.created_at)}</span>
+                      <span>{t().editor?.modProfiles?.created || "Created"}: {formatDate(profile.created_at)}</span>
                     </div>
 
                     {/* Apply Button */}
@@ -392,11 +394,11 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
                       <Show when={applying()} fallback={
                         <>
                           <i class="i-hugeicons-checkmark-circle-02 w-4 h-4" />
-                          Применить профиль
+                          {t().editor?.modProfiles?.applyProfile || "Apply Profile"}
                         </>
                       }>
                         <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                        Применение...
+                        {t().editor?.modProfiles?.applying || "Applying..."}
                       </Show>
                     </button>
                   </div>

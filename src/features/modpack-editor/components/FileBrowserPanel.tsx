@@ -80,12 +80,12 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
         setFileContent(content);
         setEditedContent(content);
       } else {
-        setFileContent("Не удалось загрузить содержимое файла");
+        setFileContent(t().editor.fileBrowser.errors.failedToLoad);
       }
     } else if (entry.size >= 1024 * 1024) {
-      setFileContent(`Файл слишком большой для редактирования (${formatFileSize(entry.size)})`);
+      setFileContent(t().editor.fileBrowser.errors.fileTooLarge.replace("{size}", formatFileSize(entry.size)));
     } else {
-      setFileContent("Редактирование недоступно для этого типа файла");
+      setFileContent(t().editor.fileBrowser.errors.editingNotSupported);
     }
   };
 
@@ -124,7 +124,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
     } catch (err) {
       addToast({
         type: "error",
-        title: "Ошибка поиска",
+        title: t().editor.fileBrowser.toast.searchError,
         message: String(err),
         duration: 5000,
       });
@@ -148,10 +148,10 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
     if (!file) return;
 
     const confirmed = await confirm({
-      title: "Удалить файл?",
-      message: `Файл "${file.name}" будет удалён. Это действие нельзя отменить.`,
+      title: t().editor.fileBrowser.confirmDelete.title,
+      message: t().editor.fileBrowser.confirmDelete.message.replace("{name}", file.name),
       variant: "danger",
-      confirmText: "Удалить",
+      confirmText: t().editor.fileBrowser.confirmDelete.confirm,
     });
 
     if (!confirmed) return;
@@ -162,8 +162,8 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
       setFileContent(null);
       addToast({
         type: "success",
-        title: "Файл удалён",
-        message: `${file.name} успешно удалён`,
+        title: t().editor.fileBrowser.toast.fileDeleted,
+        message: t().editor.fileBrowser.toast.fileDeletedMessage.replace("{name}", file.name),
         duration: 3000,
       });
     }
@@ -181,8 +181,8 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
       if (import.meta.env.DEV) console.error("Failed to open folder:", e);
       addToast({
         type: "error",
-        title: "Ошибка",
-        message: "Не удалось открыть папку в проводнике",
+        title: t().editor.fileBrowser.toast.error,
+        message: t().editor.fileBrowser.toast.failedToOpenFolder,
         duration: 3000,
       });
     }
@@ -205,8 +205,60 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
       if (import.meta.env.DEV) console.error("Failed to reveal file:", e);
       addToast({
         type: "error",
-        title: "Ошибка",
-        message: "Не удалось показать файл в проводнике",
+        title: t().editor.fileBrowser.toast.error,
+        message: t().editor.fileBrowser.toast.failedToShowFile,
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleOpenInVSCode = async () => {
+    const file = selectedFile();
+    if (!file) return;
+
+    try {
+      await invoke("open_file_in_vscode", {
+        instanceId: props.instanceId,
+        relativePath: file.path,
+      });
+    } catch (e) {
+      const errorMsg = String(e);
+      if (import.meta.env.DEV) console.error("Failed to open in VS Code:", e);
+
+      // Check if VS Code is not installed
+      if (errorMsg.includes("not found") || errorMsg.includes("NotFound")) {
+        addToast({
+          type: "warning",
+          title: t().editor.fileBrowser.toast.vscodeNotFound,
+          message: t().editor.fileBrowser.toast.vscodeNotFoundMessage,
+          duration: 5000,
+        });
+      } else {
+        addToast({
+          type: "error",
+          title: t().editor.fileBrowser.toast.error,
+          message: t().editor.fileBrowser.toast.failedToOpenInVSCode,
+          duration: 3000,
+        });
+      }
+    }
+  };
+
+  const handleOpenInEditor = async () => {
+    const file = selectedFile();
+    if (!file) return;
+
+    try {
+      await invoke("open_file_in_editor", {
+        instanceId: props.instanceId,
+        relativePath: file.path,
+      });
+    } catch (e) {
+      if (import.meta.env.DEV) console.error("Failed to open in editor:", e);
+      addToast({
+        type: "error",
+        title: t().editor.fileBrowser.toast.error,
+        message: t().editor.fileBrowser.toast.failedToOpenInEditor,
         duration: 3000,
       });
     }
@@ -246,14 +298,14 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
       addToast({
         type: "success",
-        title: "Файл переименован",
-        message: `${file.name} → ${newName().trim()}`,
+        title: t().editor.fileBrowser.toast.fileRenamed,
+        message: t().editor.fileBrowser.toast.fileRenamedMessage.replace("{from}", file.name).replace("{to}", newName().trim()),
         duration: 3000,
       });
     } catch (err) {
       addToast({
         type: "error",
-        title: "Ошибка переименования",
+        title: t().editor.fileBrowser.toast.renameError,
         message: String(err),
         duration: 5000,
       });
@@ -276,14 +328,14 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
       addToast({
         type: "success",
-        title: "Файл скопирован",
-        message: `Создана копия: ${newName().trim()}`,
+        title: t().editor.fileBrowser.toast.fileCopied,
+        message: t().editor.fileBrowser.toast.fileCopiedMessage.replace("{name}", newName().trim()),
         duration: 3000,
       });
     } catch (err) {
       addToast({
         type: "error",
-        title: "Ошибка копирования",
+        title: t().editor.fileBrowser.toast.copyError,
         message: String(err),
         duration: 5000,
       });
@@ -547,10 +599,10 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                 useGlobalSearch() ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-300"
               }`}
               onClick={() => setUseGlobalSearch(!useGlobalSearch())}
-              title="Искать во всех папках"
+              title={t().editor.fileBrowser.searchGlobal}
             >
               <i class="i-hugeicons-folder-search w-3.5 h-3.5" />
-              Глобально
+              {t().editor.fileBrowser.global}
             </button>
 
             <button
@@ -558,10 +610,10 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                 useRegex() ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-300"
               }`}
               onClick={() => setUseRegex(!useRegex())}
-              title="Использовать регулярные выражения"
+              title={t().editor.fileBrowser.useRegex}
             >
               <i class="i-hugeicons-source-code w-3.5 h-3.5" />
-              Regex
+              {t().editor.fileBrowser.regex}
             </button>
 
             <Show when={searchLoading()}>
@@ -570,7 +622,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
             <Show when={useGlobalSearch() && globalSearchResults().length > 0}>
               <span class="text-gray-500 ml-auto">
-                {globalSearchResults().length} {globalSearchResults().length === 1 ? "файл" : "файлов"}
+                {globalSearchResults().length} {globalSearchResults().length === 1 ? t().editor.fileBrowser.file : t().editor.fileBrowser.files}
               </span>
             </Show>
           </div>
@@ -582,16 +634,16 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
             class="btn-sm btn-secondary flex-1"
             onClick={handleGoUp}
             disabled={!browser.currentPath()}
-            title="Вернуться на уровень выше"
+            title={t().editor.fileBrowser.goUpLevel}
           >
             <i class="i-hugeicons-arrow-left-01 w-4 h-4" />
-            Назад
+            {t().editor.fileBrowser.back}
           </button>
 
           <button
             class="btn-sm btn-secondary"
             onClick={handleOpenInExplorer}
-            title="Открыть в проводнике"
+            title={t().editor.fileBrowser.openInExplorer}
           >
             <i class="i-hugeicons-folder-open w-4 h-4" />
           </button>
@@ -599,7 +651,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
           <button
             class={`btn-sm ${showHidden() ? "btn-primary" : "btn-secondary"}`}
             onClick={() => setShowHidden(!showHidden())}
-            title={showHidden() ? "Скрыть скрытые файлы" : "Показать скрытые файлы"}
+            title={showHidden() ? t().editor.fileBrowser.hideHiddenFiles : t().editor.fileBrowser.showHiddenFiles}
           >
             <i class={`w-4 h-4 ${showHidden() ? "i-hugeicons-view" : "i-hugeicons-view-off"}`} />
           </button>
@@ -617,12 +669,12 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
             <div class="flex-col-center p-8 text-center">
               <Show when={searchQuery() && useGlobalSearch()}>
                 <i class="i-hugeicons-search-01 w-12 h-12 text-gray-600 mb-2" />
-                <p class="text-muted text-sm">Ничего не найдено</p>
-                <p class="text-xs text-gray-600 mt-1">Попробуйте изменить запрос</p>
+                <p class="text-muted text-sm">{t().editor.fileBrowser.noResults}</p>
+                <p class="text-xs text-gray-600 mt-1">{t().editor.fileBrowser.tryDifferentQuery}</p>
               </Show>
               <Show when={!searchQuery() || !useGlobalSearch()}>
                 <i class="i-hugeicons-folder-01 w-12 h-12 text-gray-600 mb-2" />
-                <p class="text-muted text-sm">Папка пуста</p>
+                <p class="text-muted text-sm">{t().editor.fileBrowser.emptyFolder}</p>
               </Show>
             </div>
           </Show>
@@ -649,7 +701,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                       <Show when={useGlobalSearch()}>
                         <span class="text-blue-400 font-mono mr-2">{entry.path}</span>
                       </Show>
-                      {entry.is_dir ? "Папка" : formatFileSize(entry.size)} • <span title={formatFullDateTime(entry.modified)}>{formatRelativeTime(entry.modified)}</span>
+                      {entry.is_dir ? t().editor.fileBrowser.folder : formatFileSize(entry.size)} • <span title={formatFullDateTime(entry.modified)}>{formatRelativeTime(entry.modified)}</span>
                     </div>
                   </div>
                   <Show when={entry.is_dir}>
@@ -667,14 +719,14 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
         <Show when={!selectedFile()}>
           <div class="card flex-1 flex-col-center text-center p-8">
             <i class="i-hugeicons-folder-search w-16 h-16 text-gray-600 mb-4" />
-            <h3 class="text-lg font-semibold mb-2">Браузер файлов</h3>
+            <h3 class="text-lg font-semibold mb-2">{t().editor.fileBrowser.title}</h3>
             <p class="text-muted text-sm max-w-md">
-              Навигация по файлам экземпляра. Выберите файл для предпросмотра
+              {t().editor.fileBrowser.description}
             </p>
             <div class="mt-6 flex gap-2 flex-wrap justify-center">
               <div class="px-3 py-2 rounded bg-gray-800 text-xs flex items-center gap-1">
                 <i class="i-hugeicons-mouse-left-click-02 w-4 h-4" />
-                Открыть папку / файл
+                {t().editor.fileBrowser.openFolderOrFile}
               </div>
             </div>
           </div>
@@ -695,31 +747,47 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
               </div>
 
               <div class="flex gap-1 flex-shrink-0">
+                <Show when={isTextFile(selectedFile()!.name)}>
+                  <button
+                    class="btn-ghost btn-sm p-1.5 text-blue-400 hover:text-blue-300"
+                    onClick={handleOpenInVSCode}
+                    title={t().editor.fileBrowser.openInVSCode}
+                  >
+                    <i class="i-hugeicons-source-code w-4 h-4" />
+                  </button>
+                  <button
+                    class="btn-ghost btn-sm p-1.5"
+                    onClick={handleOpenInEditor}
+                    title={t().editor.fileBrowser.openInDefaultEditor}
+                  >
+                    <i class="i-hugeicons-file-edit w-4 h-4" />
+                  </button>
+                </Show>
                 <button
                   class="btn-ghost btn-sm p-1.5"
                   onClick={handleShowFileInExplorer}
-                  title="Показать файл в проводнике"
+                  title={t().editor.fileBrowser.showInFileManager}
                 >
                   <i class="i-hugeicons-folder-search w-4 h-4" />
                 </button>
                 <button
                   class="btn-ghost btn-sm p-1.5"
                   onClick={handleRename}
-                  title="Переименовать файл"
+                  title={t().editor.fileBrowser.renameFile}
                 >
                   <i class="i-hugeicons-edit-02 w-4 h-4" />
                 </button>
                 <button
                   class="btn-ghost btn-sm p-1.5"
                   onClick={handleCopy}
-                  title="Создать копию файла"
+                  title={t().editor.fileBrowser.copyFile}
                 >
                   <i class="i-hugeicons-copy-01 w-4 h-4" />
                 </button>
                 <button
                   class="btn-ghost btn-sm p-1.5 text-red-400 hover:text-red-300"
                   onClick={handleDelete}
-                  title="Удалить файл"
+                  title={t().editor.fileBrowser.deleteFile}
                 >
                   <i class="i-hugeicons-delete-02 w-4 h-4" />
                 </button>
@@ -751,12 +819,12 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
           <Show when={selectedFile() && !isTextFile(selectedFile()!.name)}>
             <div class="card flex-1 flex-col-center text-center">
               <i class="i-hugeicons-image-not-found-01 w-16 h-16 text-gray-600 mb-4" />
-              <h3 class="text-lg font-semibold mb-2">Предпросмотр недоступен</h3>
+              <h3 class="text-lg font-semibold mb-2">{t().editor.fileBrowser.previewUnavailable}</h3>
               <p class="text-muted text-sm max-w-md">
-                Файл {selectedFile()!.name} не является текстовым и не может быть отображён в редакторе
+                {t().editor.fileBrowser.fileNotText.replace("{name}", selectedFile()!.name)}
               </p>
               <div class="mt-4 text-xs text-muted">
-                Поддерживаются: .toml, .json, .properties, .cfg, .txt, .java, .js, .py и другие текстовые форматы
+                {t().editor.fileBrowser.supportedFormats}
               </div>
             </div>
           </Show>
@@ -769,9 +837,9 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
       <Show when={showRenameDialog()}>
         <div class="modal-backdrop" onClick={() => setShowRenameDialog(false)}>
           <div class="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 class="text-xl font-semibold mb-4">Переименовать</h2>
+            <h2 class="text-xl font-semibold mb-4">{t().editor.fileBrowser.renameDialog.title}</h2>
             <div class="mb-4">
-              <label class="block text-sm font-medium mb-2">Новое имя</label>
+              <label class="block text-sm font-medium mb-2">{t().editor.fileBrowser.renameDialog.newName}</label>
               <input
                 type="text"
                 value={newName()}
@@ -790,14 +858,14 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                 class="btn-secondary"
                 onClick={() => setShowRenameDialog(false)}
               >
-                Отмена
+                {t().editor.fileBrowser.renameDialog.cancel}
               </button>
               <button
                 class="btn-primary"
                 onClick={confirmRename}
                 disabled={!newName().trim()}
               >
-                Переименовать
+                {t().editor.fileBrowser.renameDialog.confirm}
               </button>
             </div>
           </div>
@@ -808,9 +876,9 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
       <Show when={showCopyDialog()}>
         <div class="modal-backdrop" onClick={() => setShowCopyDialog(false)}>
           <div class="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 class="text-xl font-semibold mb-4">Копировать</h2>
+            <h2 class="text-xl font-semibold mb-4">{t().editor.fileBrowser.copyDialog.title}</h2>
             <div class="mb-4">
-              <label class="block text-sm font-medium mb-2">Имя копии</label>
+              <label class="block text-sm font-medium mb-2">{t().editor.fileBrowser.copyDialog.copyName}</label>
               <input
                 type="text"
                 value={newName()}
@@ -829,14 +897,14 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                 class="btn-secondary"
                 onClick={() => setShowCopyDialog(false)}
               >
-                Отмена
+                {t().editor.fileBrowser.copyDialog.cancel}
               </button>
               <button
                 class="btn-primary"
                 onClick={confirmCopy}
                 disabled={!newName().trim()}
               >
-                Копировать
+                {t().editor.fileBrowser.copyDialog.confirm}
               </button>
             </div>
           </div>

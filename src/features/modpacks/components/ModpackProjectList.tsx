@@ -4,6 +4,7 @@ import type { ModpackProject } from "../../../shared/types";
 import { createConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { LoaderIcon } from "../../../shared/components/LoaderSelector";
 import { Select } from "../../../shared/ui/Select";
+import { useI18n } from "../../../shared/i18n";
 
 interface Props {
   onSelect: (project: ModpackProject) => void;
@@ -12,6 +13,7 @@ interface Props {
 
 export default function ModpackProjectList(props: Props) {
   const { confirm, ConfirmDialogComponent } = createConfirmDialog();
+  const { t } = useI18n();
   const [projects, setProjects] = createSignal<ModpackProject[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
@@ -133,7 +135,11 @@ export default function ModpackProjectList(props: Props) {
             <div class="i-hugeicons-add-01 w-4 h-4" />
             Новый проект
           </button>
-          <button class="btn-close" onClick={props.onClose}>
+          <button
+            class="btn-close"
+            onClick={props.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
+          >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
         </div>

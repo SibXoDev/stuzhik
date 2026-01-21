@@ -88,6 +88,8 @@ export interface Mod {
   latest_version_id?: string | null;
   update_available?: boolean;
   update_checked_at?: string | null;
+  /** Changelog text for available update (markdown format) */
+  latest_changelog?: string | null;
 }
 
 export interface UpdateCheckResult {
@@ -106,6 +108,8 @@ export interface ModUpdateInfo {
   latest_version: string;
   latest_version_id: string;
   source: ModSource;
+  /** Changelog text for this update (markdown format) */
+  changelog?: string | null;
 }
 
 export interface ModDependency {
@@ -1975,6 +1979,33 @@ export interface ImportOverrideInfo {
   enabled: boolean;
 }
 
+/** Тип выбора для опциональных модов */
+export type OptionalModSelectionType = "single" | "multiple";
+
+/** Опциональный мод в группе */
+export interface OptionalMod {
+  /** ID мода (ссылка на мод в списке mods) */
+  mod_id: string;
+  /** Включён по умолчанию */
+  default_enabled: boolean;
+  /** Дополнительное описание */
+  note?: string | null;
+}
+
+/** Группа опциональных модов */
+export interface OptionalModGroup {
+  /** ID группы */
+  id: string;
+  /** Название группы */
+  name: string;
+  /** Описание группы */
+  description?: string | null;
+  /** Тип выбора: single (radio) или multiple (checkbox) */
+  selection_type: OptionalModSelectionType;
+  /** Моды в группе */
+  mods: OptionalMod[];
+}
+
 /** Детальный предпросмотр модпака перед импортом */
 export interface ModpackDetailedPreview {
   /** Формат модпака */
@@ -2003,6 +2034,8 @@ export interface ModpackDetailedPreview {
   overrides_size: number;
   /** Размер архива */
   archive_size: number;
+  /** Группы опциональных модов (только для .stzhk) */
+  optional_mods?: OptionalModGroup[];
 }
 
 /** Опции для селективного импорта */
@@ -2122,4 +2155,145 @@ export interface MinecraftFolderAnalysis {
   confidence: number;
   /** Доказательства детекции */
   evidence: string[];
+}
+
+// ========== Launch Tracker (blake3) ==========
+
+/** Информация об обновлении мода (для отслеживания изменений) */
+export interface LaunchModUpdateInfo {
+  /** Старое имя файла */
+  old_filename: string;
+  /** Новое имя файла */
+  new_filename: string;
+  /** Slug мода */
+  mod_slug: string;
+}
+
+/** Краткая сводка изменений */
+export interface LaunchChangesSummary {
+  /** Всего изменений модов */
+  total_mod_changes: number;
+  /** Всего изменений конфигов */
+  total_config_changes: number;
+  /** Всего изменений файлов */
+  total_file_changes: number;
+}
+
+/** Метаданные снимка (без содержимого) */
+export interface SnapshotMeta {
+  /** Уникальный ID снимка (timestamp-based) */
+  id: string;
+  /** Время создания snapshot (ISO 8601) */
+  created_at: string;
+  /** Был ли запуск успешным (или краш) */
+  was_successful: boolean | null;
+  /** ID связанного бэкапа (если есть) */
+  backup_id: string | null;
+  /** Количество модов */
+  mods_count: number;
+  /** Количество конфигов */
+  configs_count: number;
+  /** Количество отслеживаемых файлов */
+  files_count: number;
+}
+
+/** История снимков экземпляра */
+export interface SnapshotHistory {
+  /** Список метаданных снимков (от новых к старым) */
+  snapshots: SnapshotMeta[];
+  /** Максимальное количество хранимых снимков */
+  max_snapshots: number;
+}
+
+/** Информация о файле в snapshot */
+export interface SnapshotFileInfo {
+  /** Относительный путь от директории экземпляра */
+  path: string;
+  /** Blake3 хэш содержимого */
+  hash: string;
+  /** Размер в байтах */
+  size: number;
+  /** Время последнего изменения (unix timestamp) */
+  modified: number;
+}
+
+/** Информация о моде в snapshot */
+export interface SnapshotModInfo {
+  /** Имя файла */
+  filename: string;
+  /** Blake3 хэш */
+  hash: string;
+  /** Размер в байтах */
+  size: number;
+  /** Включён ли мод (не .disabled) */
+  enabled: boolean;
+}
+
+/** Полный snapshot состояния экземпляра */
+export interface LaunchSnapshot {
+  /** Версия формата snapshot */
+  format_version: number;
+  /** ID экземпляра */
+  instance_id: string;
+  /** Уникальный ID снимка */
+  id: string;
+  /** Время создания snapshot (ISO 8601) */
+  created_at: string;
+  /** Был ли запуск успешным */
+  was_successful: boolean | null;
+  /** ID связанного бэкапа (если был создан) */
+  backup_id: string | null;
+  /** Версия Minecraft */
+  minecraft_version: string;
+  /** Загрузчик */
+  loader: string;
+  /** Версия загрузчика */
+  loader_version: string | null;
+  /** Список модов */
+  mods: SnapshotModInfo[];
+  /** Конфиги */
+  configs: SnapshotFileInfo[];
+  /** Другие отслеживаемые файлы */
+  tracked_files: SnapshotFileInfo[];
+}
+
+/** Изменения с последнего успешного запуска */
+export interface LaunchChanges {
+  /** Время последнего запуска (ISO 8601) или null если первый запуск */
+  last_launch_at: string | null;
+  /** ID снимка с которым сравниваем */
+  compared_with_snapshot_id: string | null;
+  /** Есть ли изменения */
+  has_changes: boolean;
+
+  // Моды
+  /** Добавленные моды (имена файлов) */
+  mods_added: string[];
+  /** Удалённые моды (имена файлов) */
+  mods_removed: string[];
+  /** Обновлённые моды (старое имя -> новое имя) */
+  mods_updated: LaunchModUpdateInfo[];
+  /** Включённые моды */
+  mods_enabled: string[];
+  /** Выключенные моды */
+  mods_disabled: string[];
+
+  // Конфиги
+  /** Добавленные конфиги */
+  configs_added: string[];
+  /** Удалённые конфиги */
+  configs_removed: string[];
+  /** Изменённые конфиги */
+  configs_modified: string[];
+
+  // Другие файлы
+  /** Добавленные файлы */
+  files_added: string[];
+  /** Удалённые файлы */
+  files_removed: string[];
+  /** Изменённые файлы */
+  files_modified: string[];
+
+  /** Сводка изменений */
+  summary: LaunchChangesSummary;
 }

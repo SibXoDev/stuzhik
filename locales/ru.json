@@ -37,10 +37,17 @@
     "connect": "Друзья",
     "docs": "Документация",
     "changelog": "История изменений",
+    "sourceCode": "Исходный код",
     "minimize": "Свернуть",
     "maximize": "Развернуть",
     "restore": "Восстановить",
-    "close": "Закрыть"
+    "close": "Закрыть",
+    "closeConfirm": {
+      "title": "Закрыть приложение?",
+      "message": "Вы уверены что хотите закрыть приложение?",
+      "confirm": "Закрыть",
+      "cancel": "Отмена"
+    }
   },
   "changelog": {
     "title": "Changelog",
@@ -67,7 +74,62 @@
     "forge": "Forge",
     "neoforge": "NeoForge",
     "quilt": "Quilt",
-    "vanilla": "Vanilla"
+    "vanilla": "Vanilla",
+    "descriptions": {
+      "vanilla": "Чистый Minecraft без модов",
+      "forge": "Классический загрузчик для Minecraft модов",
+      "neoforge": "Современный форк Forge с улучшениями",
+      "fabric": "Лёгкий и быстрый загрузчик модов",
+      "quilt": "Форк Fabric с дополнительными возможностями"
+    }
+  },
+  "versions": {
+    "select": "Выберите версию",
+    "notFound": "Версии не найдены",
+    "showingOf": "Показано {shown} из {total} версий",
+    "loaderNotSupported": "Загрузчик {loader} не поддерживает Minecraft {version}",
+    "compatibilityCheckFailed": "Не удалось проверить совместимость: {error}",
+    "types": {
+      "release": "Релиз",
+      "snapshot": "Снапшот",
+      "old_beta": "Бета",
+      "old_alpha": "Альфа"
+    },
+    "filters": {
+      "snapshots": "Снапшоты",
+      "oldBeta": "Старые бета",
+      "oldAlpha": "Старые альфа"
+    }
+  },
+  "dragDrop": {
+    "mixedFiles": "Разные файлы",
+    "mixedFilesDesc": "Перетащите файлы одного типа",
+    "manifestDesc": "Будет создан экземпляр и скачаны все моды",
+    "mod": "Мод",
+    "mods": "{count} модов",
+    "modDesc": "Перетащите на экземпляр в списке или откройте нужный",
+    "modpackStuzhik": "Модпак Stuzhik",
+    "modpackModrinth": "Модпак Modrinth",
+    "modpackDesc": "Откроется браузер модпаков для импорта",
+    "archive": "Архив",
+    "archives": "{count} архивов",
+    "archiveDesc": "Модпак CurseForge или ресурспак",
+    "resources": "Ресурсы",
+    "resourcesDesc": "Ресурспаки или текстуры",
+    "unsupportedFormat": "Неподдерживаемый формат",
+    "unsupportedDesc": "Поддерживаются: .jar, .stzhk, .mrpack, .zip, manifest.json",
+    "verifying": "Проверка...",
+    "verifyFailed": "Не удалось проверить",
+    "notFoundOnPlatforms": "Не найден на платформах",
+    "verifyingAuthenticity": "Проверка подлинности",
+    "unknown": "неизвестно",
+    "modWillBeInstalled": "Мод будет установлен в текущий экземпляр",
+    "releaseToInstall": "Отпустите для установки",
+    "releaseToCancel": "Отпустите для отмены",
+    "moreFiles": "+{count} файлов...",
+    "dragToInstance": "Перетащите на нужный экземпляр ниже",
+    "authenticity": "Подлинность:",
+    "files": "файлов"
   },
   "quickPlay": {
     "installing": "Установка...",
@@ -215,6 +277,55 @@
     "downloads": "загрузок",
     "incompatible": "Несовместим",
     "hideIncompatible": "Скрыть несовместимые",
+    "browser": {
+      "searchByName": "Поиск по названию мода...",
+      "searchById": "Поиск по mod ID (например: jei, create)...",
+      "searchAll": "Поиск по названию или mod ID...",
+      "searchBy": "Искать по:",
+      "searchByNameBtn": "Название",
+      "searchByIdBtn": "Mod ID",
+      "searchByAllBtn": "Все",
+      "showIncompatible": "Показать несовместимые",
+      "hideCategories": "Скрыть категории",
+      "showCategories": "Показать категории",
+      "allCategories": "Все",
+      "searching": "Поиск модов...",
+      "noResults": "Ничего не найдено",
+      "noResultsHint": "Попробуйте изменить запрос или выбрать другую категорию",
+      "byAuthor": "от",
+      "matchedById": "По ID",
+      "conflictInstalled": "установлен, но обнаружены конфликты:",
+      "deleteMod": "Удалить",
+      "goToInstalled": "К установленным",
+      "sortOptions": {
+        "relevance": "Релевантность",
+        "downloads": "Популярные",
+        "follows": "По подпискам",
+        "newest": "Новые",
+        "updated": "Обновлённые"
+      },
+      "categories": {
+        "adventure": "Приключения",
+        "cursed": "Проклятые",
+        "decoration": "Декорации",
+        "economy": "Экономика",
+        "equipment": "Снаряжение",
+        "food": "Еда",
+        "game-mechanics": "Игровая механика",
+        "library": "Библиотеки",
+        "magic": "Магия",
+        "management": "Управление",
+        "minigame": "Мини-игры",
+        "mobs": "Мобы",
+        "optimization": "Оптимизация",
+        "social": "Социальное",
+        "storage": "Хранение",
+        "technology": "Технологии",
+        "transportation": "Транспорт",
+        "utility": "Утилиты",
+        "worldgen": "Генерация мира"
+      }
+    },
     "recommendations": {
       "title": "Рекомендуемые моды",
       "basedOn": "На основе установленных модов",
@@ -308,6 +419,124 @@
         "unverified": "Мод не найден в Modrinth или CurseForge",
         "local": "Локальный мод без верификации"
       }
+    },
+    "list": {
+      "header": {
+        "modsCount": "Моды",
+        "catalog": "Каталог"
+      },
+      "tabs": {
+        "installed": "Установленные",
+        "browse": "Каталог"
+      },
+      "actions": {
+        "filters": "Фильтры",
+        "forceRefresh": "Принудительное обновление данных",
+        "addLocalMod": "Добавить локальный мод (.jar файл)",
+        "localMod": "Локальный мод",
+        "updates": "Обновления",
+        "checking": "Проверка...",
+        "updatesAvailable": "обновлений доступно - нажмите для просмотра",
+        "checkUpdates": "Проверить обновления",
+        "recheckUpdates": "Повторно проверить обновления",
+        "graph": "Граф",
+        "graphTooltip": "Визуальный граф зависимостей между модами",
+        "changelogTooltip": "Просмотреть изменения в недавно обновлённых модах",
+        "verifyingMods": "Проверка подлинности модов...",
+        "loadingDeps": "Загрузка информации о зависимостях..."
+      },
+      "search": {
+        "placeholder": "Поиск по названию, mod ID, версии или источнику...",
+        "selectAll": "Выбрать все",
+        "selectMod": "Выбрать мод"
+      },
+      "filters": {
+        "title": "Фильтры",
+        "resetAll": "Сбросить все",
+        "state": "Состояние",
+        "allStates": "Все",
+        "enabled": "Включено",
+        "disabled": "Выключено",
+        "source": "Источник",
+        "allSources": "Все источники",
+        "local": "Локальные",
+        "security": "Безопасность",
+        "anyStatus": "Любой статус",
+        "verified": "Проверенные",
+        "unverified": "Непроверенные",
+        "modified": "Модифицированные",
+        "autoUpdate": "Автообновление",
+        "any": "Любое",
+        "updates": "Обновления",
+        "anyUpdates": "Любые",
+        "hasUpdate": "Есть",
+        "noUpdate": "Нет обновлений",
+        "activeFilters": "Активные фильтры:",
+        "autoUpdateYes": "Авто-обновление: Да",
+        "autoUpdateNo": "Авто-обновление: Нет",
+        "hasUpdates": "Есть обновления",
+        "noUpdates": "Нет обновлений"
+      },
+      "conflicts": {
+        "title": "Обнаружены конфликты",
+        "autoResolve": "Автоматически разрешить",
+        "resolving": "Разрешение..."
+      },
+      "empty": {
+        "noMods": "Моды не установлены",
+        "noModsHint": "Перейдите в каталог чтобы найти моды",
+        "openCatalog": "Открыть каталог",
+        "noResults": "Ничего не найдено",
+        "noResultsHint": "Нет модов, соответствующих"
+      },
+      "loading": "Загрузка...",
+      "modActions": {
+        "updateAvailable": "Доступно обновление",
+        "updateTo": "Обновить до",
+        "autoUpdateEnabled": "Автообновление включено",
+        "autoUpdateDisabled": "Автообновление отключено",
+        "modInfo": "Информация о моде",
+        "showInFolder": "Показать в папке",
+        "deleteMod": "Удалить мод"
+      },
+      "verification": {
+        "verifiedTooltip": "Проверен: хэш совпадает с официальным источником. Нажмите для открытия страницы мода.",
+        "modifiedTooltip": "Модифицирован: файл изменён после загрузки. Нажмите для открытия страницы мода.",
+        "unknownTooltip": "Не найден на платформах: локальный мод или из другого источника."
+      },
+      "confirm": {
+        "deleteTitle": "Удалить мод?",
+        "deleteMessage": "Удалить мод \"{name}\"? Файл будет удалён из папки модов.",
+        "deleteBulkTitle": "Удалить выбранные моды?",
+        "deleteBulkMessage": "Будет удалено модов: {count}. Файлы будут удалены из папки модов.",
+        "delete": "Удалить"
+      },
+      "fileDialog": {
+        "title": "Выберите мод-файлы (.jar)"
+      }
+    },
+    "updates": {
+      "title": "Доступные обновления",
+      "updating": "Обновление",
+      "selected": "Выбрано",
+      "of": "из",
+      "selectAll": "Выбрать все",
+      "deselectAll": "Снять все",
+      "changelog": "Changelog",
+      "viewChangelog": "Посмотреть changelog",
+      "changelogFor": "Changelog версии",
+      "willUpdate": "Выбранные моды будут обновлены до последних версий",
+      "withChangelogs": "модов с доступным changelog",
+      "update": "Обновить"
+    },
+    "changelog": {
+      "title": "Что нового",
+      "modsUpdated": "модов обновлено",
+      "withChangelogs": "модов с changelog",
+      "expandAll": "Развернуть все",
+      "collapseAll": "Свернуть все",
+      "noChangelogAvailable": "Changelog недоступен",
+      "noUpdates": "Обновления не были применены"
     }
   },
   "modpacks": {
@@ -389,6 +618,160 @@
         "atlauncher": "ATLauncher",
         "gdlauncher": "GDLauncher",
         "generic": "Обычный Minecraft"
+      }
+    },
+    "browser": {
+      "title": "Установка модпака",
+      "installCancelled": "Установка отменена",
+      "ready": "Готово!",
+      "installingComponents": "Установка компонентов...",
+      "preparing": "Подготовка...",
+      "downloadingModpack": "Скачивание модпака...",
+      "creatingInstance": "Создание экземпляра...",
+      "analyzingMods": "Анализ модов",
+      "downloadingMods": "Скачивание модов",
+      "extractingFiles": "Распаковка файлов...",
+      "installingLoader": "Установка загрузчика...",
+      "installing": "Установка...",
+      "cancelling": "Отмена...",
+      "waitingForOperation": "Ожидание завершения текущей операции",
+      "cancel": "Отменить",
+      "waiting": "Ожидание...",
+      "steps": {
+        "modpack": "Модпак",
+        "mods": "Моды",
+        "files": "Файлы",
+        "javaMc": "Java + MC",
+        "loader": "Загрузчик",
+        "done": "Готово"
+      },
+      "summary": {
+        "title": "Сводка установки",
+        "modrinthWarning": "Следующие моды были найдены на Modrinth автоматически.",
+        "modrinthWarningNote": "Возможно скачаны НЕ ТЕ версии! Проверьте совместимость.",
+        "failedMods": "Следующие моды НЕ удалось скачать:",
+        "totalMods": "Всего модов",
+        "notDownloaded": "Не скачано",
+        "understood": "Понятно"
+      },
+      "confirm": {
+        "title": "Установить модпак",
+        "instanceName": "Название экземпляра"
+      },
+      "tabs": {
+        "search": "Поиск",
+        "fromFile": "Из файла",
+        "byLink": "По ссылке",
+        "compare": "Сравнить"
+      },
+      "file": {
+        "supportedFormats": "Поддерживаются форматы:",
+        "modpackFile": "Файл модпака",
+        "selectFile": "Выбрать файл...",
+        "clear": "Очистить",
+        "reading": "Чтение модпака...",
+        "readError": "Не удалось прочитать информацию о модпаке",
+        "minecraft": "Minecraft",
+        "loader": "Загрузчик",
+        "modsCount": "Модов",
+        "inManifest": "в манифесте",
+        "inOverrides": "в overrides",
+        "details": "Подробнее",
+        "install": "Установить"
+      },
+      "url": {
+        "description": "Вставьте ссылку на модпак .stzhk с облачного хранилища",
+        "yandexDisk": "Яндекс.Диск",
+        "googleDrive": "Google Drive",
+        "dropbox": "Dropbox",
+        "directLink": "Прямая ссылка",
+        "modpackLink": "Ссылка на модпак",
+        "instanceName": "Название экземпляра",
+        "installByLink": "Установить по ссылке"
+      },
+      "search": {
+        "searching": "Поиск...",
+        "by": "от",
+        "notFound": "Модпаки не найдены",
+        "tryDifferent": "Попробуйте изменить запрос",
+        "enterQuery": "Введите запрос для поиска",
+        "findModpacks": "Найдите модпаки на Modrinth или CurseForge"
+      },
+      "preview": {
+        "name": "Название:"
+      }
+    },
+    "export": {
+      "title": "Экспорт в STZHK",
+      "subtitle": "Создание модпака из",
+      "success": "Экспорт завершён",
+      "metadata": {
+        "title": "Информация о модпаке",
+        "name": "Название",
+        "version": "Версия",
+        "author": "Автор",
+        "description": "Описание"
+      },
+      "options": {
+        "embedMods": "Встроить моды в архив",
+        "embedModsHint": "Моды будут включены в файл. Иначе будут добавлены ссылки на Modrinth",
+        "includeOverrides": "Включить конфиги и ресурсы",
+        "includeOverridesHint": "Добавить папки config, resourcepacks, shaderpacks"
+      },
+      "preview": {
+        "toggle": "Предпросмотр файлов",
+        "loading": "Загрузка предпросмотра..."
+      },
+      "previewProgress": {
+        "hashing": "Вычисление хешей...",
+        "modrinth": "Поиск на Modrinth...",
+        "processing": "Обработка результатов..."
+      },
+      "summary": {
+        "mods": "Моды",
+        "archiveSize": "Размер архива",
+        "fromModrinth": "с Modrinth",
+        "local": "локальных"
+      },
+      "warnings": {
+        "localModsEmbedded": "Локальные моды будут встроены",
+        "localModsEmbeddedHint": "модов не найдены на Modrinth и будут встроены в архив"
+      },
+      "mods": {
+        "title": "Моды",
+        "selectAll": "Выбрать всё",
+        "deselectAll": "Снять всё",
+        "all": "Все",
+        "local": "Локальные",
+        "noModsWithFilter": "Нет модов с выбранным источником",
+        "embedded": "встроен",
+        "sourceModrinth": "Modrinth",
+        "sourceLocal": "Локальный",
+        "sourceEmbedded": "Встроен"
+      },
+      "overrides": {
+        "title": "Файлы экземпляра",
+        "generated": "генерируемые",
+        "filesCount": "файлов",
+        "generatedHint": "Генерируемые данные (миры, скриншоты) можно исключить для уменьшения размера архива."
+      },
+      "progress": {
+        "manifest": "Создание манифеста...",
+        "mods": "Встраивание модов...",
+        "overrides": "Добавление overrides...",
+        "finishing": "Завершение..."
+      },
+      "exclusions": {
+        "title": "Выбранные элементы",
+        "modsCount": "Моды",
+        "filesCount": "Файлы",
+        "hint": "Исключённые элементы не будут включены в архив."
+      },
+      "buttons": {
+        "close": "Закрыть",
+        "cancel": "Отмена",
+        "export": "Экспортировать",
+        "exporting": "Экспорт..."
       }
     }
   },
@@ -936,6 +1319,51 @@
       "chunkLoading": "Загрузка чанков",
       "garbageCollection": "Сборка мусора",
       "diskIO": "Дисковый I/O"
+    },
+    "history": "История",
+    "maxRam": "Макс. RAM",
+    "maxCpu": "Макс. CPU",
+    "coresThreads": "{cores} ядер / {threads} потоков",
+    "threadUsage": "Загрузка по потокам (система)",
+    "thread": "Поток",
+    "priority": "Приоритет",
+    "applying": "Применение...",
+    "snapshots": "снимков",
+    "instanceClosed": "Экземпляр закрыт. Данные мониторинга сохранены.",
+    "dataSource": {
+      "spark": "Данные: Spark",
+      "systemLogs": "Данные: Система + Логи",
+      "system": "Данные: Система"
+    },
+    "toast": {
+      "memoryIncreased": "Память увеличена",
+      "memoryIncreasedMessage": "{memory}. Перезапустите экземпляр.",
+      "modDisabled": "Мод отключён",
+      "modDisabledMessage": "{modId}. Перезапустите экземпляр.",
+      "modInstalled": "Мод установлен",
+      "modInstalledMessage": "{name}. Перезапустите экземпляр.",
+      "addJvmArgManually": "Добавьте JVM аргумент вручную",
+      "executeManually": "Выполните вручную",
+      "error": "Ошибка"
+    },
+    "actions": {
+      "increaseTo": "Увеличить до {memory}",
+      "disableMod": "Отключить мод",
+      "install": "Установить {name}",
+      "updateMod": "Обновить мод",
+      "copyArgument": "Скопировать аргумент",
+      "reduceTo": "Уменьшить до {value}",
+      "changeSetting": "Изменить настройку",
+      "apply": "Применить"
+    },
+    "modPerformanceInfo": {
+      "title": "Как получить данные о производительности модов",
+      "intro": "Spark установлен, но нужно создать отчёт профилирования:",
+      "step1": "В чате игры введите:",
+      "step2": "Поиграйте 30-60 секунд (загрузите чанки, откройте инвентари модов)",
+      "step3": "Остановите профилирование:",
+      "step4": "Spark создаст ссылку на отчёт в чате",
+      "otherCommands": "Другие полезные команды:"
     }
   },
   "modpackCompare": {
@@ -1654,7 +2082,171 @@
     "visualToolsDescription": "Визуальные инструменты для создания контента модпака",
     "recipeBuilderDesc": "Создание рецептов для KubeJS, CraftTweaker, датапаков",
     "metadataEditorDesc": "Редактирование pack.mcmeta и метаданных модов",
-    "externalEditorTip": "Для редактирования файлов используйте внешний редактор (VS Code, Notepad++). Откройте папку экземпляра через кнопку «Открыть папку» на вкладке «Файлы»."
+    "externalEditorTip": "Для редактирования файлов используйте внешний редактор (VS Code, Notepad++). Откройте папку экземпляра через кнопку «Открыть папку» на вкладке «Файлы».",
+    "fileBrowser": {
+      "title": "Браузер файлов",
+      "description": "Навигация по файлам экземпляра. Выберите файл для предпросмотра",
+      "folder": "Папка",
+      "openFolderOrFile": "Открыть папку / файл",
+      "back": "Назад",
+      "goUpLevel": "Вернуться на уровень выше",
+      "openInExplorer": "Открыть в проводнике",
+      "showHiddenFiles": "Показать скрытые файлы",
+      "hideHiddenFiles": "Скрыть скрытые файлы",
+      "searchGlobal": "Искать во всех папках",
+      "global": "Глобально",
+      "regex": "Regex",
+      "useRegex": "Использовать регулярные выражения",
+      "file": "файл",
+      "files": "файлов",
+      "emptyFolder": "Папка пуста",
+      "noResults": "Ничего не найдено",
+      "tryDifferentQuery": "Попробуйте изменить запрос",
+      "previewUnavailable": "Предпросмотр недоступен",
+      "fileNotText": "Файл {name} не является текстовым и не может быть отображён в редакторе",
+      "supportedFormats": "Поддерживаются: .toml, .json, .properties, .cfg, .txt, .java, .js, .py и другие текстовые форматы",
+      "openInVSCode": "Открыть в VS Code",
+      "openInDefaultEditor": "Открыть в редакторе по умолчанию",
+      "showInFileManager": "Показать файл в проводнике",
+      "renameFile": "Переименовать файл",
+      "copyFile": "Создать копию файла",
+      "deleteFile": "Удалить файл",
+      "renameDialog": {
+        "title": "Переименовать",
+        "newName": "Новое имя",
+        "confirm": "Переименовать",
+        "cancel": "Отмена"
+      },
+      "copyDialog": {
+        "title": "Копировать",
+        "copyName": "Имя копии",
+        "confirm": "Копировать",
+        "cancel": "Отмена"
+      },
+      "confirmDelete": {
+        "title": "Удалить файл?",
+        "message": "Файл «{name}» будет удалён. Это действие нельзя отменить.",
+        "confirm": "Удалить"
+      },
+      "toast": {
+        "fileDeleted": "Файл удалён",
+        "fileDeletedMessage": "{name} успешно удалён",
+        "fileRenamed": "Файл переименован",
+        "fileRenamedMessage": "{from} → {to}",
+        "fileCopied": "Файл скопирован",
+        "fileCopiedMessage": "Создана копия: {name}",
+        "searchError": "Ошибка поиска",
+        "error": "Ошибка",
+        "failedToOpenFolder": "Не удалось открыть папку в проводнике",
+        "failedToShowFile": "Не удалось показать файл в проводнике",
+        "vscodeNotFound": "VS Code не найден",
+        "vscodeNotFoundMessage": "Убедитесь, что VS Code установлен и команда 'code' доступна в PATH",
+        "failedToOpenInVSCode": "Не удалось открыть файл в VS Code",
+        "failedToOpenInEditor": "Не удалось открыть файл в редакторе",
+        "renameError": "Ошибка переименования",
+        "copyError": "Ошибка копирования"
+      },
+      "errors": {
+        "failedToLoad": "Не удалось загрузить содержимое файла",
+        "fileTooLarge": "Файл слишком большой для редактирования ({size})",
+        "editingNotSupported": "Редактирование недоступно для этого типа файла"
+      }
+    },
+    "metadataEditor": {
+      "title": "Редактор метаданных",
+      "metadataFiles": "Файлы метаданных",
+      "createPackMcmeta": "Создать pack.mcmeta",
+      "noFilesFound": "Файлы метаданных не найдены",
+      "selectFileToEdit": "Выберите файл для редактирования",
+      "close": "Закрыть",
+      "save": "Сохранить",
+      "saving": "Сохранение...",
+      "create": "Создать",
+      "cancel": "Отмена",
+      "location": "Расположение",
+      "packFormat": "Формат пака",
+      "description": "Описание",
+      "descriptionPlaceholder": "Описание пака...",
+      "packMetadata": "Метаданные пака",
+      "compatibleWith": "Совместим с Minecraft {versions}",
+      "formattingHint": "Поддерживает коды форматирования Minecraft (например, §c для красного)",
+      "supportedFormats": "Поддерживаемые форматы",
+      "filters": "Фильтры",
+      "forgeModMetadata": "Метаданные мода Forge/NeoForge",
+      "modLoader": "Загрузчик модов",
+      "loaderVersion": "Версия загрузчика",
+      "license": "Лицензия",
+      "mods": "Моды",
+      "modsTomlReadOnly": "Редактирование mods.toml только для чтения. Используйте редактор исходного кода для изменений.",
+      "fabricModMetadata": "Метаданные мода Fabric",
+      "modId": "ID мода",
+      "version": "Версия",
+      "name": "Название",
+      "authors": "Авторы",
+      "dependencies": "Зависимости",
+      "environment": "Окружение",
+      "fabricReadOnly": "Редактирование fabric.mod.json только для чтения. Используйте редактор исходного кода для изменений.",
+      "defaultDescription": "Кастомный пак",
+      "toast": {
+        "failedToLoad": "Не удалось загрузить метаданные",
+        "saved": "Сохранено",
+        "savedMessage": "{file} сохранён",
+        "failedToSave": "Не удалось сохранить",
+        "created": "Создано",
+        "createdMessage": "pack.mcmeta успешно создан",
+        "failedToCreate": "Не удалось создать"
+      }
+    },
+    "modProfiles": {
+      "title": "Создать профиль",
+      "name": "Название",
+      "description": "Описание",
+      "descriptionOptional": "(опционально)",
+      "descriptionPlaceholder": "Описание профиля...",
+      "currentStateInfo": "Профиль сохранит текущее состояние модов ({count} включено)",
+      "saveProfile": "Сохранить профиль",
+      "saving": "Сохранение...",
+      "currentState": "Текущее состояние",
+      "enabled": "Включено",
+      "disabled": "Выключено",
+      "savedProfiles": "Сохранённые профили",
+      "import": "Импорт",
+      "importTitle": "Импортировать профиль из файла",
+      "noProfiles": "Нет сохранённых профилей",
+      "noProfilesHint": "Создайте профиль, чтобы сохранить текущую конфигурацию модов и быстро переключаться между ними",
+      "exportTitle": "Экспортировать профиль",
+      "deleteTitle": "Удалить профиль",
+      "created": "Создан",
+      "applyProfile": "Применить профиль",
+      "applying": "Применение...",
+      "toast": {
+        "error": "Ошибка",
+        "enterName": "Введите название профиля",
+        "profileSaved": "Профиль сохранён",
+        "profileSavedMessage": "«{name}» успешно создан",
+        "profileApplied": "Профиль применён",
+        "profileAppliedMessage": "«{name}» успешно применён",
+        "profileDeleted": "Профиль удалён",
+        "profileDeletedMessage": "«{name}» успешно удалён",
+        "profileExported": "Профиль экспортирован",
+        "profileExportedMessage": "«{name}» сохранён в {path}",
+        "exportError": "Ошибка экспорта",
+        "profileImported": "Профиль импортирован",
+        "profileImportedMessage": "Профиль успешно добавлен",
+        "importError": "Ошибка импорта"
+      },
+      "confirm": {
+        "noEnabledMods": "Нет включённых модов",
+        "noEnabledModsMessage": "Вы уверены, что хотите сохранить профиль без включённых модов?",
+        "save": "Сохранить",
+        "applyProfile": "Применить профиль?",
+        "applyProfileMessage": "Будут включены {count} модов, остальные будут отключены. Продолжить?",
+        "apply": "Применить",
+        "deleteProfile": "Удалить профиль?",
+        "deleteProfileMessage": "Профиль «{name}» будет удалён. Это действие нельзя отменить.",
+        "delete": "Удалить"
+      }
+    }
   },
   "console": {
     "title": "Консоль",
@@ -2329,10 +2921,75 @@
       "createManifest": "Создать манифест для отслеживания изменений",
       "previous": "Предыдущая",
       "next": "Следующая",
+      "goToPage": "Перейти на страницу",
+      "pagination": "Постраничная навигация",
       "deselect": "Снять выделение",
       "modConfigs": "Конфиги модов из папки config/",
       "rootConfigs": "Конфиги из корня экземпляра",
       "hasQuickPresets": "Есть быстрые шаблоны"
+    },
+    "bulkOperations": {
+      "selected": "Выбрано:",
+      "enable": "Включить",
+      "enableAll": "Включить все",
+      "disable": "Выключить",
+      "disableAll": "Выключить все",
+      "delete": "Удалить",
+      "deleteAll": "Удалить все",
+      "deselect": "Снять выделение",
+      "cancel": "Отменить"
+    },
+    "units": {
+      "bytes": "Б",
+      "kilobytes": "КБ",
+      "megabytes": "МБ",
+      "gigabytes": "ГБ",
+      "terabytes": "ТБ"
     }
+  },
+  "launchChanges": {
+    "title": "Изменения с последнего запуска",
+    "lastLaunch": "Последний запуск",
+    "changesCount": "изменений",
+    "daysAgo": "дн. назад",
+    "hoursAgo": "ч. назад",
+    "recently": "недавно",
+    "today": "Сегодня",
+    "yesterday": "Вчера",
+    "mods": "модов",
+    "updated": "обновлено",
+    "enabled": "включено",
+    "disabled": "выключено",
+    "configs": "конфигов",
+    "expand": "Показать детали",
+    "collapse": "Скрыть детали",
+    "addedMods": "Добавленные моды",
+    "removedMods": "Удалённые моды",
+    "updatedMods": "Обновлённые моды",
+    "enabledMods": "Включённые моды",
+    "disabledMods": "Выключенные моды",
+    "configChanges": "Изменения конфигов",
+    "fileChanges": "Другие файлы",
+    "files": "файлов",
+    "crashTitle": "Изменения перед крашем",
+    "rollback": "Откатить",
+    "rollbackHint": "Откатить изменения через бэкапы",
+    "reset": "Сбросить",
+    "resetHint": "Сбросить базовое состояние для отслеживания",
+    "historyTitle": "История запусков",
+    "showHistory": "История",
+    "hideHistory": "Скрыть историю",
+    "comparingWith": "Сравнение с прошлым снимком",
+    "snapshotFrom": "Снимок от",
+    "compareLatest": "К последнему",
+    "noSnapshots": "Нет снимков",
+    "latest": "Последний",
+    "hasBackup": "Есть бэкап",
+    "statusUnknown": "Статус неизвестен",
+    "statusSuccess": "Успешный запуск",
+    "statusCrashed": "Краш",
+    "modsShort": "м.",
+    "configsShort": "к.",
+    "filesShort": "ф."
   }
 }

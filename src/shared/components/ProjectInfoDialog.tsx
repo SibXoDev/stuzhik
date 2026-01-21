@@ -5,6 +5,7 @@ import { sanitizeImageUrl } from "../utils/url-validator";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { MarkdownRenderer, HtmlRenderer } from "./MarkdownRenderer";
 import { ModalWrapper } from "../ui";
+import { formatSize } from "../utils/format-size";
 
 export interface ProjectInfoDialogProps {
   /** Project info to display */
@@ -61,14 +62,6 @@ function formatCount(count: number | undefined): string {
   return count.toString();
 }
 
-/** Format file size */
-function formatSize(bytes: number | undefined): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
 /** Get version type badge class */
 function getVersionTypeBadge(type?: string | null): string {
   if (!type) return "";
@@ -92,6 +85,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
   const [selectedVersion, setSelectedVersion] = createSignal<VersionChangelog | null>(null);
   const [showAllVersionsData, setShowAllVersionsData] = createSignal(false);
   const [hideIncompatible, setHideIncompatible] = createSignal(true); // По умолчанию скрываем
+  const fmtSize = (bytes?: number) => bytes ? formatSize(bytes, t().ui?.units) : "";
 
   // Check if version is compatible with instance settings
   const isVersionCompatible = (v: VersionChangelog): boolean => {
@@ -489,7 +483,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                               </Show>
                             </div>
                             <div class="flex-shrink-0 text-right text-xs text-gray-500">
-                              <p>{formatSize(version.file_size)}</p>
+                              <p>{fmtSize(version.file_size)}</p>
                               <p>{version.downloads.toLocaleString()} {t().mods?.downloads ?? "downloads"}</p>
                             </div>
                           </div>
@@ -582,7 +576,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                 <Show when={props.project.file_size}>
                   <div>
                     <span class="text-gray-500">{t().wiki?.size ?? "Size"}:</span>
-                    <span class="text-white ml-2">{formatSize(props.project.file_size)}</span>
+                    <span class="text-white ml-2">{fmtSize(props.project.file_size)}</span>
                   </div>
                 </Show>
                 <Show when={props.project.enabled !== undefined}>
@@ -646,7 +640,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
             <Show when={hasVersionSelector() && selectedVersion()}>
               <span>{t().wiki?.selectedVersion ?? "Selected"}:</span>
               <span class="font-medium text-white">{selectedVersion()!.version_name}</span>
-              <span>({formatSize(selectedVersion()!.file_size)})</span>
+              <span>({fmtSize(selectedVersion()!.file_size)})</span>
             </Show>
           </div>
 

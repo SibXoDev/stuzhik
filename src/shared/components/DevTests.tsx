@@ -2,6 +2,7 @@ import { createSignal, For, Show, JSX, onMount } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { ModalWrapper } from "../ui";
 import { addToast } from "./Toast";
+import { useI18n } from "../i18n";
 
 interface TestResult {
   success: boolean;
@@ -108,6 +109,7 @@ function TestButton(props: {
 }
 
 export function DevTests(props: { onClose: () => void }) {
+  const { t } = useI18n();
   const [logs, setLogs] = createSignal<string[]>([]);
   const [myPeerId, setMyPeerId] = createSignal<string>("");
   const [myShortCode, setMyShortCode] = createSignal<string>("");
@@ -830,7 +832,11 @@ export function DevTests(props: { onClose: () => void }) {
                 {myPeerId().slice(0, 8)}...
               </div>
             </Show>
-            <button class="btn-close" onClick={props.onClose}>
+            <button
+              class="btn-close"
+              onClick={props.onClose}
+              aria-label={t().ui?.tooltips?.close ?? "Close"}
+            >
               <i class="i-hugeicons-cancel-01 w-5 h-5" />
             </button>
           </div>

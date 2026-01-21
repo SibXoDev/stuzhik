@@ -1,24 +1,22 @@
 import { Show, For, createMemo } from "solid-js";
 import { useDownloads } from "../hooks/useDownloads";
 import { useI18n } from "../i18n";
+import { formatSize } from "../utils/format-size";
 import type { DownloadProgress } from "../types";
 
 export default function DownloadsPanel() {
   const { t } = useI18n();
   const { downloads, activeDownloads, downloadsByInstance, totalSpeed, cancelDownload, isCancelling, setShowDownloadsPanel } = useDownloads();
 
-  const formatSpeed = (bytesPerSec: number) => {
-    if (bytesPerSec >= 1_000_000) {
-      return `${(bytesPerSec / 1_000_000).toFixed(1)} MB/s`;
-    }
-    return `${(bytesPerSec / 1000).toFixed(0)} KB/s`;
-  };
+  // Localized size formatter
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
-  const formatSize = (bytes: number) => {
-    if (bytes >= 1_000_000) {
-      return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  const formatSpeed = (bytesPerSec: number) => {
+    const units = t().ui?.units;
+    if (bytesPerSec >= 1_000_000) {
+      return `${(bytesPerSec / 1_000_000).toFixed(1)} ${units?.megabytes ?? "MB"}/s`;
     }
-    return `${(bytes / 1000).toFixed(0)} KB`;
+    return `${(bytesPerSec / 1000).toFixed(0)} ${units?.kilobytes ?? "KB"}/s`;
   };
 
   // Get sorted instance groups
@@ -54,6 +52,7 @@ export default function DownloadsPanel() {
         <button
           class="btn-close"
           onClick={onClose}
+          aria-label={t().ui?.tooltips?.close ?? "Close"}
         >
           <i class="i-hugeicons-cancel-01 w-5 h-5" />
         </button>
@@ -74,7 +73,7 @@ export default function DownloadsPanel() {
           <div class="space-y-2">
             <h3 class="text-sm font-medium text-gray-400 px-1">General</h3>
             <For each={instanceGroups().noInstance}>
-              {(download) => <DownloadItem download={download} onCancel={cancelDownload} isCancelling={isCancelling} formatSpeed={formatSpeed} formatSize={formatSize} />}
+              {(download) => <DownloadItem download={download} onCancel={cancelDownload} isCancelling={isCancelling} formatSpeed={formatSpeed} fmtSize={fmtSize} />}
             </For>
           </div>
         </Show>
@@ -91,7 +90,7 @@ export default function DownloadsPanel() {
                 </span>
               </h3>
               <For each={instanceDownloads}>
-                {(download) => <DownloadItem download={download} onCancel={cancelDownload} isCancelling={isCancelling} formatSpeed={formatSpeed} formatSize={formatSize} />}
+                {(download) => <DownloadItem download={download} onCancel={cancelDownload} isCancelling={isCancelling} formatSpeed={formatSpeed} fmtSize={fmtSize} />}
               </For>
             </div>
           )}
@@ -107,11 +106,11 @@ interface DownloadItemProps {
   onCancel: (operationId: string) => void;
   isCancelling: (operationId: string | null) => boolean;
   formatSpeed: (bytesPerSec: number) => string;
-  formatSize: (bytes: number) => string;
+  fmtSize: (bytes: number) => string;
 }
 
 function DownloadItem(props: DownloadItemProps) {
-  const { download, onCancel, isCancelling, formatSpeed, formatSize } = props;
+  const { download, onCancel, isCancelling, formatSpeed, fmtSize } = props;
 
   const isCompleted = download.status === "completed";
   const isVerifying = download.status === "verifying";
@@ -231,7 +230,7 @@ function DownloadItem(props: DownloadItemProps) {
                     "Verifying..."
                   ) : (
                     <>
-                      {formatSize(download.downloaded)} / {formatSize(download.total)}
+                      {fmtSize(download.downloaded)} / {fmtSize(download.total)}
                     </>
                   )}
                 </span>
@@ -243,7 +242,7 @@ function DownloadItem(props: DownloadItemProps) {
           </Show>
 
           <Show when={isCompleted}>
-            <p class="text-xs text-green-400">{formatSize(download.total)}</p>
+            <p class="text-xs text-green-400">{fmtSize(download.total)}</p>
           </Show>
 
           <Show when={isCancelled}>

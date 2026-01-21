@@ -108,7 +108,7 @@ impl ModpackManager {
                     "x-api-key",
                     "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
                         .parse()
-                        .unwrap(),
+                        .expect("valid API key header value"),
                 );
                 headers
             })
@@ -291,7 +291,7 @@ impl ModpackManager {
                     "x-api-key",
                     "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
                         .parse()
-                        .unwrap(),
+                        .expect("valid API key header value"),
                 );
                 headers
             })
@@ -457,7 +457,7 @@ impl ModpackManager {
                     "x-api-key",
                     "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
                         .parse()
-                        .unwrap(),
+                        .expect("valid API key header value"),
                 );
                 headers
             })

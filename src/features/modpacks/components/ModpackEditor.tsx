@@ -12,6 +12,7 @@ import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import { addToast } from "../../../shared/components/Toast";
 import { Tabs } from "../../../shared/ui";
 import { useI18n } from "../../../shared/i18n";
+import { formatSize } from "../../../shared/utils/format-size";
 
 interface Props {
   project: ModpackProject;
@@ -326,8 +327,8 @@ export default function ModpackEditor(props: Props) {
       setExportProgress(null);
       addToast({
         type: "success",
-        title: "Модпак экспортирован!",
-        message: `${result.path} • ${formatSize(result.size)} • ${result.mods_count} модов`,
+        title: t().modpacks.export?.success ?? "Modpack exported!",
+        message: `${result.path} • ${fmtSize(result.size)} • ${result.mods_count} ${t().common?.mods ?? "mods"}`,
         duration: 7000,
       });
     } catch (e) {
@@ -356,11 +357,8 @@ export default function ModpackEditor(props: Props) {
     }
   };
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
+  // Localized size formatter
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   const getLoaderColor = (loader: string) => {
     switch (loader) {
@@ -632,7 +630,7 @@ export default function ModpackEditor(props: Props) {
                                   : mod.source}
                             </span>
                             <Show when={mod.size}>
-                              <span>{formatSize(mod.size!)}</span>
+                              <span>{fmtSize(mod.size!)}</span>
                             </Show>
                           </div>
                         </div>

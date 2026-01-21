@@ -1,6 +1,7 @@
 import { Show, For, createMemo, createSignal, createEffect } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { useDragDrop, type DroppedFile } from "../stores/dragDrop";
+import { useI18n } from "../i18n";
 
 /** Verification result from backend */
 interface ModVerificationResult {
@@ -21,8 +22,27 @@ interface BatchVerificationResult {
 /** Map of file path -> verification result */
 type VerificationMap = Map<string, ModVerificationResult | "loading" | "error">;
 
+interface DragDropTranslations {
+  mixedFiles: string;
+  mixedFilesDesc: string;
+  manifestDesc: string;
+  mod: string;
+  mods: string;
+  modDesc: string;
+  modpackStuzhik: string;
+  modpackModrinth: string;
+  modpackDesc: string;
+  archive: string;
+  archives: string;
+  archiveDesc: string;
+  resources: string;
+  resourcesDesc: string;
+  unsupportedFormat: string;
+  unsupportedDesc: string;
+}
+
 /** Определяет тип файла и соответствующую иконку/цвет */
-function getFileTypeInfo(files: DroppedFile[]): {
+function getFileTypeInfo(files: DroppedFile[], tr: DragDropTranslations): {
   type: "mod" | "modpack" | "modpack-manifest" | "resource" | "mixed" | "unknown";
   icon: string;
   color: string;
@@ -43,8 +63,8 @@ function getFileTypeInfo(files: DroppedFile[]): {
       color: "text-yellow-400",
       bgColor: "bg-yellow-600/20",
       borderColor: "border-yellow-500",
-      title: "Разные файлы",
-      description: "Перетащите файлы одного типа",
+      title: tr.mixedFiles,
+      description: tr.mixedFilesDesc,
     };
   }
 
@@ -63,7 +83,7 @@ function getFileTypeInfo(files: DroppedFile[]): {
         bgColor: "bg-green-600/20",
         borderColor: "border-green-500",
         title: "Modrinth Manifest",
-        description: "Будет создан экземпляр и скачаны все моды",
+        description: tr.manifestDesc,
         format: "modrinth",
       };
     }
@@ -76,7 +96,7 @@ function getFileTypeInfo(files: DroppedFile[]): {
         bgColor: "bg-orange-600/20",
         borderColor: "border-orange-500",
         title: "CurseForge Manifest",
-        description: "Будет создан экземпляр и скачаны все моды",
+        description: tr.manifestDesc,
         format: "curseforge",
       };
     }
@@ -90,8 +110,8 @@ function getFileTypeInfo(files: DroppedFile[]): {
       color: "text-blue-400",
       bgColor: "bg-blue-600/20",
       borderColor: "border-blue-500",
-      title: files.length === 1 ? "Мод" : `${files.length} модов`,
-      description: "Перетащите на экземпляр в списке или откройте нужный",
+      title: files.length === 1 ? tr.mod : tr.mods.replace("{count}", String(files.length)),
+      description: tr.modDesc,
     };
   }
 
@@ -103,8 +123,8 @@ function getFileTypeInfo(files: DroppedFile[]): {
       color: "text-cyan-400",
       bgColor: "bg-cyan-600/20",
       borderColor: "border-cyan-500",
-      title: "Модпак Stuzhik",
-      description: "Откроется браузер модпаков для импорта",
+      title: tr.modpackStuzhik,
+      description: tr.modpackDesc,
     };
   }
 
@@ -116,8 +136,8 @@ function getFileTypeInfo(files: DroppedFile[]): {
       color: "text-green-400",
       bgColor: "bg-green-600/20",
       borderColor: "border-green-500",
-      title: "Модпак Modrinth",
-      description: "Откроется браузер модпаков для импорта",
+      title: tr.modpackModrinth,
+      description: tr.modpackDesc,
     };
   }
 
@@ -129,8 +149,8 @@ function getFileTypeInfo(files: DroppedFile[]): {
       color: "text-orange-400",
       bgColor: "bg-orange-600/20",
       borderColor: "border-orange-500",
-      title: files.length === 1 ? "Архив" : `${files.length} архивов`,
-      description: "Модпак CurseForge или ресурспак",
+      title: files.length === 1 ? tr.archive : tr.archives.replace("{count}", String(files.length)),
+      description: tr.archiveDesc,
     };
   }
 
@@ -142,8 +162,8 @@ function getFileTypeInfo(files: DroppedFile[]): {
       color: "text-purple-400",
       bgColor: "bg-purple-600/20",
       borderColor: "border-purple-500",
-      title: "Ресурсы",
-      description: "Ресурспаки или текстуры",
+      title: tr.resources,
+      description: tr.resourcesDesc,
     };
   }
 
@@ -154,15 +174,36 @@ function getFileTypeInfo(files: DroppedFile[]): {
     color: "text-gray-400",
     bgColor: "bg-gray-600/20",
     borderColor: "border-gray-500",
-    title: "Неподдерживаемый формат",
-    description: "Поддерживаются: .jar, .stzhk, .mrpack, .zip, manifest.json",
+    title: tr.unsupportedFormat,
+    description: tr.unsupportedDesc,
   };
 }
 
 export function DragDropOverlay() {
+  const { t } = useI18n();
   const { isDragging, draggedFiles, isInDetailView } = useDragDrop();
 
-  const fileInfo = createMemo(() => getFileTypeInfo(draggedFiles()));
+  // Create translations object for getFileTypeInfo
+  const translations = createMemo((): DragDropTranslations => ({
+    mixedFiles: t().dragDrop?.mixedFiles ?? "Mixed files",
+    mixedFilesDesc: t().dragDrop?.mixedFilesDesc ?? "Drop files of the same type",
+    manifestDesc: t().dragDrop?.manifestDesc ?? "An instance will be created and all mods downloaded",
+    mod: t().dragDrop?.mod ?? "Mod",
+    mods: t().dragDrop?.mods ?? "{count} mods",
+    modDesc: t().dragDrop?.modDesc ?? "Drag to an instance in the list or open one",
+    modpackStuzhik: t().dragDrop?.modpackStuzhik ?? "Stuzhik Modpack",
+    modpackModrinth: t().dragDrop?.modpackModrinth ?? "Modrinth Modpack",
+    modpackDesc: t().dragDrop?.modpackDesc ?? "Modpack browser will open for import",
+    archive: t().dragDrop?.archive ?? "Archive",
+    archives: t().dragDrop?.archives ?? "{count} archives",
+    archiveDesc: t().dragDrop?.archiveDesc ?? "CurseForge modpack or resource pack",
+    resources: t().dragDrop?.resources ?? "Resources",
+    resourcesDesc: t().dragDrop?.resourcesDesc ?? "Resource packs or textures",
+    unsupportedFormat: t().dragDrop?.unsupportedFormat ?? "Unsupported format",
+    unsupportedDesc: t().dragDrop?.unsupportedDesc ?? "Supported: .jar, .stzhk, .mrpack, .zip, manifest.json",
+  }));
+
+  const fileInfo = createMemo(() => getFileTypeInfo(draggedFiles(), translations()));
   const isSupported = createMemo(() =>
     fileInfo().type !== "unknown" && fileInfo().type !== "mixed"
   );
@@ -226,10 +267,10 @@ export function DragDropOverlay() {
   const getVerificationDisplay = (file: DroppedFile) => {
     const verification = verifications().get(file.path);
     if (!verification || verification === "loading") {
-      return { icon: "i-svg-spinners-ring-resize", color: "text-gray-400", label: "Проверка..." };
+      return { icon: "i-svg-spinners-ring-resize", color: "text-gray-400", label: t().dragDrop?.verifying ?? "Verifying..." };
     }
     if (verification === "error") {
-      return { icon: "i-hugeicons-alert-02", color: "text-yellow-400", label: "Не удалось проверить" };
+      return { icon: "i-hugeicons-alert-02", color: "text-yellow-400", label: t().dragDrop?.verifyFailed ?? "Failed to verify" };
     }
     if (verification.verified) {
       const platformIcon = verification.platform === "modrinth"
@@ -248,7 +289,7 @@ export function DragDropOverlay() {
         label: verification.project_name || verification.platform,
       };
     }
-    return { icon: "i-hugeicons-alert-02", color: "text-yellow-400", label: "Не найден на платформах" };
+    return { icon: "i-hugeicons-alert-02", color: "text-yellow-400", label: t().dragDrop?.notFoundOnPlatforms ?? "Not found on platforms" };
   };
 
   // Summary of verification results
@@ -303,12 +344,12 @@ export function DragDropOverlay() {
               <Show when={verificationSummary()}>
                 {(summary) => (
                   <div class="flex flex-col items-center gap-2 w-full">
-                    <span class="text-xs text-gray-500">Проверка подлинности</span>
+                    <span class="text-xs text-gray-500">{t().dragDrop?.verifyingAuthenticity ?? "Verifying authenticity"}</span>
                     <div class="flex items-center gap-2 flex-wrap justify-center">
                       <Show when={summary().loading > 0}>
                         <div class="flex items-center gap-1.5 bg-gray-700/50 px-3 py-1.5 rounded-full">
                           <i class="i-svg-spinners-ring-resize w-4 h-4 text-gray-400" />
-                          <span class="text-gray-300 text-sm">Проверка...</span>
+                          <span class="text-gray-300 text-sm">{t().dragDrop?.verifying ?? "Verifying..."}</span>
                         </div>
                       </Show>
                       <Show when={summary().modrinth > 0}>
@@ -326,7 +367,7 @@ export function DragDropOverlay() {
                       <Show when={summary().unknown > 0}>
                         <div class="flex items-center gap-1.5 bg-yellow-600/20 px-3 py-1.5 rounded-full">
                           <i class="i-hugeicons-alert-02 w-4 h-4 text-yellow-400" />
-                          <span class="text-yellow-300 text-sm">{summary().unknown} неизвестно</span>
+                          <span class="text-yellow-300 text-sm">{summary().unknown} {t().dragDrop?.unknown ?? "unknown"}</span>
                         </div>
                       </Show>
                     </div>
@@ -335,11 +376,11 @@ export function DragDropOverlay() {
               </Show>
 
               <p class="text-sm text-gray-400 text-center">
-                Мод будет установлен в текущий экземпляр
+                {t().dragDrop?.modWillBeInstalled ?? "Mod will be installed to current instance"}
               </p>
               <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600/30 text-blue-300">
                 <i class="i-hugeicons-arrow-down-01 w-4 h-4 animate-bounce" />
-                <span class="text-sm">Отпустите для установки</span>
+                <span class="text-sm">{t().dragDrop?.releaseToInstall ?? "Release to install"}</span>
               </div>
             </div>
           </div>
@@ -458,7 +499,7 @@ export function DragDropOverlay() {
                 {/* Many files hint */}
                 <Show when={draggedFiles().length > 5}>
                   <p class="text-xs text-gray-500">
-                    +{draggedFiles().length - 5} файлов...
+                    {(t().dragDrop?.moreFiles ?? "+{count} more files...").replace("{count}", String(draggedFiles().length - 5))}
                   </p>
                 </Show>
 
@@ -475,12 +516,12 @@ export function DragDropOverlay() {
                     fallback={
                       <>
                         <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                        <span class="text-sm">Отпустите для отмены</span>
+                        <span class="text-sm">{t().dragDrop?.releaseToCancel ?? "Release to cancel"}</span>
                       </>
                     }
                   >
                     <i class="i-hugeicons-arrow-down-01 w-4 h-4 animate-bounce" />
-                    <span class="text-sm">Отпустите для установки</span>
+                    <span class="text-sm">{t().dragDrop?.releaseToInstall ?? "Release to install"}</span>
                   </Show>
                 </div>
               </div>
@@ -503,7 +544,7 @@ export function DragDropOverlay() {
                   {fileInfo().title}
                 </h3>
                 <p class="text-blue-100 text-sm">
-                  Перетащите на нужный экземпляр ниже
+                  {t().dragDrop?.dragToInstance ?? "Drag to an instance below"}
                 </p>
               </div>
 
@@ -511,7 +552,7 @@ export function DragDropOverlay() {
               <Show when={verificationSummary()}>
                 {(summary) => (
                   <div class="flex items-center gap-1.5 flex-shrink-0">
-                    <span class="text-white/60 text-xs">Подлинность:</span>
+                    <span class="text-white/60 text-xs">{t().dragDrop?.authenticity ?? "Authenticity:"}</span>
                     <Show when={summary().loading > 0}>
                       <div class="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full">
                         <i class="i-svg-spinners-ring-resize w-3.5 h-3.5 text-white" />
@@ -543,7 +584,7 @@ export function DragDropOverlay() {
               <Show when={draggedFiles().length > 1 && !verificationSummary()}>
                 <div class="flex-shrink-0 bg-white/20 px-3 py-1.5 rounded-full">
                   <span class="text-white text-sm font-medium">
-                    {draggedFiles().length} файлов
+                    {draggedFiles().length} {t().dragDrop?.files ?? "files"}
                   </span>
                 </div>
               </Show>

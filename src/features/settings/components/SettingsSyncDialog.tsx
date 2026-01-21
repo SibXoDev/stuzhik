@@ -278,7 +278,11 @@ const SettingsSyncDialog: Component<Props> = (props) => {
               <p class="text-sm text-muted">{t().sync.subtitle}</p>
             </div>
           </div>
-          <button class="btn-close" onClick={props.onClose}>
+          <button
+            class="btn-close"
+            onClick={props.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
+          >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
         </div>

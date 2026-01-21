@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { ModalWrapper } from "../../../shared/ui/ModalWrapper";
 import { useI18n } from "../../../shared/i18n";
+import { formatSize } from "../../../shared/utils/format-size";
 
 interface ImportProgress {
   phase: string;
@@ -76,7 +77,7 @@ export default function ImportServerDialog(props: Props) {
       const selected = await open({
         directory: true,
         multiple: false,
-        title: "Выберите папку сервера",
+        title: t().server.import.selectFolderTitle,
       });
 
       if (selected && typeof selected === "string") {
@@ -154,14 +155,8 @@ export default function ImportServerDialog(props: Props) {
     return phases[phase] || phase;
   };
 
-  // Format bytes
-  const formatSize = (bytes: number): string => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  // Localized size formatter
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   // Get loader display name
   const getLoaderName = (loader: string): string => {
@@ -212,7 +207,7 @@ export default function ImportServerDialog(props: Props) {
                   <div>
                     <div class="text-lg font-medium text-green-300">{t().server.import.success}</div>
                     <div class="text-sm text-green-400/70">
-                      {result().files_copied} {t().server.import.files}, {formatSize(result().total_size)}
+                      {result().files_copied} {t().server.import.files}, {fmtSize(result().total_size)}
                     </div>
                   </div>
                 </div>
@@ -399,10 +394,10 @@ export default function ImportServerDialog(props: Props) {
                           {/* Stats */}
                           <div class="flex items-center justify-between text-xs text-gray-400">
                             <span>
-                              {progress().current.toLocaleString()} / {progress().total.toLocaleString()} файлов
+                              {progress().current.toLocaleString()} / {progress().total.toLocaleString()} {t().server.import.files}
                             </span>
                             <span>
-                              {formatSize(progress().bytes_copied)} / {formatSize(progress().total_bytes)}
+                              {fmtSize(progress().bytes_copied)} / {fmtSize(progress().total_bytes)}
                             </span>
                           </div>
 

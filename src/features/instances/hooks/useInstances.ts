@@ -90,6 +90,14 @@ export function useInstances() {
       setError(null);
       addToOperating(id);
       updateInstanceStatus(id, "starting");
+
+      // Create launch snapshot before starting (for tracking changes)
+      try {
+        await invoke("save_launch_snapshot", { instanceId: id });
+      } catch {
+        // Non-critical - continue even if snapshot fails
+      }
+
       await invoke("start_instance", { id });
       // Backend emits event, but as fallback fetch actual status
       // This ensures status is synced even if event is missed
@@ -362,6 +370,12 @@ export function useInstances() {
 
         // Запускаем заново
         try {
+          // Create snapshot before restart
+          try {
+            await invoke("save_launch_snapshot", { instanceId: instance_id });
+          } catch {
+            // Non-critical
+          }
           await invoke("start_instance", { id: instance_id });
         } catch (e) {
           console.error("Auto-restart failed:", e);

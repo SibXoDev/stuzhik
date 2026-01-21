@@ -9,6 +9,8 @@ import { highlightCode, detectLanguage, resetHighlighter } from "../../../shared
 import { MarkdownRenderer } from "../../../shared/components/MarkdownRenderer";
 import { addToast } from "../../../shared/components/Toast";
 import { useSafeTimers } from "../../../shared/hooks";
+import { formatSize } from "../../../shared/utils/format-size";
+import { useI18n } from "../../../shared/i18n";
 
 interface Props {
   onClose: () => void;
@@ -62,6 +64,7 @@ const LANG_NAMES: Record<string, string> = {
 };
 
 const SourceCodePage: Component<Props> = (props) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = createSignal<Tab>("files");
   const [selectedPath, setSelectedPath] = createSignal<string | null>(null);
   const [expandedDirs, setExpandedDirs] = createSignal<Set<string>>(new Set());
@@ -75,6 +78,7 @@ const SourceCodePage: Component<Props> = (props) => {
   const [codeLoading, setCodeLoading] = createSignal(false);
   const [codeError, setCodeError] = createSignal<string | null>(null);
   const { setTimeout: safeTimeout } = useSafeTimers();
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   let filesScrollRef: HTMLDivElement | undefined;
   let changesScrollRef: HTMLDivElement | undefined;
@@ -427,12 +431,6 @@ const SourceCodePage: Component<Props> = (props) => {
     }
   };
 
-  const formatSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   // Calculate language stats for GitHub-style bar (merge similar extensions)
   const languageStats = createMemo(() => {
     const langs = sourceBundle.stats.languages as Record<string, number>;
@@ -667,7 +665,7 @@ const SourceCodePage: Component<Props> = (props) => {
                             <i class={`w-4 h-4 flex-shrink-0 ${getFileIcon(node()!)}`} />
                             <span class="flex-1 truncate text-sm">{node()!.name}</span>
                             <Show when={node()!.type === "file" && node()!.size}>
-                              <span class="text-xs text-gray-600">{formatSize(node()!.size!)}</span>
+                              <span class="text-xs text-gray-600">{fmtSize(node()!.size!)}</span>
                             </Show>
                           </div>
                         </Show>
@@ -767,7 +765,7 @@ const SourceCodePage: Component<Props> = (props) => {
           <div class="px-3 pb-3 text-xs text-gray-500">
             <div class="flex justify-between">
               <span>{sourceBundle.stats.totalFiles} файлов</span>
-              <span>{formatSize(sourceBundle.stats.totalSize)}</span>
+              <span>{fmtSize(sourceBundle.stats.totalSize)}</span>
             </div>
           </div>
         </div>

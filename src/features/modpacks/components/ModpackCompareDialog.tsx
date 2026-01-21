@@ -13,6 +13,7 @@ import { useI18n } from "../../../shared/i18n";
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import { Select, Tabs } from "../../../shared/ui";
 import { useDebounce } from "../../../shared/hooks";
+import { formatSize } from "../../../shared/utils/format-size";
 
 interface Props {
   instances: Instance[];
@@ -197,7 +198,11 @@ const ModDownloadSearch: Component<{
       <div class="card w-[500px] max-h-[70vh] overflow-hidden flex flex-col" style="animation: scaleIn 0.1s ease-out">
         <div class="flex items-center justify-between pb-4 border-b border-gray-800">
           <h3 class="font-semibold">{t().modpackCompare.download.title}: {props.modName}</h3>
-          <button class="btn-close" onClick={props.onClose}>
+          <button
+            class="btn-close"
+            onClick={props.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
+          >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
         </div>
@@ -284,7 +289,7 @@ const ModList: Component<{
   title: string;
   onDownload?: (mod: ModInfo) => void;
   downloadState?: DownloadState;
-  formatSize: (bytes: number) => string;
+  fmtSize: (bytes: number) => string;
   downloadTooltip?: string;
   downloadedTooltip?: string;
   failedTooltip?: string;
@@ -329,7 +334,7 @@ const ModList: Component<{
                   </Show>
                 </div>
                 <div class="flex items-center gap-2">
-                  <span class="text-xs text-muted whitespace-nowrap">{props.formatSize(mod.size)}</span>
+                  <span class="text-xs text-muted whitespace-nowrap">{props.fmtSize(mod.size)}</span>
                   <Show when={props.onDownload}>
                     <Show when={isCompleted()} fallback={
                       <Show when={isFailed()} fallback={
@@ -694,12 +699,8 @@ const ModpackCompareDialog: Component<Props> = (props) => {
     };
   };
 
-  const formatSize = (bytes: number) => {
-    const units = t().settings.units;
-    if (bytes < 1024) return `${bytes} ${units.bytes}`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} ${units.kilobytes}`;
-    return `${(bytes / 1024 / 1024).toFixed(2)} ${units.megabytes}`;
-  };
+  // Localized size formatter
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   const getFileName = (path: string) => path.split(/[/\\]/).pop() || path;
 
@@ -1020,11 +1021,15 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                     <div class="font-medium truncate">{p.selectedModpack?.title}</div>
                     <div class="text-xs text-muted">{p.selectedModpack?.author}</div>
                   </div>
-                  <button class="btn-ghost btn-sm" onClick={() => {
-                    p.setSelectedModpack(null);
-                    p.setModpackVersions([]);
-                    p.setSelectedVersion("");
-                  }}>
+                  <button
+                    class="btn-ghost btn-sm"
+                    onClick={() => {
+                      p.setSelectedModpack(null);
+                      p.setModpackVersions([]);
+                      p.setSelectedVersion("");
+                    }}
+                    aria-label={t().ui?.tooltips?.close ?? "Close"}
+                  >
                     <i class="i-hugeicons-cancel-01 w-4 h-4" />
                   </button>
                 </div>
@@ -1119,7 +1124,11 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                 <p class="text-sm text-muted">{t().modpackCompare.subtitle}</p>
               </div>
             </div>
-            <button class="btn-close" onClick={handleClose}>
+            <button
+              class="btn-close"
+              onClick={handleClose}
+              aria-label={t().ui?.tooltips?.close ?? "Close"}
+            >
               <i class="i-hugeicons-cancel-01 w-5 h-5" />
             </button>
           </div>
@@ -1251,7 +1260,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                         variant="purple"
                         icon="i-hugeicons-arrow-left-01"
                         title={t().modpackCompare.mods.onlyInFirst}
-                        formatSize={formatSize}
+                        fmtSize={fmtSize}
                       />
                     </Show>
 
@@ -1264,7 +1273,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                           title={t().modpackCompare.mods.onlyInSecond}
                           onDownload={handleDownloadMod}
                           downloadState={downloadState()}
-                          formatSize={formatSize}
+                          fmtSize={fmtSize}
                           downloadTooltip={t().modpackCompare.download.download}
                           downloadedTooltip={t().modpackCompare.download.downloaded}
                           failedTooltip={t().modpackCompare.download.failed}
@@ -1323,7 +1332,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                           <i class="i-hugeicons-arrow-down-01 w-4 h-4 group-open:rotate-180 transition-transform duration-100" />
                         </summary>
                         <div class="mt-2">
-                          <ModList mods={result()!.mods_identical} variant="green" icon="" title="" formatSize={formatSize} />
+                          <ModList mods={result()!.mods_identical} variant="green" icon="" title="" fmtSize={fmtSize} />
                         </div>
                       </details>
                     </Show>
@@ -1345,7 +1354,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                             {(config) => (
                               <div class="flex items-center justify-between p-2 bg-purple-600/10 rounded border border-purple-600/30 text-sm">
                                 <span class="truncate">{config.path}</span>
-                                <span class="text-xs text-muted">{formatSize(config.size)}</span>
+                                <span class="text-xs text-muted">{fmtSize(config.size)}</span>
                               </div>
                             )}
                           </For>
@@ -1361,7 +1370,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                             {(config) => (
                               <div class="flex items-center justify-between p-2 bg-blue-600/10 rounded border border-blue-600/30 text-sm">
                                 <span class="truncate">{config.path}</span>
-                                <span class="text-xs text-muted">{formatSize(config.size)}</span>
+                                <span class="text-xs text-muted">{fmtSize(config.size)}</span>
                               </div>
                             )}
                           </For>
@@ -1378,8 +1387,8 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                               <div class="p-2 bg-yellow-600/10 rounded border border-yellow-600/30 text-sm">
                                 <div class="truncate">{diff.path}</div>
                                 <div class="flex gap-4 text-xs text-muted mt-1">
-                                  <span class="text-purple-400">{t().modpackCompare.mods.diffFirst}: {formatSize(diff.first_size)}</span>
-                                  <span class="text-blue-400">{t().modpackCompare.mods.diffSecond}: {formatSize(diff.second_size)}</span>
+                                  <span class="text-purple-400">{t().modpackCompare.mods.diffFirst}: {fmtSize(diff.first_size)}</span>
+                                  <span class="text-blue-400">{t().modpackCompare.mods.diffSecond}: {fmtSize(diff.second_size)}</span>
                                 </div>
                               </div>
                             )}

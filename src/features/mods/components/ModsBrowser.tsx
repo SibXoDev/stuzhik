@@ -31,36 +31,31 @@ interface Props {
   onSwitchToInstalled?: () => void; // Переключиться на вкладку установленных
 }
 
-// Категории Modrinth
-const CATEGORIES = [
-  { id: "adventure", name: "Приключения", icon: "i-hugeicons-maps-location-01" },
-  { id: "cursed", name: "Проклятые", icon: "i-hugeicons-wink" },
-  { id: "decoration", name: "Декорации", icon: "i-hugeicons-paint-brush-01" },
-  { id: "economy", name: "Экономика", icon: "i-hugeicons-dollar-01" },
-  { id: "equipment", name: "Снаряжение", icon: "i-hugeicons-wrench-01" },
-  { id: "food", name: "Еда", icon: "i-hugeicons-restaurant-01" },
-  { id: "game-mechanics", name: "Игровая механика", icon: "i-hugeicons-game-controller-03" },
-  { id: "library", name: "Библиотеки", icon: "i-hugeicons-source-code" },
-  { id: "magic", name: "Магия", icon: "i-hugeicons-magic-wand-01" },
-  { id: "management", name: "Управление", icon: "i-hugeicons-settings-02" },
-  { id: "minigame", name: "Мини-игры", icon: "i-hugeicons-game-controller-03" },
-  { id: "mobs", name: "Мобы", icon: "i-hugeicons-user-group" },
-  { id: "optimization", name: "Оптимизация", icon: "i-hugeicons-flash" },
-  { id: "social", name: "Социальное", icon: "i-hugeicons-user-group" },
-  { id: "storage", name: "Хранение", icon: "i-hugeicons-database" },
-  { id: "technology", name: "Технологии", icon: "i-hugeicons-cpu" },
-  { id: "transportation", name: "Транспорт", icon: "i-hugeicons-car-01" },
-  { id: "utility", name: "Утилиты", icon: "i-hugeicons-tools" },
-  { id: "worldgen", name: "Генерация мира", icon: "i-hugeicons-earth" },
+// Категории Modrinth - ID и иконки (названия берутся из i18n)
+const CATEGORY_IDS = [
+  { id: "adventure", icon: "i-hugeicons-maps-location-01" },
+  { id: "cursed", icon: "i-hugeicons-wink" },
+  { id: "decoration", icon: "i-hugeicons-paint-brush-01" },
+  { id: "economy", icon: "i-hugeicons-dollar-01" },
+  { id: "equipment", icon: "i-hugeicons-wrench-01" },
+  { id: "food", icon: "i-hugeicons-restaurant-01" },
+  { id: "game-mechanics", icon: "i-hugeicons-game-controller-03" },
+  { id: "library", icon: "i-hugeicons-source-code" },
+  { id: "magic", icon: "i-hugeicons-magic-wand-01" },
+  { id: "management", icon: "i-hugeicons-settings-02" },
+  { id: "minigame", icon: "i-hugeicons-game-controller-03" },
+  { id: "mobs", icon: "i-hugeicons-user-group" },
+  { id: "optimization", icon: "i-hugeicons-flash" },
+  { id: "social", icon: "i-hugeicons-user-group" },
+  { id: "storage", icon: "i-hugeicons-database" },
+  { id: "technology", icon: "i-hugeicons-cpu" },
+  { id: "transportation", icon: "i-hugeicons-car-01" },
+  { id: "utility", icon: "i-hugeicons-tools" },
+  { id: "worldgen", icon: "i-hugeicons-earth" },
 ];
 
-const SORT_OPTIONS = [
-  { value: "relevance", label: "Релевантность" },
-  { value: "downloads", label: "Популярные" },
-  { value: "follows", label: "По подпискам" },
-  { value: "newest", label: "Новые" },
-  { value: "updated", label: "Обновлённые" },
-];
+// Sort option keys (labels come from i18n)
+const SORT_OPTION_KEYS = ["relevance", "downloads", "follows", "newest", "updated"] as const;
 
 // Цвет для severity
 const getSeverityColor = (severity: ConflictSeverity): string => {
@@ -75,6 +70,19 @@ const ModsBrowser: Component<Props> = (props) => {
   const { t } = useI18n();
   const modSearch = useModSearch();
   const installingMods = useInstallingMods();
+
+  // Memoized translations for categories and sort options
+  const sortOptions = createMemo(() =>
+    SORT_OPTION_KEYS.map(key => ({
+      value: key,
+      label: t().mods?.browser?.sortOptions?.[key] ?? key.charAt(0).toUpperCase() + key.slice(1),
+    }))
+  );
+
+  const getCategoryName = (id: string) => {
+    const categories = t().mods?.browser?.categories;
+    return categories?.[id as keyof typeof categories] ?? id.charAt(0).toUpperCase() + id.slice(1);
+  };
   const [source, setSource] = createSignal<"modrinth" | "curseforge">("modrinth");
   const [searchQuery, setSearchQuery] = createSignal("");
   const [searchMode, setSearchMode] = createSignal<"name" | "id" | "all">("name");
@@ -370,7 +378,7 @@ const ModsBrowser: Component<Props> = (props) => {
               {t().conflictPredictor.dangerTitle}
             </h3>
             <p class="text-sm text-muted mt-1">
-              Мод <span class="font-medium text-white">{conflictNotification()!.modName}</span> установлен, но обнаружены конфликты:
+              <span class="font-medium text-white">{conflictNotification()!.modName}</span> {t().mods?.browser?.conflictInstalled ?? "installed, but conflicts detected:"}
             </p>
 
             {/* Список конфликтов */}
@@ -389,7 +397,7 @@ const ModsBrowser: Component<Props> = (props) => {
                         onClick={() => handleAutoFix(conflict.conflicting_mod!)}
                       >
                         <i class="i-hugeicons-delete-02 w-4 h-4" />
-                        Удалить {conflict.conflicting_mod}
+                        {t().mods?.browser?.deleteMod ?? "Delete"} {conflict.conflicting_mod}
                       </button>
                     </Show>
                   </div>
@@ -402,7 +410,7 @@ const ModsBrowser: Component<Props> = (props) => {
               <Show when={props.onSwitchToInstalled}>
                 <button class="btn-secondary" data-size="sm" onClick={handleGoToInstalled}>
                   <i class="i-hugeicons-menu-01 w-4 h-4" />
-                  К установленным
+                  {t().mods?.browser?.goToInstalled ?? "Go to installed"}
                 </button>
               </Show>
               <button class="btn-ghost" data-size="sm" onClick={closeNotification}>
@@ -459,10 +467,10 @@ const ModsBrowser: Component<Props> = (props) => {
                   onInput={(e) => setSearchQuery(e.currentTarget.value)}
                   placeholder={
                     searchMode() === "name"
-                      ? "Поиск по названию мода..."
+                      ? (t().mods?.browser?.searchByName ?? "Search by mod name...")
                       : searchMode() === "id"
-                        ? "Поиск по mod ID (например: jei, create)..."
-                        : "Поиск по названию или mod ID..."
+                        ? (t().mods?.browser?.searchById ?? "Search by mod ID (e.g.: jei, create)...")
+                        : (t().mods?.browser?.searchAll ?? "Search by name or mod ID...")
                   }
                   class="w-full pl-10"
                 />
@@ -472,7 +480,7 @@ const ModsBrowser: Component<Props> = (props) => {
               <Select
                 value={sortBy()}
                 onChange={(val) => { setSortBy(val); setPage(0); }}
-                options={SORT_OPTIONS}
+                options={sortOptions()}
                 class="w-48"
               />
             </div>
@@ -480,7 +488,7 @@ const ModsBrowser: Component<Props> = (props) => {
             {/* Search Mode Toggle */}
             <div class="flex items-center justify-between gap-4 flex-wrap">
               <div class="flex items-center gap-4">
-                <span class="text-sm text-muted">Искать по:</span>
+                <span class="text-sm text-muted">{t().mods?.browser?.searchBy ?? "Search by:"}</span>
                 <div class="flex gap-2">
                   <button
                     class={`px-3 py-1 rounded-2xl text-sm font-medium transition-colors duration-100 ${
@@ -491,7 +499,7 @@ const ModsBrowser: Component<Props> = (props) => {
                     onClick={() => { setSearchMode("name"); setPage(0); }}
                   >
                     <i class="i-hugeicons-text-font w-4 h-4" />
-                    Название
+                    {t().mods?.browser?.searchByNameBtn ?? "Name"}
                   </button>
                   <button
                     class={`px-3 py-1 rounded-2xl text-sm font-medium transition-colors duration-100 ${
@@ -502,7 +510,7 @@ const ModsBrowser: Component<Props> = (props) => {
                     onClick={() => { setSearchMode("id"); setPage(0); }}
                   >
                     <i class="i-hugeicons-user-account w-4 h-4" />
-                    Mod ID
+                    {t().mods?.browser?.searchByIdBtn ?? "Mod ID"}
                   </button>
                   <button
                     class={`px-3 py-1 rounded-2xl text-sm font-medium transition-colors duration-100 ${
@@ -513,7 +521,7 @@ const ModsBrowser: Component<Props> = (props) => {
                     onClick={() => { setSearchMode("all"); setPage(0); }}
                   >
                     <i class="i-hugeicons-search-02 w-4 h-4" />
-                    Все
+                    {t().mods?.browser?.searchByAllBtn ?? "All"}
                   </button>
                 </div>
               </div>
@@ -526,7 +534,7 @@ const ModsBrowser: Component<Props> = (props) => {
                   onChange={(e) => { setShowIncompatible(e.currentTarget.checked); setPage(0); }}
                   class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
                 />
-                <span class="text-sm text-muted">Показать несовместимые</span>
+                <span class="text-sm text-muted">{t().mods?.browser?.showIncompatible ?? "Show incompatible"}</span>
               </label>
             </div>
           </div>
@@ -538,7 +546,7 @@ const ModsBrowser: Component<Props> = (props) => {
             onClick={() => setShowCategories(!showCategories())}
           >
             <i class={`w-4 h-4 transition-transform duration-100 ${showCategories() ? "i-hugeicons-arrow-up-01" : "i-hugeicons-arrow-down-01"}`} />
-            {showCategories() ? "Скрыть" : "Показать"} категории
+            {showCategories() ? (t().mods?.browser?.hideCategories ?? "Hide categories") : (t().mods?.browser?.showCategories ?? "Show categories")}
           </button>
 
           {/* Categories Grid */}
@@ -553,9 +561,9 @@ const ModsBrowser: Component<Props> = (props) => {
                 onClick={() => handleCategorySelect(null)}
               >
                 <i class="i-hugeicons-grid w-4 h-4" />
-                Все
+                {t().mods?.browser?.allCategories ?? "All"}
               </button>
-              <For each={CATEGORIES}>
+              <For each={CATEGORY_IDS}>
                 {(cat) => (
                   <button
                     class={`px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-100 flex items-center gap-2 ${
@@ -566,7 +574,7 @@ const ModsBrowser: Component<Props> = (props) => {
                     onClick={() => handleCategorySelect(cat.id)}
                   >
                     <i class={`${cat.icon} w-4 h-4`} />
-                    {cat.name}
+                    {getCategoryName(cat.id)}
                   </button>
                 )}
               </For>
@@ -579,7 +587,7 @@ const ModsBrowser: Component<Props> = (props) => {
       <Show when={modSearch.loading()}>
         <div class="flex-center gap-3 py-12">
           <i class="i-svg-spinners-6-dots-scale w-8 h-8" />
-          <span class="text-muted">Поиск модов...</span>
+          <span class="text-muted">{t().mods?.browser?.searching ?? "Searching mods..."}</span>
         </div>
       </Show>
 
@@ -599,9 +607,9 @@ const ModsBrowser: Component<Props> = (props) => {
       <Show when={!modSearch.loading() && modSearch.results().length === 0 && !modSearch.error()}>
         <div class="card flex-col-center py-16 text-center">
           <i class="i-hugeicons-search-02 w-16 h-16 text-gray-600 mb-4" />
-          <h3 class="text-lg font-medium mb-2">Ничего не найдено</h3>
+          <h3 class="text-lg font-medium mb-2">{t().mods?.browser?.noResults ?? "Nothing found"}</h3>
           <p class="text-sm text-muted max-w-md">
-            Попробуйте изменить запрос или выбрать другую категорию
+            {t().mods?.browser?.noResultsHint ?? "Try changing your query or select a different category"}
           </p>
         </div>
       </Show>
@@ -632,7 +640,7 @@ const ModsBrowser: Component<Props> = (props) => {
                     <div class="flex-1 min-w-0">
                       <h3 class="font-semibold truncate">{mod.title || mod.name}</h3>
                       <Show when={mod.author}>
-                        <p class="text-xs text-muted">от {mod.author}</p>
+                        <p class="text-xs text-muted">{t().mods?.browser?.byAuthor ?? "by"} {mod.author}</p>
                       </Show>
                       <p class="text-xs text-gray-500 font-mono truncate">{mod.slug || mod.id}</p>
                     </div>
@@ -646,7 +654,7 @@ const ModsBrowser: Component<Props> = (props) => {
                     <Show when={mod._exact_match}>
                       <span class="badge badge-sm bg-green-600/20 text-green-400">
                         <i class="i-hugeicons-checkmark-circle-02 w-3 h-3" />
-                        По ID
+                        {t().mods?.browser?.matchedById ?? "By ID"}
                       </span>
                     </Show>
                     <span class="badge badge-sm">

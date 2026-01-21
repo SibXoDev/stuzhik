@@ -9,6 +9,85 @@ use crate::error::{LauncherError, Result};
 
 use super::lifecycle::get_instance;
 
+/// Find VS Code executable on the system
+/// Checks common installation paths for each platform
+fn find_vscode_executable() -> Option<PathBuf> {
+    // First, try the 'code' command in PATH
+    if Command::new("code").arg("--version").output().is_ok() {
+        return Some(PathBuf::from("code"));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::env;
+
+        // Common Windows installation paths
+        let mut paths_to_check = Vec::new();
+
+        // User installation (most common)
+        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+            paths_to_check.push(PathBuf::from(&local_app_data).join("Programs/Microsoft VS Code/Code.exe"));
+        }
+
+        // System installation
+        if let Ok(program_files) = env::var("ProgramFiles") {
+            paths_to_check.push(PathBuf::from(&program_files).join("Microsoft VS Code/Code.exe"));
+        }
+
+        // 32-bit on 64-bit Windows
+        if let Ok(program_files_x86) = env::var("ProgramFiles(x86)") {
+            paths_to_check.push(PathBuf::from(&program_files_x86).join("Microsoft VS Code/Code.exe"));
+        }
+
+        // VS Code Insiders
+        if let Ok(local_app_data) = env::var("LOCALAPPDATA") {
+            paths_to_check.push(PathBuf::from(&local_app_data).join("Programs/Microsoft VS Code Insiders/Code - Insiders.exe"));
+        }
+
+        for path in paths_to_check {
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let paths_to_check = [
+            "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+            "/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code-insiders",
+            "/usr/local/bin/code",
+        ];
+
+        for path in paths_to_check {
+            let path_buf = PathBuf::from(path);
+            if path_buf.exists() {
+                return Some(path_buf);
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let paths_to_check = [
+            "/usr/bin/code",
+            "/usr/share/code/code",
+            "/snap/bin/code",
+            "/usr/bin/code-insiders",
+            "/var/lib/flatpak/exports/bin/com.visualstudio.code",
+        ];
+
+        for path in paths_to_check {
+            let path_buf = PathBuf::from(path);
+            if path_buf.exists() {
+                return Some(path_buf);
+            }
+        }
+    }
+
+    None
+}
+
 /// Очистка мёртвых и осиротевших процессов при запуске приложения
 /// - Убивает процессы, которые остались от предыдущей сессии
 /// - Помечает статус как stopped для мёртвых процессов
@@ -221,6 +300,142 @@ pub async fn reveal_instance_file(
     app.opener()
         .reveal_item_in_dir(canonical_path)
         .map_err(|e| LauncherError::ApiError(e.to_string()))?;
+
+    Ok(())
+}
+
+/// Открыть файл в системном редакторе по умолчанию
+#[tauri::command]
+pub async fn open_file_in_editor(
+    app: tauri::AppHandle,
+    instance_id: String,
+    relative_path: String,
+) -> Result<()> {
+    let instance = get_instance(instance_id.clone()).await?;
+
+    // Path traversal protection
+    if relative_path.contains("..") {
+        return Err(LauncherError::InvalidConfig(
+            "Invalid file path: path traversal detected".to_string(),
+        ));
+    }
+
+    let mut path = PathBuf::from(&instance.dir);
+    path.push(&relative_path);
+
+    if !path.exists() {
+        return Err(LauncherError::NotFound(format!(
+            "File not found: {}",
+            path.display()
+        )));
+    }
+
+    // Verify path is inside instance directory
+    let canonical_path = path.canonicalize().map_err(LauncherError::Io)?;
+    let canonical_instance_dir = PathBuf::from(&instance.dir)
+        .canonicalize()
+        .map_err(LauncherError::Io)?;
+
+    if !canonical_path.starts_with(&canonical_instance_dir) {
+        return Err(LauncherError::InvalidConfig(
+            "Path is outside instance directory".to_string(),
+        ));
+    }
+
+    // Open in default system editor
+    app.opener()
+        .open_path(canonical_path.to_string_lossy(), None::<&str>)
+        .map_err(|e| LauncherError::ApiError(e.to_string()))?;
+
+    Ok(())
+}
+
+/// Открыть файл в VS Code
+#[tauri::command]
+pub async fn open_file_in_vscode(
+    instance_id: String,
+    relative_path: String,
+) -> Result<()> {
+    let instance = get_instance(instance_id.clone()).await?;
+
+    // Path traversal protection
+    if relative_path.contains("..") {
+        return Err(LauncherError::InvalidConfig(
+            "Invalid file path: path traversal detected".to_string(),
+        ));
+    }
+
+    let mut path = PathBuf::from(&instance.dir);
+    path.push(&relative_path);
+
+    if !path.exists() {
+        return Err(LauncherError::NotFound(format!(
+            "File not found: {}",
+            path.display()
+        )));
+    }
+
+    // Verify path is inside instance directory
+    let canonical_path = path.canonicalize().map_err(LauncherError::Io)?;
+    let canonical_instance_dir = PathBuf::from(&instance.dir)
+        .canonicalize()
+        .map_err(LauncherError::Io)?;
+
+    if !canonical_path.starts_with(&canonical_instance_dir) {
+        return Err(LauncherError::InvalidConfig(
+            "Path is outside instance directory".to_string(),
+        ));
+    }
+
+    // Find VS Code executable
+    let vscode_path = find_vscode_executable().ok_or_else(|| {
+        LauncherError::NotFound("VS Code not found. Please install VS Code.".to_string())
+    })?;
+
+    let mut cmd = std::process::Command::new(&vscode_path);
+    cmd.arg(&canonical_path);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    cmd.spawn().map_err(LauncherError::Io)?;
+
+    Ok(())
+}
+
+/// Открыть папку экземпляра в VS Code
+#[tauri::command]
+pub async fn open_folder_in_vscode(instance_id: String) -> Result<()> {
+    let instance = get_instance(instance_id.clone()).await?;
+
+    let path = PathBuf::from(&instance.dir);
+    if !path.exists() {
+        return Err(LauncherError::NotFound(format!(
+            "Instance folder not found: {}",
+            path.display()
+        )));
+    }
+
+    // Find VS Code executable
+    let vscode_path = find_vscode_executable().ok_or_else(|| {
+        LauncherError::NotFound("VS Code not found. Please install VS Code.".to_string())
+    })?;
+
+    let mut cmd = std::process::Command::new(&vscode_path);
+    cmd.arg(&path);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    cmd.spawn().map_err(LauncherError::Io)?;
 
     Ok(())
 }

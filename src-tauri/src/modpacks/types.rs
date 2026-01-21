@@ -390,6 +390,19 @@ pub struct PatchModRemove {
     pub filename_pattern: String,
 }
 
+/// Тип патча для конфигов
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigPatchType {
+    /// Полная замена файла (по умолчанию)
+    #[default]
+    Replace,
+    /// JSON merge patch (RFC 7396)
+    JsonMerge,
+    /// Unified diff формат (для текстовых файлов)
+    Diff,
+}
+
 /// Конфиг для добавления/замены
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchConfigAdd {
@@ -397,6 +410,9 @@ pub struct PatchConfigAdd {
     pub path: String,
     /// Содержимое файла в base64
     pub content_base64: String,
+    /// Тип патча (по умолчанию Replace)
+    #[serde(default)]
+    pub patch_type: ConfigPatchType,
 }
 
 /// Файл для добавления
@@ -648,6 +664,9 @@ pub struct ModpackPreview {
     pub overrides_size: u64,
     /// Общий размер архива (байт)
     pub archive_size: u64,
+    /// Группы опциональных модов (только для .stzhk формата)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_mods: Option<Vec<crate::stzhk::OptionalModGroup>>,
 }
 
 /// Опции импорта (что включить/исключить)

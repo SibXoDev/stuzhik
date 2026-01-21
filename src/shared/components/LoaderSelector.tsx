@@ -1,6 +1,7 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, createMemo } from "solid-js";
 import type { LoaderType } from "../types";
 import Dropdown from "../ui/Dropdown";
+import { useI18n } from "../i18n";
 
 // Official loader icons
 import fabricIcon from "../../assets/loaders/fabric.png";
@@ -42,47 +43,37 @@ export const LoaderIcon = (props: { loader: string; class?: string }) => {
 interface LoaderInfo {
   id: LoaderType;
   name: string;
-  description: string;
   color: string;
 }
 
-const LOADERS: LoaderInfo[] = [
-  {
-    id: "vanilla",
-    name: "Vanilla",
-    description: "Чистый Minecraft без модов",
-    color: "text-green-400",
-  },
-  {
-    id: "forge",
-    name: "Forge",
-    description: "Классический загрузчик, большинство модов",
-    color: "text-amber-400",
-  },
-  {
-    id: "neoforge",
-    name: "NeoForge",
-    description: "Современный форк Forge для 1.20.1+",
-    color: "text-rose-400",
-  },
-  {
-    id: "fabric",
-    name: "Fabric",
-    description: "Лёгкий и быстрый, оптимизация",
-    color: "text-stone-300",
-  },
-  {
-    id: "quilt",
-    name: "Quilt",
-    description: "Форк Fabric с дополнительными функциями",
-    color: "text-purple-400",
-  },
-];
+const LOADER_COLORS: Record<LoaderType, string> = {
+  vanilla: "text-green-400",
+  forge: "text-amber-400",
+  neoforge: "text-rose-400",
+  fabric: "text-stone-300",
+  quilt: "text-purple-400",
+};
+
+const LOADER_IDS: LoaderType[] = ["vanilla", "forge", "neoforge", "fabric", "quilt"];
 
 function LoaderSelector(props: Props) {
+  const { t } = useI18n();
   const [showDropdown, setShowDropdown] = createSignal(false);
 
-  const selectedLoader = () => LOADERS.find(l => l.id === props.value) || LOADERS[0];
+  const getLoaderDescription = (id: LoaderType) => {
+    const descriptions = t().loaders?.descriptions;
+    return descriptions?.[id] ?? id;
+  };
+
+  const loaders = createMemo((): LoaderInfo[] =>
+    LOADER_IDS.map(id => ({
+      id,
+      name: t().loaders?.[id] ?? id.charAt(0).toUpperCase() + id.slice(1),
+      color: LOADER_COLORS[id],
+    }))
+  );
+
+  const selectedLoader = () => loaders().find(l => l.id === props.value) || loaders()[0];
 
   const handleSelect = (loader: LoaderType) => {
     props.onChange(loader);
@@ -103,7 +94,7 @@ function LoaderSelector(props: Props) {
             {selectedLoader().name}
           </div>
           <div class="text-xs text-gray-500 truncate max-w-[180px]">
-            {selectedLoader().description}
+            {getLoaderDescription(props.value)}
           </div>
         </div>
       </div>
@@ -119,7 +110,7 @@ function LoaderSelector(props: Props) {
       disabled={props.disabled}
     >
       <div class="p-1">
-        <For each={LOADERS}>
+        <For each={loaders()}>
           {(loader) => (
             <button
               type="button"
@@ -131,7 +122,7 @@ function LoaderSelector(props: Props) {
               <LoaderIcon loader={loader.id} class="w-6 h-6 flex-shrink-0" />
               <div class="flex-1 text-left min-w-0">
                 <div class={`font-medium ${loader.color}`}>{loader.name}</div>
-                <div class="text-xs text-gray-500 truncate">{loader.description}</div>
+                <div class="text-xs text-gray-500 truncate">{getLoaderDescription(loader.id)}</div>
               </div>
               <Show when={props.value === loader.id}>
                 <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-blue-400 flex-shrink-0" />

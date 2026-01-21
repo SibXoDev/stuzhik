@@ -1,4 +1,5 @@
 import { Show } from "solid-js";
+import { useI18n } from "../i18n";
 
 interface BulkOperationsToolbarProps {
   selectedCount: number;
@@ -16,13 +17,15 @@ interface BulkOperationsToolbarProps {
  * Shows count and bulk operation buttons
  */
 export function BulkOperationsToolbar(props: BulkOperationsToolbarProps) {
+  const { t } = useI18n();
+
   return (
     <Show when={props.selectedCount > 0}>
       <div class="flex items-center gap-3 p-3 bg-blue-600/10 border-l-4 border-blue-600 rounded-lg">
         <div class="flex items-center gap-2 text-sm text-blue-400">
           <i class="i-hugeicons-checkmark-circle-02 w-4 h-4" />
           <span class="font-medium">
-            Выбрано: {props.selectedCount}
+            {t().ui?.bulkOperations?.selected ?? "Selected:"} {props.selectedCount}
           </span>
         </div>
 
@@ -31,10 +34,10 @@ export function BulkOperationsToolbar(props: BulkOperationsToolbarProps) {
             <button
               class="btn-sm btn-secondary"
               onClick={props.onEnableAll}
-              title={props.enableLabel || "Включить все"}
+              title={props.enableLabel || (t().ui?.bulkOperations?.enableAll ?? "Enable all")}
             >
               <i class="i-hugeicons-checkmark-circle-02 w-4 h-4" />
-              {props.enableLabel || "Включить"}
+              {props.enableLabel || (t().ui?.bulkOperations?.enable ?? "Enable")}
             </button>
           </Show>
 
@@ -42,10 +45,10 @@ export function BulkOperationsToolbar(props: BulkOperationsToolbarProps) {
             <button
               class="btn-sm btn-secondary"
               onClick={props.onDisableAll}
-              title={props.disableLabel || "Выключить все"}
+              title={props.disableLabel || (t().ui?.bulkOperations?.disableAll ?? "Disable all")}
             >
               <i class="i-hugeicons-cancel-circle w-4 h-4" />
-              {props.disableLabel || "Выключить"}
+              {props.disableLabel || (t().ui?.bulkOperations?.disable ?? "Disable")}
             </button>
           </Show>
 
@@ -53,10 +56,10 @@ export function BulkOperationsToolbar(props: BulkOperationsToolbarProps) {
             <button
               class="btn-sm bg-red-600/20 hover:bg-red-600/30 text-red-400 border-red-600/30"
               onClick={props.onDeleteAll}
-              title={props.deleteLabel || "Удалить все"}
+              title={props.deleteLabel || (t().ui?.bulkOperations?.deleteAll ?? "Delete all")}
             >
               <i class="i-hugeicons-delete-02 w-4 h-4" />
-              {props.deleteLabel || "Удалить"}
+              {props.deleteLabel || (t().ui?.bulkOperations?.delete ?? "Delete")}
             </button>
           </Show>
         </div>
@@ -64,10 +67,10 @@ export function BulkOperationsToolbar(props: BulkOperationsToolbarProps) {
         <button
           class="btn-sm btn-ghost"
           onClick={props.onDeselectAll}
-          title="Снять выделение"
+          title={t().ui?.bulkOperations?.deselect ?? "Deselect"}
         >
           <i class="i-hugeicons-cancel-01 w-4 h-4" />
-          Отменить
+          {t().ui?.bulkOperations?.cancel ?? "Cancel"}
         </button>
       </div>
     </Show>

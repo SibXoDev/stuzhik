@@ -8,6 +8,7 @@ import ModsBrowser from "./ModsBrowser";
 import ModInfoDialog from "./ModInfoDialog";
 import DependencyGraph from "./DependencyGraph";
 import UpdateModsModal from "./UpdateModsModal";
+import ChangelogAggregatorModal from "./ChangelogAggregatorModal";
 import { createConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { startModInstall, completeModInstall, registerDropHandler, filterByExtensions, registerSearchHandler, unregisterSearchHandler } from "../../../shared/stores";
 import type { Mod } from "../../../shared/types";
@@ -39,6 +40,8 @@ const ModsList: Component<Props> = (props) => {
   const [showDependencyGraph, setShowDependencyGraph] = createSignal(false);
   const [showUpdateModal, setShowUpdateModal] = createSignal(false);
   const [updating, setUpdating] = createSignal(false);
+  const [showChangelogModal, setShowChangelogModal] = createSignal(false);
+  const [updatedModsForChangelog, setUpdatedModsForChangelog] = createSignal<Mod[]>([]);
   const { confirm, ConfirmDialogComponent } = createConfirmDialog();
 
   // Verification results come from hook (auto-verified in background)
@@ -85,7 +88,7 @@ const ModsList: Component<Props> = (props) => {
           try {
             await mods.installLocalMod(file.path);
           } catch (error) {
-            console.error(`Failed to install ${file.name}:`, error);
+            if (import.meta.env.DEV) console.error(`Failed to install ${file.name}:`, error);
           }
         }
       },
@@ -110,10 +113,10 @@ const ModsList: Component<Props> = (props) => {
 
   const handleRemoveMod = async (mod: Mod) => {
     const confirmed = await confirm({
-      title: "Удалить мод?",
-      message: `Удалить мод "${mod.name}"? Файл будет удалён из папки модов.`,
+      title: t().mods.list.confirm.deleteTitle,
+      message: t().mods.list.confirm.deleteMessage.replace("{name}", mod.name),
       variant: "danger",
-      confirmText: "Удалить",
+      confirmText: t().mods.list.confirm.delete,
     });
     if (confirmed) {
       await mods.removeMod(mod.id);
@@ -204,6 +207,11 @@ const ModsList: Component<Props> = (props) => {
     };
   });
 
+  // Mods with changelog from recent updates
+  const modsWithChangelog = createMemo(() => {
+    return mods.mods().filter(m => m.latest_changelog && m.latest_changelog.trim().length > 0);
+  });
+
   const handleInstall = async (slug: string, source: string, modName?: string, versionId?: string) => {
     // Mark mod as installing in global store
     startModInstall(props.instanceId, slug, source, modName || slug);
@@ -213,7 +221,7 @@ const ModsList: Component<Props> = (props) => {
       // После установки перезагружаем список модов для обновления состояния
       await mods.loadMods();
     } catch (error) {
-      console.error("Failed to install mod:", error);
+      if (import.meta.env.DEV) console.error("Failed to install mod:", error);
     } finally {
       // Mark installation complete
       completeModInstall(props.instanceId, slug, source);
@@ -240,7 +248,7 @@ const ModsList: Component<Props> = (props) => {
         filters: [
           { name: "Minecraft Mods", extensions: ["jar"] }
         ],
-        title: "Выберите мод-файлы (.jar)",
+        title: t().mods.list.fileDialog.title,
       });
 
       if (!selected) return;
@@ -252,7 +260,7 @@ const ModsList: Component<Props> = (props) => {
         await mods.installLocalMod(filePath);
       }
     } catch (e) {
-      console.error("Failed to add local mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to add local mod:", e);
     }
   };
 
@@ -271,7 +279,7 @@ const ModsList: Component<Props> = (props) => {
       await mods.loadMods();
       multiselect.deselectAll();
     } catch (e) {
-      console.error("Failed to enable mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to enable mods:", e);
     }
   };
 
@@ -289,7 +297,7 @@ const ModsList: Component<Props> = (props) => {
       await mods.loadMods();
       multiselect.deselectAll();
     } catch (e) {
-      console.error("Failed to disable mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to disable mods:", e);
     }
   };
 
@@ -298,10 +306,10 @@ const ModsList: Component<Props> = (props) => {
     if (selected.length === 0) return;
 
     const confirmed = await confirm({
-      title: "Удалить выбранные моды?",
-      message: `Будет удалено модов: ${selected.length}. Файлы будут удалены из папки модов.`,
+      title: t().mods.list.confirm.deleteBulkTitle,
+      message: t().mods.list.confirm.deleteBulkMessage.replace("{count}", String(selected.length)),
       variant: "danger",
-      confirmText: "Удалить",
+      confirmText: t().mods.list.confirm.delete,
     });
 
     if (!confirmed) return;
@@ -315,7 +323,7 @@ const ModsList: Component<Props> = (props) => {
       await mods.loadMods();
       multiselect.deselectAll();
     } catch (e) {
-      console.error("Failed to delete mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to delete mods:", e);
     }
   };
 
@@ -328,15 +336,15 @@ const ModsList: Component<Props> = (props) => {
             {viewMode() === "installed"
               ? searchQuery()
                 ? `${filteredMods().length}/${mods.mods().length}`
-                : `Моды (${mods.mods().length})`
-              : "Каталог"}
+                : `${t().mods.list.header.modsCount} (${mods.mods().length})`
+              : t().mods.list.header.catalog}
           </h2>
 
           {/* View Mode Toggle */}
           <Tabs
             tabs={[
-              { id: "installed", label: "Установленные", icon: "i-hugeicons-checkmark-circle-02" },
-              { id: "browse", label: "Каталог", icon: "i-hugeicons-store-01" },
+              { id: "installed", label: t().mods.list.tabs.installed, icon: "i-hugeicons-checkmark-circle-02" },
+              { id: "browse", label: t().mods.list.tabs.browse, icon: "i-hugeicons-store-01" },
             ]}
             activeTab={viewMode()}
             onTabChange={(id) => setViewMode(id as "installed" | "browse")}
@@ -351,7 +359,7 @@ const ModsList: Component<Props> = (props) => {
             <button
               class={`btn-sm ${showFilters() ? "btn-primary" : "btn-secondary"} ${hasActiveFilters() ? "ring-1 ring-blue-500" : ""}`}
               onClick={() => setShowFilters(!showFilters())}
-              title="Фильтры"
+              title={t().mods.list.actions.filters}
             >
               <i class="i-hugeicons-filter w-4 h-4" />
               <Show when={hasActiveFilters()}>
@@ -364,7 +372,7 @@ const ModsList: Component<Props> = (props) => {
               class="btn-sm btn-ghost"
               onClick={() => mods.forceSync()}
               disabled={mods.syncing() || mods.enriching() || mods.verifying()}
-              title="Принудительное обновление данных"
+              title={t().mods.list.actions.forceRefresh}
             >
               <Show when={mods.syncing() || mods.enriching() || mods.verifying()} fallback={<i class="i-hugeicons-refresh w-4 h-4" />}>
                 <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
@@ -376,10 +384,10 @@ const ModsList: Component<Props> = (props) => {
               class="btn-sm btn-secondary"
               onClick={handleAddLocalMod}
               disabled={mods.loading()}
-              title="Добавить локальный мод (.jar файл)"
+              title={t().mods.list.actions.addLocalMod}
             >
               <i class="i-hugeicons-add-01 w-4 h-4" />
-              <span>Локальный мод</span>
+              <span>{t().mods.list.actions.localMod}</span>
             </button>
 
             {/* Mod tools - show only when mods exist */}
@@ -402,7 +410,7 @@ const ModsList: Component<Props> = (props) => {
                     }
                   }}
                   disabled={mods.checkingUpdates() || updating()}
-                  title={mods.getUpdatableCount() > 0 ? `${mods.getUpdatableCount()} обновлений доступно - нажмите для просмотра` : "Проверить обновления"}
+                  title={mods.getUpdatableCount() > 0 ? `${mods.getUpdatableCount()} ${t().mods.list.actions.updatesAvailable}` : t().mods.list.actions.checkUpdates}
                 >
                   <Show when={mods.checkingUpdates()} fallback={
                     <>
@@ -410,11 +418,11 @@ const ModsList: Component<Props> = (props) => {
                       <Show when={mods.getUpdatableCount() > 0}>
                         <span class="text-xs font-bold bg-white/20 px-1.5 rounded-full">{mods.getUpdatableCount()}</span>
                       </Show>
-                      <span>Обновления</span>
+                      <span>{t().mods.list.actions.updates}</span>
                     </>
                   }>
                     <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                    <span>Проверка...</span>
+                    <span>{t().mods.list.actions.checking}</span>
                   </Show>
                 </button>
                 {/* Re-check button - visible when updates exist */}
@@ -425,7 +433,7 @@ const ModsList: Component<Props> = (props) => {
                       await mods.checkModUpdates(props.minecraftVersion, props.loader, true);
                     }}
                     disabled={mods.checkingUpdates() || updating()}
-                    title="Повторно проверить обновления"
+                    title={t().mods.list.actions.recheckUpdates}
                   >
                     <Show when={mods.checkingUpdates()} fallback={
                       <i class="i-hugeicons-refresh w-4 h-4" />
@@ -440,15 +448,31 @@ const ModsList: Component<Props> = (props) => {
               <button
                 class="btn-sm btn-secondary"
                 onClick={() => setShowDependencyGraph(true)}
-                title="Визуальный граф зависимостей между модами"
+                title={t().mods.list.actions.graphTooltip}
               >
                 <i class="i-hugeicons-chart-relationship w-4 h-4" />
-                <span>Граф</span>
+                <span>{t().mods.list.actions.graph}</span>
               </button>
+
+              {/* Changelog Button - shows changelog of recently updated mods */}
+              <Show when={modsWithChangelog().length > 0}>
+                <button
+                  class="btn-sm btn-secondary"
+                  onClick={() => {
+                    setUpdatedModsForChangelog(modsWithChangelog());
+                    setShowChangelogModal(true);
+                  }}
+                  title={t().mods.list.actions.changelogTooltip || "Просмотреть изменения в недавно обновлённых модах"}
+                >
+                  <i class="i-hugeicons-news w-4 h-4" />
+                  <span class="text-xs font-bold bg-blue-500/30 px-1.5 rounded-full">{modsWithChangelog().length}</span>
+                  <span>Changelog</span>
+                </button>
+              </Show>
 
               {/* Simple enriching/verifying indicator (spinner only) */}
               <Show when={mods.enriching() || mods.verifying()}>
-                <div class="flex items-center gap-1 text-gray-400 text-xs" title={mods.verifying() ? "Проверка подлинности модов..." : "Загрузка информации о зависимостях..."}>
+                <div class="flex items-center gap-1 text-gray-400 text-xs" title={mods.verifying() ? t().mods.list.actions.verifyingMods : t().mods.list.actions.loadingDeps}>
                   <i class="i-svg-spinners-6-dots-scale w-3.5 h-3.5" />
                   <i class={mods.verifying() ? "i-hugeicons-security-check w-3.5 h-3.5" : ""} />
                 </div>
@@ -494,7 +518,7 @@ const ModsList: Component<Props> = (props) => {
                 }
               }}
               class="w-4 h-4 rounded border-gray-600 bg-gray-800 checked:bg-blue-600 checked:border-blue-600 focus:ring-2 focus:ring-blue-600/50 cursor-pointer"
-              title="Выбрать все"
+              title={t().mods.list.search.selectAll}
             />
           </div>
 
@@ -505,7 +529,7 @@ const ModsList: Component<Props> = (props) => {
               type="text"
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
-              placeholder="Поиск по названию, mod ID, версии или источнику..."
+              placeholder={t().mods.list.search.placeholder}
               class="w-full pl-10 pr-10"
             />
             <i class="i-hugeicons-search-01 absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
@@ -538,14 +562,14 @@ const ModsList: Component<Props> = (props) => {
           <div class="flex items-center justify-between mb-3">
             <h4 class="text-sm font-semibold flex items-center gap-2">
               <i class="i-hugeicons-filter w-4 h-4" />
-              Фильтры
+              {t().mods.list.filters.title}
             </h4>
             <Show when={hasActiveFilters()}>
               <button
                 class="text-sm text-blue-400 hover:text-blue-300"
                 onClick={clearFilters}
               >
-                Сбросить все
+                {t().mods.list.filters.resetAll}
               </button>
             </Show>
           </div>
@@ -553,72 +577,72 @@ const ModsList: Component<Props> = (props) => {
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Enabled/Disabled Filter */}
             <div>
-              <label class="block text-xs font-medium mb-1 text-gray-400">Состояние</label>
+              <label class="block text-xs font-medium mb-1 text-gray-400">{t().mods.list.filters.state}</label>
               <Select
                 value={filterEnabled()}
                 onChange={(v) => setFilterEnabled(v as any)}
                 options={[
-                  { value: "all", label: `Все (${filterCounts().total})`, icon: "i-hugeicons-apps-01" },
-                  { value: "enabled", label: `Включено (${filterCounts().enabled})`, icon: "i-hugeicons-checkmark-circle-02" },
-                  { value: "disabled", label: `Выключено (${filterCounts().disabled})`, icon: "i-hugeicons-cancel-circle" },
+                  { value: "all", label: `${t().mods.list.filters.allStates} (${filterCounts().total})`, icon: "i-hugeicons-apps-01" },
+                  { value: "enabled", label: `${t().mods.list.filters.enabled} (${filterCounts().enabled})`, icon: "i-hugeicons-checkmark-circle-02" },
+                  { value: "disabled", label: `${t().mods.list.filters.disabled} (${filterCounts().disabled})`, icon: "i-hugeicons-cancel-circle" },
                 ]}
               />
             </div>
 
             {/* Source Filter */}
             <div>
-              <label class="block text-xs font-medium mb-1 text-gray-400">Источник</label>
+              <label class="block text-xs font-medium mb-1 text-gray-400">{t().mods.list.filters.source}</label>
               <Select
                 value={filterSource()}
                 onChange={(v) => setFilterSource(v as any)}
                 options={[
-                  { value: "all", label: "Все источники", icon: "i-hugeicons-globe-02" },
+                  { value: "all", label: t().mods.list.filters.allSources, icon: "i-hugeicons-globe-02" },
                   { value: "modrinth", label: `Modrinth (${filterCounts().modrinth})`, icon: "i-simple-icons-modrinth" },
                   { value: "curseforge", label: `CurseForge (${filterCounts().curseforge})`, icon: "i-simple-icons-curseforge" },
-                  { value: "local", label: `Локальные (${filterCounts().local})`, icon: "i-hugeicons-folder-01" },
+                  { value: "local", label: `${t().mods.list.filters.local} (${filterCounts().local})`, icon: "i-hugeicons-folder-01" },
                 ]}
               />
             </div>
 
             {/* Verification Filter */}
             <div>
-              <label class="block text-xs font-medium mb-1 text-gray-400">Безопасность</label>
+              <label class="block text-xs font-medium mb-1 text-gray-400">{t().mods.list.filters.security}</label>
               <Select
                 value={filterVerification()}
                 onChange={(v) => setFilterVerification(v as any)}
                 options={[
-                  { value: "all", label: "Любой статус", icon: "i-hugeicons-shield-01" },
-                  { value: "verified", label: `Проверенные (${mods.verifiedCount()})`, icon: "i-hugeicons-security-check" },
-                  { value: "unverified", label: `Непроверенные (${mods.unverifiedCount()})`, icon: "i-hugeicons-help-circle" },
-                  { value: "modified", label: "Модифицированные (0)", icon: "i-hugeicons-alert-02" },
+                  { value: "all", label: t().mods.list.filters.anyStatus, icon: "i-hugeicons-shield-01" },
+                  { value: "verified", label: `${t().mods.list.filters.verified} (${mods.verifiedCount()})`, icon: "i-hugeicons-security-check" },
+                  { value: "unverified", label: `${t().mods.list.filters.unverified} (${mods.unverifiedCount()})`, icon: "i-hugeicons-help-circle" },
+                  { value: "modified", label: `${t().mods.list.filters.modified} (0)`, icon: "i-hugeicons-alert-02" },
                 ]}
               />
             </div>
 
             {/* Auto-update Filter */}
             <div>
-              <label class="block text-xs font-medium mb-1 text-gray-400">Автообновление</label>
+              <label class="block text-xs font-medium mb-1 text-gray-400">{t().mods.list.filters.autoUpdate}</label>
               <Select
                 value={filterAutoUpdate()}
                 onChange={(v) => setFilterAutoUpdate(v as any)}
                 options={[
-                  { value: "all", label: "Любое", icon: "i-hugeicons-refresh" },
-                  { value: "yes", label: `Включено (${filterCounts().autoUpdateYes})`, icon: "i-hugeicons-checkmark-circle-02" },
-                  { value: "no", label: `Выключено (${filterCounts().autoUpdateNo})`, icon: "i-hugeicons-cancel-circle" },
+                  { value: "all", label: t().mods.list.filters.any, icon: "i-hugeicons-refresh" },
+                  { value: "yes", label: `${t().mods.list.filters.enabled} (${filterCounts().autoUpdateYes})`, icon: "i-hugeicons-checkmark-circle-02" },
+                  { value: "no", label: `${t().mods.list.filters.disabled} (${filterCounts().autoUpdateNo})`, icon: "i-hugeicons-cancel-circle" },
                 ]}
               />
             </div>
 
             {/* Update Available Filter */}
             <div>
-              <label class="block text-xs font-medium mb-1 text-gray-400">Обновления</label>
+              <label class="block text-xs font-medium mb-1 text-gray-400">{t().mods.list.filters.updates}</label>
               <Select
                 value={filterUpdateAvailable()}
                 onChange={(v) => setFilterUpdateAvailable(v as any)}
                 options={[
-                  { value: "all", label: "Любые", icon: "i-hugeicons-arrow-up-02" },
-                  { value: "has_update", label: `Есть (${filterCounts().hasUpdate})`, icon: "i-hugeicons-arrow-up-double" },
-                  { value: "no_update", label: `Нет обновлений (${filterCounts().noUpdate})`, icon: "i-hugeicons-checkmark-circle-02" },
+                  { value: "all", label: t().mods.list.filters.anyUpdates, icon: "i-hugeicons-arrow-up-02" },
+                  { value: "has_update", label: `${t().mods.list.filters.hasUpdate} (${filterCounts().hasUpdate})`, icon: "i-hugeicons-arrow-up-double" },
+                  { value: "no_update", label: `${t().mods.list.filters.noUpdate} (${filterCounts().noUpdate})`, icon: "i-hugeicons-checkmark-circle-02" },
                 ]}
               />
             </div>
@@ -627,10 +651,10 @@ const ModsList: Component<Props> = (props) => {
           {/* Active Filters Summary */}
           <Show when={hasActiveFilters()}>
             <div class="mt-3 pt-3 border-t border-gray-700 flex items-center gap-2 flex-wrap text-xs">
-              <span class="text-gray-500">Активные фильтры:</span>
+              <span class="text-gray-500">{t().mods.list.filters.activeFilters}</span>
               <Show when={filterEnabled() !== "all"}>
                 <span class="px-2 py-1 rounded bg-blue-600/20 text-blue-400 border border-blue-600/30">
-                  {filterEnabled() === "enabled" ? "Включено" : "Выключено"}
+                  {filterEnabled() === "enabled" ? t().mods.list.filters.enabled : t().mods.list.filters.disabled}
                 </span>
               </Show>
               <Show when={filterSource() !== "all"}>
@@ -640,7 +664,7 @@ const ModsList: Component<Props> = (props) => {
               </Show>
               <Show when={filterAutoUpdate() !== "all"}>
                 <span class="px-2 py-1 rounded bg-orange-600/20 text-orange-400 border border-orange-600/30">
-                  Авто-обновление: {filterAutoUpdate() === "yes" ? "Да" : "Нет"}
+                  {filterAutoUpdate() === "yes" ? t().mods.list.filters.autoUpdateYes : t().mods.list.filters.autoUpdateNo}
                 </span>
               </Show>
               <Show when={filterVerification() !== "all"}>
@@ -651,7 +675,7 @@ const ModsList: Component<Props> = (props) => {
                     ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30"
                     : "bg-gray-600/20 text-gray-400 border-gray-600/30"
                 }`}>
-                  {filterVerification() === "verified" ? "Проверенные" : filterVerification() === "modified" ? "Модифицированные" : "Непроверенные"}
+                  {filterVerification() === "verified" ? t().mods.list.filters.verified : filterVerification() === "modified" ? t().mods.list.filters.modified : t().mods.list.filters.unverified}
                 </span>
               </Show>
               <Show when={filterUpdateAvailable() !== "all"}>
@@ -660,7 +684,7 @@ const ModsList: Component<Props> = (props) => {
                     ? "bg-cyan-600/20 text-cyan-400 border-cyan-600/30"
                     : "bg-gray-600/20 text-gray-400 border-gray-600/30"
                 }`}>
-                  {filterUpdateAvailable() === "has_update" ? "Есть обновления" : "Нет обновлений"}
+                  {filterUpdateAvailable() === "has_update" ? t().mods.list.filters.hasUpdates : t().mods.list.filters.noUpdates}
                 </span>
               </Show>
             </div>
@@ -674,7 +698,7 @@ const ModsList: Component<Props> = (props) => {
           <i class="i-hugeicons-alert-02 text-yellow-400 w-5 h-5 flex-shrink-0" />
           <div class="flex-1 flex flex-col gap-2">
             <h3 class="font-medium text-yellow-400">
-              Обнаружены конфликты ({mods.conflicts().length})
+              {t().mods.list.conflicts.title} ({mods.conflicts().length})
             </h3>
             <For each={mods.conflicts()}>
               {(conflict) => (
@@ -692,11 +716,11 @@ const ModsList: Component<Props> = (props) => {
               <Show when={mods.resolvingDeps()} fallback={
                 <>
                   <i class="i-hugeicons-test-tube w-4 h-4" />
-                  Автоматически разрешить
+                  {t().mods.list.conflicts.autoResolve}
                 </>
               }>
                 <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                Разрешение...
+                {t().mods.list.conflicts.resolving}
               </Show>
             </button>
           </div>
@@ -723,7 +747,7 @@ const ModsList: Component<Props> = (props) => {
         <Show when={mods.loading()}>
           <div class="flex-center gap-2 py-8">
             <i class="i-svg-spinners-6-dots-scale w-6 h-6" />
-            <span class="text-muted">Загрузка...</span>
+            <span class="text-muted">{t().mods.list.loading}</span>
           </div>
         </Show>
 
@@ -739,15 +763,15 @@ const ModsList: Component<Props> = (props) => {
         <Show when={!mods.loading() && mods.mods().length === 0 && !mods.error()}>
           <div class="card flex-col-center py-12 text-center">
             <i class="i-hugeicons-package w-16 h-16 text-gray-600 mb-4" />
-            <p class="text-muted mb-2">Моды не установлены</p>
-            <p class="text-sm text-dimmer mb-4">Перейдите в каталог чтобы найти моды</p>
+            <p class="text-muted mb-2">{t().mods.list.empty.noMods}</p>
+            <p class="text-sm text-dimmer mb-4">{t().mods.list.empty.noModsHint}</p>
             <button
               class="btn-primary"
               data-size="sm"
               onClick={() => setViewMode("browse")}
             >
               <i class="i-hugeicons-store-01 w-4 h-4" />
-              Открыть каталог
+              {t().mods.list.empty.openCatalog}
             </button>
           </div>
         </Show>
@@ -756,8 +780,8 @@ const ModsList: Component<Props> = (props) => {
         <Show when={!mods.loading() && mods.mods().length > 0 && filteredMods().length === 0 && searchQuery()}>
           <div class="card flex-col-center py-8 text-center">
             <i class="i-hugeicons-search-01 w-12 h-12 text-gray-600 mb-3" />
-            <p class="text-muted mb-1">Ничего не найдено</p>
-            <p class="text-sm text-dimmer">Нет модов, соответствующих "{searchQuery()}"</p>
+            <p class="text-muted mb-1">{t().mods.list.empty.noResults}</p>
+            <p class="text-sm text-dimmer">{t().mods.list.empty.noResultsHint} "{searchQuery()}"</p>
           </div>
         </Show>
 
@@ -772,7 +796,7 @@ const ModsList: Component<Props> = (props) => {
                   checked={multiselect.isSelected(mod.id)}
                   onChange={() => multiselect.toggleSelect(mod.id)}
                   class="w-4 h-4 rounded border-gray-600 bg-gray-800 checked:bg-blue-600 checked:border-blue-600 focus:ring-2 focus:ring-blue-600/50 cursor-pointer"
-                  title="Выбрать мод"
+                  title={t().mods.list.search.selectMod}
                 />
 
                 {/* Enable Toggle */}
@@ -803,7 +827,7 @@ const ModsList: Component<Props> = (props) => {
                     <Show when={mod.update_available}>
                       <span
                         class="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-blue-600/20 text-blue-400 border border-blue-600/30"
-                        title={`Доступно обновление: ${mod.latest_version}`}
+                        title={`${t().mods.list.modActions.updateAvailable}: ${mod.latest_version}`}
                       >
                         <i class="i-hugeicons-arrow-up-02 w-3 h-3" />
                         <span class="hidden sm:inline">{mod.latest_version}</span>
@@ -852,15 +876,15 @@ const ModsList: Component<Props> = (props) => {
                       if (status === "verified") {
                         statusIcon = "i-hugeicons-security-check";
                         statusColor = "text-green-400 hover:text-green-300";
-                        tooltip = "Проверен: хэш совпадает с официальным источником. Нажмите для открытия страницы мода.";
+                        tooltip = t().mods.list.verification.verifiedTooltip;
                       } else if (status === "modified") {
                         statusIcon = "i-hugeicons-alert-02";
                         statusColor = "text-orange-400 hover:text-orange-300";
-                        tooltip = "Модифицирован: файл изменён после загрузки. Нажмите для открытия страницы мода.";
+                        tooltip = t().mods.list.verification.modifiedTooltip;
                       } else {
                         statusIcon = "i-hugeicons-help-circle";
                         statusColor = "text-gray-500 hover:text-gray-400";
-                        tooltip = "Не найден на платформах: локальный мод или из другого источника.";
+                        tooltip = t().mods.list.verification.unknownTooltip;
                       }
 
                       const handleClick = async (e: MouseEvent) => {
@@ -869,7 +893,7 @@ const ModsList: Component<Props> = (props) => {
                           try {
                             await openUrl(modUrl);
                           } catch (err) {
-                            console.error("Failed to open URL:", err);
+                            if (import.meta.env.DEV) console.error("Failed to open URL:", err);
                           }
                         }
                       };
@@ -901,7 +925,7 @@ const ModsList: Component<Props> = (props) => {
                       class="btn-primary btn-sm"
                       onClick={() => mods.updateMod(mod.id)}
                       disabled={mods.loading()}
-                      title={`Обновить до ${mod.latest_version}`}
+                      title={`${t().mods.list.modActions.updateTo} ${mod.latest_version}`}
                     >
                       <i class="i-hugeicons-arrow-up-02 w-4 h-4" />
                     </button>
@@ -912,7 +936,7 @@ const ModsList: Component<Props> = (props) => {
                     <button
                       class={`btn-ghost btn-sm ${mod.auto_update ? "text-blue-400" : "text-gray-500"}`}
                       onClick={() => mods.toggleModAutoUpdate(mod.id, !mod.auto_update)}
-                      title={mod.auto_update ? "Автообновление включено" : "Автообновление отключено"}
+                      title={mod.auto_update ? t().mods.list.modActions.autoUpdateEnabled : t().mods.list.modActions.autoUpdateDisabled}
                     >
                       <i class="i-hugeicons-refresh w-4 h-4" />
                     </button>
@@ -922,7 +946,7 @@ const ModsList: Component<Props> = (props) => {
                   <button
                     class="btn-ghost btn-sm"
                     onClick={() => setSelectedMod(mod)}
-                    title="Информация о моде"
+                    title={t().mods.list.modActions.modInfo}
                   >
                     <i class="i-hugeicons-information-circle w-4 h-4" />
                   </button>
@@ -936,10 +960,10 @@ const ModsList: Component<Props> = (props) => {
                         const modPath = `${instance.dir}/mods/${mod.file_name}`;
                         await revealItemInDir(modPath);
                       } catch (e) {
-                        console.error("Failed to open mod in folder:", e);
+                        if (import.meta.env.DEV) console.error("Failed to open mod in folder:", e);
                       }
                     }}
-                    title="Показать в папке"
+                    title={t().mods.list.modActions.showInFolder}
                   >
                     <i class="i-hugeicons-folder-search w-4 h-4" />
                   </button>
@@ -948,7 +972,7 @@ const ModsList: Component<Props> = (props) => {
                   <button
                     class="btn-ghost btn-sm text-red-400 hover:text-red-300"
                     onClick={() => handleRemoveMod(mod)}
-                    title="Удалить мод"
+                    title={t().mods.list.modActions.deleteMod}
                   >
                     <i class="i-hugeicons-delete-02 w-4 h-4" />
                   </button>
@@ -999,9 +1023,34 @@ const ModsList: Component<Props> = (props) => {
               for (const modId of modIds) {
                 await mods.updateMod(modId);
               }
+
+              // Reload mods to get updated data with latest_changelog
+              await mods.loadMods();
+
+              // Get updated mods for changelog display
+              // Use modsBeforeUpdate to preserve changelogs that were fetched
+              const updatedMods = mods.mods().filter(m => modIds.includes(m.id));
+
+              // Show changelog aggregator if any mods have changelogs
+              if (updatedMods.some(m => m.latest_changelog)) {
+                setUpdatedModsForChangelog(updatedMods);
+                setShowUpdateModal(false);
+                setShowChangelogModal(true);
+              }
             } finally {
               setUpdating(false);
             }
+          }}
+        />
+      </Show>
+
+      {/* Changelog Aggregator Modal - shown after mods are updated */}
+      <Show when={showChangelogModal() && updatedModsForChangelog().length > 0}>
+        <ChangelogAggregatorModal
+          updatedMods={updatedModsForChangelog()}
+          onClose={() => {
+            setShowChangelogModal(false);
+            setUpdatedModsForChangelog([]);
           }}
         />
       </Show>

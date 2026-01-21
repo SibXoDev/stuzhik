@@ -1,6 +1,7 @@
 import { createSignal, For, Show, JSX } from "solid-js";
 import { Toggle, Dropdown, Pagination, ModalWrapper, Tooltip, RangeSlider, Select, Tabs, Skeleton, SkeletonCard, SkeletonList } from "../ui";
 import { addToast } from "./Toast";
+import { useI18n } from "../i18n";
 
 interface SectionProps {
   title: string;
@@ -32,6 +33,7 @@ function ComponentBox(props: { label: string; children: JSX.Element; vertical?: 
 }
 
 export function UIKit(props: { onClose: () => void }) {
+  const { t } = useI18n();
   // State for interactive demos
   const [toggleState, setToggleState] = createSignal(false);
   const [toggleLoading, setToggleLoading] = createSignal(false);
@@ -57,7 +59,11 @@ export function UIKit(props: { onClose: () => void }) {
               <p class="text-sm text-gray-500">Component showcase (dev mode only)</p>
             </div>
           </div>
-          <button class="btn-close" onClick={props.onClose}>
+          <button
+            class="btn-close"
+            onClick={props.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
+          >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
         </div>

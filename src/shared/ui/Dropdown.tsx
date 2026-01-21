@@ -163,7 +163,7 @@ function Dropdown(props: DropdownProps) {
       <Show when={props.open && position()}>
         <div
           ref={dropdownRef}
-          class={`fixed bg-[--color-bg-elevated] border border-gray-700 rounded-xl shadow-xl flex flex-col ${
+          class={`fixed bg-[--color-bg-elevated] border border-gray-700 rounded-xl shadow-xl overflow-y-auto ${
             props.contentClass || ""
           }`}
           style={{

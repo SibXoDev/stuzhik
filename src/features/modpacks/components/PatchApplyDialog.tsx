@@ -158,6 +158,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
           <button
             class="btn-close"
             onClick={props.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
           >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>

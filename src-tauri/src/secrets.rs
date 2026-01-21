@@ -131,8 +131,11 @@ fn get_master_key() -> Result<&'static [u8; 32]> {
     // Try to set it (ignore if another thread set it first - that's fine)
     let _ = MASTER_KEY.set(key);
 
-    // Now get() will return Some
-    Ok(MASTER_KEY.get().expect("key was just set"))
+    // Now get() will return Some - this should never fail since either we just set it
+    // or another thread set it before us (which is why we use let _ = above)
+    MASTER_KEY
+        .get()
+        .ok_or_else(|| SecretError::KeyDerivationError("Failed to initialize master key".to_string()))
 }
 
 /// Derive master key from machine_uid using Argon2id

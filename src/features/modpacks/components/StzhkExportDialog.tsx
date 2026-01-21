@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Toggle } from "../../../shared/ui";
 import { ModalWrapper } from "../../../shared/ui/ModalWrapper";
 import { useI18n } from "../../../shared/i18n";
+import { formatSize } from "../../../shared/utils/format-size";
 
 interface StzhkExportDialogProps {
   instanceId: string;
@@ -63,16 +64,11 @@ interface ExportPreview {
   overrides_size: number;
 }
 
-function formatSize(bytes: number): string {
-  if (bytes === 0) return "0 Б";
-  const k = 1024;
-  const sizes = ["Б", "КБ", "МБ", "ГБ"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
-
 export function StzhkExportDialog(props: StzhkExportDialogProps) {
   const { t } = useI18n();
+
+  // Memoized size formatter with localized units
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
   // Load saved metadata from localStorage
   const savedMetadata = localStorage.getItem(`modpack-export-${props.instanceId}`);
   const initialMetadata = savedMetadata ? JSON.parse(savedMetadata) : {};
@@ -246,13 +242,14 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
         {/* Header */}
         <div class="flex items-center justify-between mb-6 flex-shrink-0">
           <div>
-            <h2 class="text-xl font-bold">Экспорт в STZHK</h2>
-            <p class="text-sm text-muted mt-1">Создание модпака из {props.instanceName}</p>
+            <h2 class="text-xl font-bold">{t().modpacks.export.title}</h2>
+            <p class="text-sm text-muted mt-1">{t().modpacks.export.subtitle} {props.instanceName}</p>
           </div>
           <button
             class="btn-close"
             onClick={props.onClose}
             disabled={exporting()}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
           >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
@@ -269,7 +266,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
             <div class="flex items-start gap-3">
               <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
               <div>
-                <p class="text-green-400 font-medium">Экспорт завершён</p>
+                <p class="text-green-400 font-medium">{t().modpacks.export.success}</p>
                 <p class="text-sm text-muted mt-1 break-all">{success()}</p>
               </div>
             </div>
@@ -281,11 +278,11 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
           <div class="bg-gradient-to-br from-gray-800/50 to-gray-750/50 rounded-xl p-4 mb-4 border border-gray-700 flex-shrink-0">
             <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
               <i class="i-hugeicons-package w-4 h-4 text-blue-400" />
-              Информация о модпаке
+              {t().modpacks.export.metadata.title}
             </h3>
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs text-muted mb-1.5">Название</label>
+                <label class="block text-xs text-muted mb-1.5">{t().modpacks.export.metadata.name}</label>
                 <input
                   type="text"
                   value={modpackName()}
@@ -296,7 +293,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 />
               </div>
               <div>
-                <label class="block text-xs text-muted mb-1.5">Версия</label>
+                <label class="block text-xs text-muted mb-1.5">{t().modpacks.export.metadata.version}</label>
                 <input
                   type="text"
                   value={modpackVersion()}
@@ -307,7 +304,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 />
               </div>
               <div class="col-span-2">
-                <label class="block text-xs text-muted mb-1.5">Автор</label>
+                <label class="block text-xs text-muted mb-1.5">{t().modpacks.export.metadata.author}</label>
                 <input
                   type="text"
                   value={modpackAuthor()}
@@ -318,7 +315,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 />
               </div>
               <div class="col-span-2">
-                <label class="block text-xs text-muted mb-1.5">Описание</label>
+                <label class="block text-xs text-muted mb-1.5">{t().modpacks.export.metadata.description}</label>
                 <textarea
                   value={modpackDescription()}
                   onInput={(e) => setModpackDescription(e.currentTarget.value)}
@@ -342,10 +339,10 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
               />
               <div class="flex-1">
                 <span class="font-medium">
-                  Встроить моды в архив
+                  {t().modpacks.export.options.embedMods}
                 </span>
                 <p class="text-sm text-muted mt-0.5">
-                  Моды будут включены в файл. Иначе будут добавлены ссылки на Modrinth
+                  {t().modpacks.export.options.embedModsHint}
                 </p>
               </div>
             </div>
@@ -359,10 +356,10 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
               />
               <div class="flex-1">
                 <span class="font-medium">
-                  Включить конфиги и ресурсы
+                  {t().modpacks.export.options.includeOverrides}
                 </span>
                 <p class="text-sm text-muted mt-0.5">
-                  Добавить папки config, resourcepacks, shaderpacks
+                  {t().modpacks.export.options.includeOverridesHint}
                 </p>
               </div>
             </div>
@@ -375,8 +372,8 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
             disabled={loadingPreview()}
           >
             <i class={`w-4 h-4 ${showPreview() ? "i-hugeicons-arrow-down-01" : "i-hugeicons-arrow-right-01"}`} />
-            <Show when={loadingPreview()} fallback="Предпросмотр файлов">
-              <Show when={previewProgress()} fallback="Загрузка предпросмотра...">
+            <Show when={loadingPreview()} fallback={t().modpacks.export.preview.toggle}>
+              <Show when={previewProgress()} fallback={t().modpacks.export.preview.loading}>
                 {previewProgress()!.message} ({previewProgress()!.current}/{previewProgress()!.total})
               </Show>
             </Show>
@@ -397,9 +394,9 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
               </div>
               <div class="flex justify-between items-center mt-1">
                 <span class="text-xs text-muted">
-                  {previewProgress()!.stage === "hashing" && "Вычисление хешей..."}
-                  {previewProgress()!.stage === "modrinth" && "Поиск на Modrinth..."}
-                  {previewProgress()!.stage === "processing" && "Обработка результатов..."}
+                  {previewProgress()!.stage === "hashing" && t().modpacks.export.previewProgress.hashing}
+                  {previewProgress()!.stage === "modrinth" && t().modpacks.export.previewProgress.modrinth}
+                  {previewProgress()!.stage === "processing" && t().modpacks.export.previewProgress.processing}
                 </span>
                 <span class="text-xs text-gray-500">
                   {previewProgress()!.current}/{previewProgress()!.total}
@@ -414,19 +411,19 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
               {/* Summary */}
               <div class="grid grid-cols-2 gap-3 mb-4">
                 <div class="bg-gray-800/50 rounded-xl p-3">
-                  <div class="text-sm text-muted">Моды</div>
+                  <div class="text-sm text-muted">{t().modpacks.export.summary.mods}</div>
                   <div class="text-lg font-semibold">{preview()!.mods.length}</div>
                   <Show when={!embedMods()}>
                     <div class="text-xs text-muted mt-1">
-                      <span class="text-green-400">{preview()!.modrinth_mods_count}</span> с Modrinth,
-                      <span class="text-yellow-400 ml-1">{preview()!.local_mods_count}</span> локальных
+                      <span class="text-green-400">{preview()!.modrinth_mods_count}</span> {t().modpacks.export.summary.fromModrinth},
+                      <span class="text-yellow-400 ml-1">{preview()!.local_mods_count}</span> {t().modpacks.export.summary.local}
                     </div>
                   </Show>
                 </div>
                 <div class="bg-gray-800/50 rounded-xl p-3">
-                  <div class="text-sm text-muted">Размер архива</div>
+                  <div class="text-sm text-muted">{t().modpacks.export.summary.archiveSize}</div>
                   <div class="text-lg font-semibold">
-                    {formatSize(preview()!.embedded_size + preview()!.overrides_size)}
+                    {fmtSize(preview()!.embedded_size + preview()!.overrides_size)}
                   </div>
                 </div>
               </div>
@@ -436,9 +433,9 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 mb-4 flex items-start gap-3">
                   <i class="i-hugeicons-alert-02 w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                   <div class="text-sm">
-                    <p class="text-yellow-400 font-medium">Локальные моды будут встроены</p>
+                    <p class="text-yellow-400 font-medium">{t().modpacks.export.warnings.localModsEmbedded}</p>
                     <p class="text-muted mt-1">
-                      {preview()!.local_mods_count} модов не найдены на Modrinth и будут встроены в архив
+                      {preview()!.local_mods_count} {t().modpacks.export.warnings.localModsEmbeddedHint}
                     </p>
                   </div>
                 </div>
@@ -450,19 +447,19 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
                     <h3 class="text-sm font-medium text-muted">
-                      Моды ({preview()!.mods.length - excludedMods().size} / {preview()!.mods.length})
+                      {t().modpacks.export.mods.title} ({preview()!.mods.length - excludedMods().size} / {preview()!.mods.length})
                     </h3>
                     <button
                       class="text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
                       onClick={selectAllMods}
                     >
-                      Выбрать всё
+                      {t().modpacks.export.mods.selectAll}
                     </button>
                     <button
                       class="text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
                       onClick={deselectAllMods}
                     >
-                      Снять всё
+                      {t().modpacks.export.mods.deselectAll}
                     </button>
                   </div>
                   <div class="flex gap-1">
@@ -474,7 +471,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                       }`}
                       onClick={() => setSourceFilter("all")}
                     >
-                      Все
+                      {t().modpacks.export.mods.all}
                     </button>
                     <button
                       class={`text-xs px-2 py-1 rounded-lg transition-colors flex items-center gap-1 ${
@@ -496,14 +493,14 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                       onClick={() => setSourceFilter("local")}
                     >
                       <span class="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-                      Локальные ({preview()!.local_mods_count})
+                      {t().modpacks.export.mods.local} ({preview()!.local_mods_count})
                     </button>
                   </div>
                 </div>
                 <div class="space-y-1 max-h-48 overflow-y-auto">
                   <Show when={filteredMods().length > 0} fallback={
                     <div class="text-center py-4 text-gray-500 text-sm">
-                      Нет модов с выбранным источником
+                      {t().modpacks.export.mods.noModsWithFilter}
                     </div>
                   }>
                     <For each={filteredMods()}>
@@ -531,14 +528,14 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                             <div class="flex items-center gap-2">
                               <span class="font-medium truncate">{mod.name}</span>
                               <Show when={mod.will_embed}>
-                                <span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded">встроен</span>
+                                <span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded">{t().modpacks.export.mods.embedded}</span>
                               </Show>
                             </div>
                             <div class="text-xs text-muted truncate">{mod.filename}</div>
                           </div>
 
                           {/* Size */}
-                          <div class="text-xs text-muted flex-shrink-0">{formatSize(mod.size)}</div>
+                          <div class="text-xs text-muted flex-shrink-0">{fmtSize(mod.size)}</div>
 
                           {/* Source badge */}
                           <div class={`text-xs px-2 py-0.5 rounded flex-shrink-0 ${
@@ -546,9 +543,9 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                             mod.source_type === "local" ? "bg-yellow-500/20 text-yellow-400" :
                             "bg-blue-500/20 text-blue-400"
                           }`}>
-                            {mod.source_type === "modrinth" ? "Modrinth" :
-                             mod.source_type === "local" ? "Локальный" :
-                             "Встроен"}
+                            {mod.source_type === "modrinth" ? t().modpacks.export.mods.sourceModrinth :
+                             mod.source_type === "local" ? t().modpacks.export.mods.sourceLocal :
+                             t().modpacks.export.mods.sourceEmbedded}
                           </div>
                         </div>
                       )}
@@ -562,20 +559,20 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                 <div>
                   <div class="flex items-center justify-between mb-2">
                     <h3 class="text-sm font-medium text-muted">
-                      Файлы экземпляра ({preview()!.overrides.length - excludedOverrides().size} / {preview()!.overrides.length})
+                      {t().modpacks.export.overrides.title} ({preview()!.overrides.length - excludedOverrides().size} / {preview()!.overrides.length})
                     </h3>
                     <div class="flex gap-2">
                       <button
                         class="text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
                         onClick={() => setExcludedOverrides(new Set<string>())}
                       >
-                        Выбрать всё
+                        {t().modpacks.export.mods.selectAll}
                       </button>
                       <button
                         class="text-xs px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
                         onClick={() => setExcludedOverrides(new Set(preview()!.overrides.map(o => o.path)))}
                       >
-                        Снять всё
+                        {t().modpacks.export.mods.deselectAll}
                       </button>
                     </div>
                   </div>
@@ -616,13 +613,13 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                             <span class="flex-1 font-medium truncate">{override.name}</span>
                             <Show when={override.category === "generated"}>
                               <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400">
-                                генерируемые
+                                {t().modpacks.export.overrides.generated}
                               </span>
                             </Show>
                             <Show when={!override.is_file}>
-                              <span class="text-xs text-muted">{override.file_count} файлов</span>
+                              <span class="text-xs text-muted">{override.file_count} {t().modpacks.export.overrides.filesCount}</span>
                             </Show>
-                            <span class="text-xs text-muted">{formatSize(override.size)}</span>
+                            <span class="text-xs text-muted">{fmtSize(override.size)}</span>
                           </div>
                         );
                       }}
@@ -633,7 +630,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                     <div class="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                       <p class="text-xs text-amber-400">
                         <i class="i-hugeicons-information-circle w-3 h-3 inline-block mr-1" />
-                        Генерируемые данные (миры, скриншоты) можно исключить для уменьшения размера архива.
+                        {t().modpacks.export.overrides.generatedHint}
                       </p>
                     </div>
                   </Show>
@@ -647,10 +644,10 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
             <div class="mb-4 flex-shrink-0">
               <div class="flex justify-between text-sm mb-2">
                 <span class="text-muted">
-                  {progress()!.stage === "manifest" && "Создание манифеста..."}
-                  {progress()!.stage === "mods" && "Встраивание модов..."}
-                  {progress()!.stage === "overrides" && "Добавление overrides..."}
-                  {progress()!.stage === "finishing" && "Завершение..."}
+                  {progress()!.stage === "manifest" && t().modpacks.export.progress.manifest}
+                  {progress()!.stage === "mods" && t().modpacks.export.progress.mods}
+                  {progress()!.stage === "overrides" && t().modpacks.export.progress.overrides}
+                  {progress()!.stage === "finishing" && t().modpacks.export.progress.finishing}
                 </span>
                 <span class="text-white">{progress()!.current}/{progress()!.total}</span>
               </div>
@@ -672,11 +669,11 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
           <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-3 flex-shrink-0">
             <i class="i-hugeicons-filter w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <div class="text-sm">
-              <p class="text-amber-400 font-medium">Выбранные элементы</p>
+              <p class="text-amber-400 font-medium">{t().modpacks.export.exclusions.title}</p>
               <p class="text-muted mt-1">
-                {excludedMods().size > 0 && `Моды: ${preview()!.mods.length - excludedMods().size}/${preview()!.mods.length}. `}
-                {excludedOverrides().size > 0 && `Файлы: ${preview()!.overrides.length - excludedOverrides().size}/${preview()!.overrides.length}. `}
-                Исключённые элементы не будут включены в архив.
+                {excludedMods().size > 0 && `${t().modpacks.export.exclusions.modsCount}: ${preview()!.mods.length - excludedMods().size}/${preview()!.mods.length}. `}
+                {excludedOverrides().size > 0 && `${t().modpacks.export.exclusions.filesCount}: ${preview()!.overrides.length - excludedOverrides().size}/${preview()!.overrides.length}. `}
+                {t().modpacks.export.exclusions.hint}
               </p>
             </div>
           </div>
@@ -689,7 +686,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
             onClick={props.onClose}
             disabled={exporting()}
           >
-            {success() ? "Закрыть" : "Отмена"}
+            {success() ? t().modpacks.export.buttons.close : t().modpacks.export.buttons.cancel}
           </button>
           <Show when={!success()}>
             <button
@@ -700,11 +697,11 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
               <Show when={exporting()} fallback={
                 <>
                   <i class="i-hugeicons-share-01 w-4 h-4" />
-                  Экспортировать
+                  {t().modpacks.export.buttons.export}
                 </>
               }>
                 <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                Экспорт...
+                {t().modpacks.export.buttons.exporting}
               </Show>
             </button>
           </Show>

@@ -62,10 +62,13 @@ function VersionSelector(props: Props) {
       });
 
       if (availableVersions.length === 0) {
+        const msg = (t().versions?.loaderNotSupported ?? "{loader} does not support Minecraft {version}")
+          .replace("{loader}", loader)
+          .replace("{version}", mcVersion);
         setCompatibility({
           isCompatible: false,
           availableVersions: [],
-          message: `Загрузчик ${loader} не поддерживает Minecraft ${mcVersion}`,
+          message: msg,
         });
       } else {
         setCompatibility({
@@ -75,10 +78,12 @@ function VersionSelector(props: Props) {
       }
     } catch (e) {
       console.error("Failed to check loader compatibility:", e);
+      const msg = (t().versions?.compatibilityCheckFailed ?? "Failed to check compatibility: {error}")
+        .replace("{error}", String(e));
       setCompatibility({
         isCompatible: false,
         availableVersions: [],
-        message: `Не удалось проверить совместимость: ${e}`,
+        message: msg,
       });
     }
   };
@@ -139,15 +144,16 @@ function VersionSelector(props: Props) {
   };
 
   const getVersionTypeLabel = (type: string) => {
+    const types = t().versions?.types;
     switch (type) {
       case "release":
-        return { label: "Релиз", color: "text-green-400" };
+        return { label: types?.release ?? "Release", color: "text-green-400" };
       case "snapshot":
-        return { label: "Снапшот", color: "text-yellow-400" };
+        return { label: types?.snapshot ?? "Snapshot", color: "text-yellow-400" };
       case "old_beta":
-        return { label: "Бета", color: "text-blue-400" };
+        return { label: types?.old_beta ?? "Beta", color: "text-blue-400" };
       case "old_alpha":
-        return { label: "Альфа", color: "text-purple-400" };
+        return { label: types?.old_alpha ?? "Alpha", color: "text-purple-400" };
       default:
         return { label: type, color: "text-gray-400" };
     }
@@ -183,7 +189,7 @@ function VersionSelector(props: Props) {
             <i class="i-hugeicons-alert-02 w-4 h-4 text-red-400" />
           </Show>
         </Show>
-        <span>{props.value || "Выберите версию"}</span>
+        <span>{props.value || (t().versions?.select ?? "Select version")}</span>
       </div>
       <i class={`${showDropdown() ? "i-hugeicons-arrow-up-01" : "i-hugeicons-arrow-down-01"} w-5 h-5 text-gray-400 transition-transform`} />
     </button>
@@ -219,7 +225,7 @@ function VersionSelector(props: Props) {
                 onChange={(e) => setShowSnapshots(e.currentTarget.checked)}
                 class="w-3.5 h-3.5 rounded-md accent-blue-600"
               />
-              <span class="text-gray-400">Снапшоты</span>
+              <span class="text-gray-400">{t().versions?.filters?.snapshots ?? "Snapshots"}</span>
             </label>
 
             <label class="flex items-center gap-1.5 cursor-pointer">
@@ -229,7 +235,7 @@ function VersionSelector(props: Props) {
                 onChange={(e) => setShowOldBeta(e.currentTarget.checked)}
                 class="w-3.5 h-3.5 rounded-md accent-blue-600"
               />
-              <span class="text-gray-400">Старые бета</span>
+              <span class="text-gray-400">{t().versions?.filters?.oldBeta ?? "Old beta"}</span>
             </label>
 
             <label class="flex items-center gap-1.5 cursor-pointer">
@@ -239,7 +245,7 @@ function VersionSelector(props: Props) {
                 onChange={(e) => setShowOldAlpha(e.currentTarget.checked)}
                 class="w-3.5 h-3.5 rounded-md accent-blue-600"
               />
-              <span class="text-gray-400">Старые альфа</span>
+              <span class="text-gray-400">{t().versions?.filters?.oldAlpha ?? "Old alpha"}</span>
             </label>
           </div>
         </div>
@@ -251,7 +257,7 @@ function VersionSelector(props: Props) {
             fallback={
               <div class="p-8 text-center text-gray-500 text-sm">
                 <i class="i-hugeicons-search-02 w-10 h-10 mx-auto mb-2 text-gray-600" />
-                <p>Версии не найдены</p>
+                <p>{t().versions?.notFound ?? "No versions found"}</p>
               </div>
             }
           >
@@ -298,7 +304,9 @@ function VersionSelector(props: Props) {
 
         {/* Footer */}
         <div class="p-2 border-t border-gray-800 text-xs text-gray-500 text-center flex-shrink-0">
-          Показано {filteredVersions().length} из {versions().length} версий
+          {(t().versions?.showingOf ?? "Showing {shown} of {total} versions")
+            .replace("{shown}", String(filteredVersions().length))
+            .replace("{total}", String(versions().length))}
         </div>
       </Dropdown>
 

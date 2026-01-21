@@ -120,7 +120,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to load mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to load mods:", e);
     } finally {
       setLoading(false);
     }
@@ -139,7 +139,7 @@ export function useMods(instanceId: () => string) {
       const result = await invoke<SyncResult>("sync_mods_folder", { instanceId: id });
       return result;
     } catch (e: unknown) {
-      console.error("Failed to sync mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to sync mods:", e);
       return null;
     } finally {
       setSyncing(false);
@@ -157,7 +157,7 @@ export function useMods(instanceId: () => string) {
       const result = await invoke<ModConflict[]>("check_mod_dependencies", { instanceId: id });
       setConflicts(result);
     } catch (e: unknown) {
-      console.error("Failed to check dependencies:", e);
+      if (import.meta.env.DEV) console.error("Failed to check dependencies:", e);
     }
   }
 
@@ -186,7 +186,7 @@ export function useMods(instanceId: () => string) {
       return false; // Enrichment was skipped (hash unchanged)
     } catch (e: unknown) {
       // Non-critical - data still usable without enrichment
-      console.debug("Enrichment failed (non-critical):", e);
+      if (import.meta.env.DEV) console.debug("Enrichment failed (non-critical):", e);
       return false;
     } finally {
       if (showIndicator) {
@@ -235,7 +235,7 @@ export function useMods(instanceId: () => string) {
         }
       }
     } catch (e: unknown) {
-      console.debug("Verification failed (non-critical):", e);
+      if (import.meta.env.DEV) console.debug("Verification failed (non-critical):", e);
     } finally {
       setVerifying(false);
       setVerificationProgress(null); // Clear progress when done
@@ -290,7 +290,7 @@ export function useMods(instanceId: () => string) {
 
       return result;
     } catch (e: unknown) {
-      console.error("Failed to check mod updates:", e);
+      if (import.meta.env.DEV) console.error("Failed to check mod updates:", e);
       if (showNotification) {
         addToast({
           type: "error",
@@ -335,7 +335,7 @@ export function useMods(instanceId: () => string) {
       // Then check updates
       return await checkModUpdates(minecraftVersion, loader, true);
     } catch (e) {
-      console.error("Failed to force check updates:", e);
+      if (import.meta.env.DEV) console.error("Failed to force check updates:", e);
       return null;
     }
   }
@@ -361,7 +361,7 @@ export function useMods(instanceId: () => string) {
       }
       return removed;
     } catch (e) {
-      console.error("Failed to cleanup duplicates:", e);
+      if (import.meta.env.DEV) console.error("Failed to cleanup duplicates:", e);
       return 0;
     }
   }
@@ -466,7 +466,7 @@ export function useMods(instanceId: () => string) {
       await verifyMods(true);
       await checkDependencies();
     } catch (e) {
-      console.error("Force sync failed:", e);
+      if (import.meta.env.DEV) console.error("Force sync failed:", e);
     } finally {
       setSyncing(false);
       setEnriching(false);
@@ -509,7 +509,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to install mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to install mod:", e);
       return null;
     } finally {
       setLoading(false);
@@ -534,7 +534,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to install local mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to install local mod:", e);
       return null;
     } finally {
       setLoading(false);
@@ -561,7 +561,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to toggle mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to toggle mod:", e);
     }
   }
 
@@ -578,7 +578,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to remove mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to remove mod:", e);
     }
   }
 
@@ -597,7 +597,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to update mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to update mod:", e);
     } finally {
       setLoading(false);
     }
@@ -627,7 +627,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to bulk toggle mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to bulk toggle mods:", e);
       return [];
     }
   }
@@ -646,7 +646,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to bulk remove mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to bulk remove mods:", e);
       return [];
     }
   }
@@ -670,7 +670,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to bulk toggle auto update:", e);
+      if (import.meta.env.DEV) console.error("Failed to bulk toggle auto update:", e);
       return [];
     }
   }
@@ -697,7 +697,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to resolve dependencies:", e);
+      if (import.meta.env.DEV) console.error("Failed to resolve dependencies:", e);
     } finally {
       setResolvingDeps(false);
     }
@@ -720,7 +720,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to toggle mod auto update:", e);
+      if (import.meta.env.DEV) console.error("Failed to toggle mod auto update:", e);
     }
   }
 
@@ -743,7 +743,7 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to auto resolve dependencies:", e);
+      if (import.meta.env.DEV) console.error("Failed to auto resolve dependencies:", e);
     } finally {
       setResolvingDeps(false);
     }
@@ -766,7 +766,7 @@ export function useMods(instanceId: () => string) {
       });
       return result;
     } catch (e: unknown) {
-      console.error("Failed to predict conflicts:", e);
+      if (import.meta.env.DEV) console.error("Failed to predict conflicts:", e);
       return null;
     } finally {
       setPredictionLoading(false);
@@ -782,7 +782,7 @@ export function useMods(instanceId: () => string) {
       const response = await invoke<ModSearchResponse>("search_mods", { params });
       return response;
     } catch (e: unknown) {
-      console.error("Failed to search mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to search mods:", e);
       return null;
     }
   }
@@ -792,7 +792,7 @@ export function useMods(instanceId: () => string) {
       const result = await invoke<ModSearchResult>("get_mod_details", { slug, source });
       return result;
     } catch (e: unknown) {
-      console.error("Failed to get mod details:", e);
+      if (import.meta.env.DEV) console.error("Failed to get mod details:", e);
       return null;
     }
   }

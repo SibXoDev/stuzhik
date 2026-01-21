@@ -1,8 +1,10 @@
 import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
 import type { Component } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import type { ModpackDetailedPreview, ImportOverrideInfo, ImportFileCategory } from "../../../shared/types";
+import type { ModpackDetailedPreview, ImportOverrideInfo, ImportFileCategory, OptionalModGroup } from "../../../shared/types";
 import CodeViewer from "../../../shared/components/CodeViewer";
+import { formatSize } from "../../../shared/utils/format-size";
+import { useI18n } from "../../../shared/i18n";
 
 interface Props {
   filePath: string;
@@ -10,15 +12,6 @@ interface Props {
   onImport: (instanceName: string, excludedMods: string[], excludedOverrides: string[]) => void;
   importing?: boolean;
 }
-
-/** Форматирование размера файла */
-const formatSize = (bytes: number): string => {
-  if (bytes === 0) return "0 B";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-};
 
 /** Иконка для категории файла */
 const getCategoryIcon = (category: ImportFileCategory): string => {
@@ -112,17 +105,22 @@ function buildFileTree(files: ImportOverrideInfo[]): TreeNode {
 }
 
 const ModpackImportPreview: Component<Props> = (props) => {
+  const { t } = useI18n();
   const [preview, setPreview] = createSignal<ModpackDetailedPreview | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [instanceName, setInstanceName] = createSignal("");
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   // Track enabled/disabled state for mods and overrides
   const [modsEnabled, setModsEnabled] = createSignal<Record<string, boolean>>({});
   const [overridesEnabled, setOverridesEnabled] = createSignal<Record<string, boolean>>({});
 
   // Active tab for files view
-  const [activeTab, setActiveTab] = createSignal<"mods" | "files" | "tree">("mods");
+  const [activeTab, setActiveTab] = createSignal<"mods" | "files" | "tree" | "optional">("mods");
+
+  // Track optional mods selection (mod_id -> enabled)
+  const [optionalModsSelection, setOptionalModsSelection] = createSignal<Record<string, boolean>>({});
 
   // Expand/collapse categories
   const [expandedCategories, setExpandedCategories] = createSignal<Set<ImportFileCategory>>(new Set());
@@ -148,7 +146,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
       });
       setPreviewContent(content);
     } catch (e) {
-      console.error("Failed to load file content:", e);
+      if (import.meta.env.DEV) console.error("Failed to load file content:", e);
       setPreviewContent(null);
     } finally {
       setPreviewLoading(false);
@@ -213,6 +211,17 @@ const ModpackImportPreview: Component<Props> = (props) => {
           overridesState[override.archive_path] = override.enabled;
         }
         setOverridesEnabled(overridesState);
+
+        // Initialize optional mods selection based on default_enabled
+        if (data.optional_mods && data.optional_mods.length > 0) {
+          const optionalState: Record<string, boolean> = {};
+          for (const group of data.optional_mods) {
+            for (const mod of group.mods) {
+              optionalState[mod.mod_id] = mod.default_enabled;
+            }
+          }
+          setOptionalModsSelection(optionalState);
+        }
       })
       .catch((e) => {
         setError(String(e));
@@ -355,12 +364,78 @@ const ModpackImportPreview: Component<Props> = (props) => {
     });
   };
 
+  // Check if modpack has optional mods
+  const hasOptionalMods = createMemo(() => {
+    const p = preview();
+    return p?.optional_mods && p.optional_mods.length > 0;
+  });
+
+  // Toggle optional mod (for multiple selection type)
+  const toggleOptionalMod = (modId: string) => {
+    setOptionalModsSelection(prev => ({ ...prev, [modId]: !prev[modId] }));
+  };
+
+  // Select optional mod (for single selection type - radio button behavior)
+  const selectOptionalMod = (group: OptionalModGroup, modId: string) => {
+    setOptionalModsSelection(prev => {
+      const newState = { ...prev };
+      // Disable all mods in the group first
+      for (const mod of group.mods) {
+        newState[mod.mod_id] = false;
+      }
+      // Enable only the selected one
+      newState[modId] = true;
+      return newState;
+    });
+  };
+
+  // Get optional mods count
+  const optionalModsCount = createMemo(() => {
+    const p = preview();
+    if (!p?.optional_mods) return { selected: 0, total: 0 };
+    const selection = optionalModsSelection();
+    let total = 0;
+    let selected = 0;
+    for (const group of p.optional_mods) {
+      for (const mod of group.mods) {
+        total++;
+        if (selection[mod.mod_id]) selected++;
+      }
+    }
+    return { selected, total };
+  });
+
   // Get excluded items for import
   const getExcludedMods = (): string[] => {
     const state = modsEnabled();
-    return Object.entries(state)
+    const optionalSelection = optionalModsSelection();
+    const p = preview();
+
+    // Get disabled mods from main mods list
+    const excludedFromMain = Object.entries(state)
       .filter(([_, enabled]) => !enabled)
       .map(([path]) => path);
+
+    // Get disabled optional mods (match by mod_id to mods[].path containing mod_id)
+    const excludedFromOptional: string[] = [];
+    if (p?.optional_mods) {
+      for (const group of p.optional_mods) {
+        for (const optMod of group.mods) {
+          if (!optionalSelection[optMod.mod_id]) {
+            // Find the corresponding mod path
+            const mod = p.mods.find(m =>
+              m.filename.toLowerCase().includes(optMod.mod_id.toLowerCase()) ||
+              m.name?.toLowerCase().includes(optMod.mod_id.toLowerCase())
+            );
+            if (mod) {
+              excludedFromOptional.push(mod.path);
+            }
+          }
+        }
+      }
+    }
+
+    return [...new Set([...excludedFromMain, ...excludedFromOptional])];
   };
 
   const getExcludedOverrides = (): string[] => {
@@ -399,7 +474,12 @@ const ModpackImportPreview: Component<Props> = (props) => {
         {/* Header */}
         <div class="flex items-center justify-between p-4 border-b border-gray-750 flex-shrink-0">
           <h2 class="text-xl font-bold">Предпросмотр модпака</h2>
-          <button class="btn-close" onClick={props.onClose} disabled={props.importing}>
+          <button
+            class="btn-close"
+            onClick={props.onClose}
+            disabled={props.importing}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
+          >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
         </div>
@@ -479,9 +559,9 @@ const ModpackImportPreview: Component<Props> = (props) => {
             </div>
 
             {/* Tabs */}
-            <div class="flex gap-2">
+            <div class="flex gap-2 flex-wrap">
               <button
-                class={`flex-1 px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
+                class={`flex-1 min-w-fit px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
                   activeTab() === "mods"
                     ? "bg-blue-600 text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-750"
@@ -491,8 +571,21 @@ const ModpackImportPreview: Component<Props> = (props) => {
                 <i class="i-hugeicons-package w-4 h-4" />
                 Моды ({enabledModsCount()}/{preview()!.mods.length})
               </button>
+              <Show when={hasOptionalMods()}>
+                <button
+                  class={`flex-1 min-w-fit px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
+                    activeTab() === "optional"
+                      ? "bg-purple-600 text-white"
+                      : "bg-gray-800 text-gray-300 hover:bg-gray-750"
+                  }`}
+                  onClick={() => setActiveTab("optional")}
+                >
+                  <i class="i-hugeicons-toggle-on w-4 h-4" />
+                  Опциональные ({optionalModsCount().selected}/{optionalModsCount().total})
+                </button>
+              </Show>
               <button
-                class={`flex-1 px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
+                class={`flex-1 min-w-fit px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
                   activeTab() === "files"
                     ? "bg-blue-600 text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-750"
@@ -503,7 +596,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                 По категориям
               </button>
               <button
-                class={`flex-1 px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
+                class={`flex-1 min-w-fit px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
                   activeTab() === "tree"
                     ? "bg-blue-600 text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-750"
@@ -584,11 +677,120 @@ const ModpackImportPreview: Component<Props> = (props) => {
                             )}
                           </span>
                         </Show>
-                        <span class="text-xs text-dimmer">{formatSize(mod.size)}</span>
+                        <span class="text-xs text-dimmer">{fmtSize(mod.size)}</span>
                       </div>
                     )}
                   </For>
                 </div>
+              </div>
+            </Show>
+
+            {/* Optional mods list */}
+            <Show when={activeTab() === "optional" && hasOptionalMods()}>
+              <div class="space-y-3">
+                <div class="card bg-purple-600/10 border-purple-600/30">
+                  <p class="text-sm text-purple-300">
+                    <i class="i-hugeicons-information-circle w-4 h-4 inline-block mr-1" />
+                    Опциональные моды можно включить или выключить по желанию.
+                    Автор модпака сгруппировал их для удобства выбора.
+                  </p>
+                </div>
+
+                <For each={preview()!.optional_mods}>
+                  {(group) => {
+                    const selection = () => optionalModsSelection();
+
+                    return (
+                      <div class="card bg-gray-alpha-50">
+                        {/* Group header */}
+                        <div class="flex items-center gap-3 mb-3">
+                          <i class={`w-5 h-5 ${
+                            group.selection_type === "single"
+                              ? "i-hugeicons-radio text-purple-400"
+                              : "i-hugeicons-checkbox-check text-purple-400"
+                          }`} />
+                          <div class="flex-1 min-w-0">
+                            <h4 class="font-medium">{group.name}</h4>
+                            <Show when={group.description}>
+                              <p class="text-xs text-muted mt-0.5">{group.description}</p>
+                            </Show>
+                          </div>
+                          <span class="badge bg-gray-700/50 text-xs">
+                            {group.selection_type === "single" ? "Выберите один" : "Выберите любые"}
+                          </span>
+                        </div>
+
+                        {/* Mods in group */}
+                        <div class="space-y-1.5">
+                          <For each={group.mods}>
+                            {(optMod) => {
+                              const isSelected = () => selection()[optMod.mod_id] ?? false;
+                              // Find mod info from main mods list
+                              const modInfo = () => preview()!.mods.find(m =>
+                                m.filename.toLowerCase().includes(optMod.mod_id.toLowerCase()) ||
+                                m.name?.toLowerCase().includes(optMod.mod_id.toLowerCase())
+                              );
+
+                              return (
+                                <div
+                                  class={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors duration-100 ${
+                                    isSelected()
+                                      ? "bg-purple-600/10 hover:bg-purple-600/20"
+                                      : "bg-gray-900/50 opacity-60 hover:opacity-80"
+                                  }`}
+                                  onClick={() => {
+                                    if (group.selection_type === "single") {
+                                      selectOptionalMod(group, optMod.mod_id);
+                                    } else {
+                                      toggleOptionalMod(optMod.mod_id);
+                                    }
+                                  }}
+                                >
+                                  {/* Radio or Checkbox */}
+                                  {group.selection_type === "single" ? (
+                                    <div class={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                                      isSelected() ? "border-purple-500 bg-purple-500" : "border-gray-500"
+                                    }`}>
+                                      <Show when={isSelected()}>
+                                        <div class="w-2 h-2 rounded-full bg-white" />
+                                      </Show>
+                                    </div>
+                                  ) : (
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected()}
+                                      class="w-4 h-4 accent-purple-600"
+                                      onChange={() => {}}
+                                    />
+                                  )}
+
+                                  <i class="i-hugeicons-package w-4 h-4 text-purple-400 flex-shrink-0" />
+
+                                  <div class="flex-1 min-w-0">
+                                    <p class="text-sm truncate">{modInfo()?.name || optMod.mod_id}</p>
+                                    <Show when={optMod.note}>
+                                      <p class="text-xs text-muted mt-0.5">{optMod.note}</p>
+                                    </Show>
+                                  </div>
+
+                                  <Show when={optMod.default_enabled}>
+                                    <span class="badge bg-purple-600/20 text-purple-300 text-xs">
+                                      по умолчанию
+                                    </span>
+                                  </Show>
+
+                                  <Show when={modInfo()}>
+                                    <span class="text-xs text-dimmer">{fmtSize(modInfo()!.size)}</span>
+                                  </Show>
+                                </div>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </div>
+                    );
+                  }}
+                </For>
               </div>
             </Show>
 
@@ -672,7 +874,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                                         <i class="i-hugeicons-view w-3.5 h-3.5" />
                                       </button>
                                     </Show>
-                                    <span class="text-xs text-dimmer">{formatSize(file.size)}</span>
+                                    <span class="text-xs text-dimmer">{fmtSize(file.size)}</span>
                                   </div>
                                 );
                               }}
@@ -785,7 +987,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                                     <i class="i-hugeicons-view w-3.5 h-3.5" />
                                   </button>
                                 </Show>
-                                <span class="text-xs text-dimmer">{formatSize(file.size)}</span>
+                                <span class="text-xs text-dimmer">{fmtSize(file.size)}</span>
                               </div>
                             );
                           }
@@ -803,12 +1005,12 @@ const ModpackImportPreview: Component<Props> = (props) => {
               <div>
                 <p class="text-sm text-muted">Будет импортировано:</p>
                 <p class="text-xs text-dimmer">
-                  {enabledModsCount()} модов ({formatSize(selectedModsSize())}) +{" "}
-                  {enabledOverridesCount()} файлов ({formatSize(selectedOverridesSize())})
+                  {enabledModsCount()} модов ({fmtSize(selectedModsSize())}) +{" "}
+                  {enabledOverridesCount()} файлов ({fmtSize(selectedOverridesSize())})
                 </p>
               </div>
               <p class="font-medium">
-                Всего: {formatSize(selectedModsSize() + selectedOverridesSize())}
+                Всего: {fmtSize(selectedModsSize() + selectedOverridesSize())}
               </p>
             </div>
           </Show>
@@ -856,11 +1058,12 @@ const ModpackImportPreview: Component<Props> = (props) => {
               <div class="flex items-center gap-3 min-w-0">
                 <i class={`w-5 h-5 ${getCategoryIcon(previewFile()!.category)} ${getCategoryColor(previewFile()!.category)}`} />
                 <span class="font-medium truncate">{previewFile()!.dest_path}</span>
-                <span class="text-xs text-dimmer flex-shrink-0">{formatSize(previewFile()!.size)}</span>
+                <span class="text-xs text-dimmer flex-shrink-0">{fmtSize(previewFile()!.size)}</span>
               </div>
               <button
                 class="btn-close"
                 onClick={() => setPreviewFile(null)}
+                aria-label={t().ui?.tooltips?.close ?? "Close"}
               >
                 <i class="i-hugeicons-cancel-01 w-5 h-5" />
               </button>

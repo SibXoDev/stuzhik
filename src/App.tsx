@@ -90,6 +90,19 @@ function AppContent() {
       emit("connect-join-invite", inviteCode);
     });
 
+    // Check for pending modpack file (from file association / first launch)
+    // This handles the case when app was launched by double-clicking .stzhk file
+    try {
+      const pendingFile = await invoke<string | null>("get_pending_modpack_file");
+      if (pendingFile) {
+        if (import.meta.env.DEV) console.log("Found pending modpack file:", pendingFile);
+        setPendingModpackFile(pendingFile);
+        setShowModpackBrowser(true);
+      }
+    } catch (e) {
+      if (import.meta.env.DEV) console.error("Failed to check pending modpack file:", e);
+    }
+
     // Keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       // ESC для закрытия документации и исходников
@@ -609,7 +622,11 @@ function AppContent() {
               <h2 class="text-xl font-bold">{t().logAnalyzer?.analyzeExternal || "Analyze Log File"}</h2>
               <p class="text-sm text-muted">{t().logAnalyzer?.analyzeExternalHint || "Open a log file from any location"}</p>
             </div>
-            <button class="btn-close" onClick={() => setShowExternalLogAnalyzer(false)}>
+            <button
+              class="btn-close"
+              onClick={() => setShowExternalLogAnalyzer(false)}
+              aria-label={t().ui?.tooltips?.close ?? "Close"}
+            >
               <i class="i-hugeicons-cancel-01 w-5 h-5" />
             </button>
           </div>
@@ -660,6 +677,7 @@ function AppContent() {
             <button
               class="btn-close"
               onClick={() => setShowCreateForm(false)}
+              aria-label={t().ui?.tooltips?.close ?? "Close"}
             >
               <i class="i-hugeicons-cancel-01 w-5 h-5" />
             </button>

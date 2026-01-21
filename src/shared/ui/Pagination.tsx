@@ -74,13 +74,14 @@ const Pagination: Component<PaginationProps> = (props) => {
 
   return (
     <Show when={props.totalPages > 1}>
-      <div class="flex items-center justify-center gap-1 flex-wrap">
+      <nav class="flex items-center justify-center gap-1 flex-wrap" aria-label={t().ui?.tooltips?.pagination ?? "Pagination"}>
         {/* Previous button */}
         <button
           class="btn-ghost px-2 py-1.5 min-w-8"
           onClick={() => props.onPageChange(props.currentPage - 1)}
           disabled={props.currentPage === 0}
           title={t().ui?.tooltips?.previous ?? "Previous"}
+          aria-label={t().ui?.tooltips?.previous ?? "Previous page"}
         >
           <i class="i-hugeicons-arrow-left-01 w-4 h-4" />
         </button>
@@ -90,7 +91,7 @@ const Pagination: Component<PaginationProps> = (props) => {
           {(item) => (
             <>
               <Show when={typeof item === "number"} fallback={
-                <span class="px-2 py-1.5 text-gray-500">...</span>
+                <span class="px-2 py-1.5 text-gray-500" aria-hidden="true">...</span>
               }>
                 <button
                   class={`min-w-8 px-2 py-1.5 rounded-xl text-sm font-medium transition-colors duration-100 ${
@@ -99,6 +100,8 @@ const Pagination: Component<PaginationProps> = (props) => {
                       : "btn-ghost"
                   }`}
                   onClick={() => props.onPageChange(item as number)}
+                  aria-label={`${t().ui?.tooltips?.goToPage ?? "Go to page"} ${(item as number) + 1}`}
+                  aria-current={item === props.currentPage ? "page" : undefined}
                 >
                   {(item as number) + 1}
                 </button>
@@ -113,10 +116,11 @@ const Pagination: Component<PaginationProps> = (props) => {
           onClick={() => props.onPageChange(props.currentPage + 1)}
           disabled={props.currentPage >= props.totalPages - 1}
           title={t().ui?.tooltips?.next ?? "Next"}
+          aria-label={t().ui?.tooltips?.next ?? "Next page"}
         >
           <i class="i-hugeicons-arrow-right-01 w-4 h-4" />
         </button>
-      </div>
+      </nav>
     </Show>
   );
 };

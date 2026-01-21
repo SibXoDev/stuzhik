@@ -1236,7 +1236,21 @@ impl StzhkManager {
 
                 handles.push(tokio::spawn(async move {
                     // Acquire semaphore permit
-                    let _permit = sem.acquire().await.unwrap();
+                    let _permit = match sem.acquire().await {
+                        Ok(permit) => permit,
+                        Err(e) => {
+                            log::error!("Failed to acquire semaphore: {}", e);
+                            if let Ok(mut list) = failed_list.lock() {
+                                list.push(FailedDownload {
+                                    filename: mod_entry.filename.clone(),
+                                    mod_name: mod_entry.name.clone(),
+                                    reason: DownloadFailureReason::Unknown,
+                                    details: Some(format!("Semaphore error: {}", e)),
+                                });
+                            }
+                            return;
+                        }
+                    };
 
                     let dest_path = mods_path.join(&mod_entry.filename);
 

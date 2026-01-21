@@ -71,7 +71,7 @@ export function FeedbackDialog(props: FeedbackDialogProps) {
             <button
               onClick={props.onClose}
               class="btn-close"
-              aria-label="Close"
+              aria-label={t().ui?.tooltips?.close ?? "Close"}
             >
               <i class="i-hugeicons-cancel-01 w-5 h-5" />
             </button>

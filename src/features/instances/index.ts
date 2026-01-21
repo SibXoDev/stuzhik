@@ -9,3 +9,8 @@ export { default as ImportServerDialog } from './components/ImportServerDialog';
 
 // Instance hooks
 export { useInstances } from './hooks/useInstances';
+export { useLaunchChanges } from './hooks/useLaunchChanges';
+
+// Launch tracking
+export { default as LaunchChangesAlert } from './components/LaunchChangesAlert';
+export { default as SnapshotHistory } from './components/SnapshotHistory';

@@ -23,6 +23,7 @@ interface PerformanceGraphProps {
 }
 
 function PerformanceGraph(props: PerformanceGraphProps) {
+  const { t } = useI18n();
   const [hoveredIndex, setHoveredIndex] = createSignal<number | null>(null);
   const [mousePos, setMousePos] = createSignal({ x: 0, y: 0 });
 
@@ -88,7 +89,7 @@ function PerformanceGraph(props: PerformanceGraphProps) {
   return (
     <div class="bg-gray-750/50 rounded-xl p-4">
       <div class="flex items-center justify-between mb-3">
-        <div class="text-sm text-gray-400">История</div>
+        <div class="text-sm text-gray-400">{t().performance?.history || "History"}</div>
         <div class="flex items-center gap-4 text-xs">
           <span class="flex items-center gap-1">
             <span class="w-3 h-0.5 bg-blue-500 rounded" />
@@ -183,8 +184,8 @@ function PerformanceGraph(props: PerformanceGraphProps) {
       {/* Time axis labels */}
       <div class="flex justify-between text-xs text-gray-500 mt-2">
         <span>{graphData().snaps.length > 0 ? formatTime(graphData().snaps[0].timestamp) : ""}</span>
-        <span>Max RAM: {props.formatMemory(graphData().maxMem)}</span>
-        <span>Max CPU: {Math.max(...graphData().snaps.map(s => s.cpu_percent), 0).toFixed(0)}%</span>
+        <span>{t().performance?.maxRam || "Max RAM"}: {props.formatMemory(graphData().maxMem)}</span>
+        <span>{t().performance?.maxCpu || "Max CPU"}: {Math.max(...graphData().snaps.map(s => s.cpu_percent), 0).toFixed(0)}%</span>
         <span>{graphData().snaps.length > 0 ? formatTime(graphData().snaps[graphData().snaps.length - 1].timestamp) : ""}</span>
       </div>
     </div>
@@ -304,8 +305,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
         });
         addToast({
           type: "success",
-          title: "Память увеличена",
-          message: `${formatMemory(action.recommended_mb)}. Перезапустите экземпляр.`,
+          title: t().performance?.toast?.memoryIncreased || "Memory increased",
+          message: (t().performance?.toast?.memoryIncreasedMessage || "{memory}. Restart the instance.").replace("{memory}", formatMemory(action.recommended_mb)),
         });
       } else if (action.type === "disable_mod") {
         // Отключаем мод
@@ -316,8 +317,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
         });
         addToast({
           type: "success",
-          title: "Мод отключён",
-          message: `${action.mod_id}. Перезапустите экземпляр.`,
+          title: t().performance?.toast?.modDisabled || "Mod disabled",
+          message: (t().performance?.toast?.modDisabledMessage || "{modId}. Restart the instance.").replace("{modId}", action.mod_id),
         });
       } else if (action.type === "install_optimization_mod") {
         // Устанавливаем мод оптимизации
@@ -328,21 +329,21 @@ export function PerformancePanel(props: PerformancePanelProps) {
         });
         addToast({
           type: "success",
-          title: "Мод установлен",
-          message: `${action.mod_name}. Перезапустите экземпляр.`,
+          title: t().performance?.toast?.modInstalled || "Mod installed",
+          message: (t().performance?.toast?.modInstalledMessage || "{name}. Restart the instance.").replace("{name}", action.mod_name),
         });
       } else if (action.type === "add_jvm_argument") {
         // Добавляем JVM аргумент - нужно обновить экземпляр
         addToast({
           type: "info",
-          title: "Добавьте JVM аргумент вручную",
+          title: t().performance?.toast?.addJvmArgManually || "Add JVM argument manually",
           message: action.argument,
           duration: 10000,
         });
       } else {
         addToast({
           type: "info",
-          title: "Выполните вручную",
+          title: t().performance?.toast?.executeManually || "Execute manually",
           message: rec.description,
           duration: 10000,
         });
@@ -355,7 +356,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
       console.error("Failed to apply fix:", e);
       addToast({
         type: "error",
-        title: "Ошибка",
+        title: t().performance?.toast?.error || "Error",
         message: String(e),
         duration: 7000,
       });
@@ -367,14 +368,14 @@ export function PerformancePanel(props: PerformancePanelProps) {
   // Получить текст кнопки для действия
   const getActionButtonText = (action: PerformanceAction): string => {
     switch (action.type) {
-      case "increase_memory": return `Увеличить до ${formatMemory(action.recommended_mb)}`;
-      case "disable_mod": return "Отключить мод";
-      case "install_optimization_mod": return `Установить ${action.mod_name}`;
-      case "update_mod": return "Обновить мод";
-      case "add_jvm_argument": return "Скопировать аргумент";
-      case "reduce_render_distance": return `Уменьшить до ${action.recommended}`;
-      case "change_setting": return "Изменить настройку";
-      default: return "Применить";
+      case "increase_memory": return (t().performance?.actions?.increaseTo || "Increase to {memory}").replace("{memory}", formatMemory(action.recommended_mb));
+      case "disable_mod": return t().performance?.actions?.disableMod || "Disable mod";
+      case "install_optimization_mod": return (t().performance?.actions?.install || "Install {name}").replace("{name}", action.mod_name);
+      case "update_mod": return t().performance?.actions?.updateMod || "Update mod";
+      case "add_jvm_argument": return t().performance?.actions?.copyArgument || "Copy argument";
+      case "reduce_render_distance": return (t().performance?.actions?.reduceTo || "Reduce to {value}").replace("{value}", String(action.recommended));
+      case "change_setting": return t().performance?.actions?.changeSetting || "Change setting";
+      default: return t().performance?.actions?.apply || "Apply";
     }
   };
 
@@ -453,6 +454,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
               <button
                 onClick={props.onClose}
                 class="btn-close"
+                aria-label={t().ui?.tooltips?.close ?? "Close"}
               >
                 <i class="i-hugeicons-cancel-01 w-5 h-5" />
               </button>
@@ -491,7 +493,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
         <Show when={instanceClosed()}>
           <div class="mx-4 mt-2 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-xl flex items-center gap-2">
             <i class="i-hugeicons-power-socket-01 w-5 h-5 text-yellow-400 flex-shrink-0" />
-            <span class="text-sm text-yellow-300">Экземпляр закрыт. Данные мониторинга сохранены.</span>
+            <span class="text-sm text-yellow-300">{t().performance?.instanceClosed || "Instance closed. Monitoring data saved."}</span>
             <button
               onClick={() => setInstanceClosed(false)}
               class="ml-auto p-1 rounded hover:bg-yellow-500/20 text-yellow-400"
@@ -542,7 +544,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                           <span class="text-sm text-gray-500">%</span>
                         </div>
                         <div class="text-xs text-gray-500 mt-1">
-                          {physicalCores} ядер / {cpuCores} потоков
+                          {(t().performance?.coresThreads || "{cores} cores / {threads} threads").replace("{cores}", String(physicalCores)).replace("{threads}", String(cpuCores))}
                         </div>
                       </>
                     );
@@ -587,9 +589,9 @@ export function PerformancePanel(props: PerformancePanelProps) {
                 <details class="bg-gray-750/50 rounded-xl">
                   <summary class="px-4 py-3 cursor-pointer text-sm text-gray-400 hover:text-white transition-colors select-none flex items-center gap-2">
                     <i class="i-hugeicons-cpu w-4 h-4" />
-                    <span>Загрузка по потокам (система)</span>
+                    <span>{t().performance?.threadUsage || "Thread usage (system)"}</span>
                     <span class="text-xs text-gray-500 ml-auto">
-                      {perf.latestSnapshot()?.physical_cores || 0} ядер / {perf.latestSnapshot()?.cpu_cores || 0} потоков
+                      {(t().performance?.coresThreads || "{cores} cores / {threads} threads").replace("{cores}", String(perf.latestSnapshot()?.physical_cores || 0)).replace("{threads}", String(perf.latestSnapshot()?.cpu_cores || 0))}
                     </span>
                   </summary>
                   <div class="px-4 pb-4 pt-2 grid grid-cols-6 gap-2">
@@ -603,7 +605,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                             isEvenGroup() ? "bg-gray-700/50" : "bg-gray-800/50"
                           }`}>
                             <div class="text-xs text-gray-500 mb-1">
-                              Поток {index() + 1}
+                              {t().performance?.thread || "Thread"} {index() + 1}
                             </div>
                             <div class={`text-sm font-medium ${
                               usage >= 90 ? "text-red-400" :
@@ -742,17 +744,17 @@ export function PerformancePanel(props: PerformancePanelProps) {
                     <div class="flex items-start gap-4">
                       <i class="i-hugeicons-information-circle w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" />
                       <div>
-                        <div class="text-white font-medium mb-2">Как получить данные о производительности модов</div>
+                        <div class="text-white font-medium mb-2">{t().performance?.modPerformanceInfo?.title || "How to get mod performance data"}</div>
                         <div class="text-sm text-gray-400 space-y-2">
-                          <p>Spark установлен, но нужно создать отчёт профилирования:</p>
+                          <p>{t().performance?.modPerformanceInfo?.intro || "Spark is installed, but you need to create a profiling report:"}</p>
                           <ol class="list-decimal list-inside space-y-1 text-gray-500">
-                            <li>В чате игры введите: <code class="bg-gray-700 px-1.5 py-0.5 rounded text-blue-300">/sparkc profiler start</code></li>
-                            <li>Поиграйте 30-60 секунд (загрузите чанки, откройте инвентари модов)</li>
-                            <li>Остановите профилирование: <code class="bg-gray-700 px-1.5 py-0.5 rounded text-blue-300">/sparkc profiler stop</code></li>
-                            <li>Spark создаст ссылку на отчёт в чате</li>
+                            <li>{t().performance?.modPerformanceInfo?.step1 || "In game chat, type:"} <code class="bg-gray-700 px-1.5 py-0.5 rounded text-blue-300">/sparkc profiler start</code></li>
+                            <li>{t().performance?.modPerformanceInfo?.step2 || "Play for 30-60 seconds (load chunks, open mod inventories)"}</li>
+                            <li>{t().performance?.modPerformanceInfo?.step3 || "Stop profiling:"} <code class="bg-gray-700 px-1.5 py-0.5 rounded text-blue-300">/sparkc profiler stop</code></li>
+                            <li>{t().performance?.modPerformanceInfo?.step4 || "Spark will create a report link in chat"}</li>
                           </ol>
                           <p class="text-xs text-gray-600 mt-3">
-                            Другие полезные команды: <code class="bg-gray-700 px-1 rounded">/sparkc tps</code>, <code class="bg-gray-700 px-1 rounded">/sparkc health</code>
+                            {t().performance?.modPerformanceInfo?.otherCommands || "Other useful commands:"} <code class="bg-gray-700 px-1 rounded">/sparkc tps</code>, <code class="bg-gray-700 px-1 rounded">/sparkc health</code>
                           </p>
                         </div>
                       </div>
@@ -788,7 +790,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                           }`}>
                             {rec.expected_impact}
                           </span>
-                          <span class="text-xs text-gray-500">Приоритет: {rec.priority}/10</span>
+                          <span class="text-xs text-gray-500">{t().performance?.priority || "Priority"}: {rec.priority}/10</span>
 
                           {/* Quick Fix Button */}
                           <Show when={canAutoFix(rec.action)}>
@@ -806,7 +808,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                                 fallback={
                                   <span class="flex items-center gap-1">
                                     <i class="i-svg-spinners-6-dots-scale w-3 h-3" />
-                                    Применение...
+                                    {t().performance?.applying || "Applying..."}
                                   </span>
                                 }
                               >
@@ -840,17 +842,17 @@ export function PerformancePanel(props: PerformancePanelProps) {
             {perf.monitoring() && (
               <span class="flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                {t().performance?.monitoring || "Мониторинг активен"}
-                <span class="text-gray-600">({perf.snapshots().length} снимков)</span>
+                {t().performance?.monitoring || "Monitoring"}
+                <span class="text-gray-600">({perf.snapshots().length} {t().performance?.snapshots || "snapshots"})</span>
               </span>
             )}
           </div>
           <div>
             {perf.report()?.data_source === "spark_report"
-              ? "Данные: Spark"
+              ? (t().performance?.dataSource?.spark || "Data: Spark")
               : perf.report()?.data_source === "system_and_logs"
-              ? "Данные: Система + Логи"
-              : "Данные: Система"}
+              ? (t().performance?.dataSource?.systemLogs || "Data: System + Logs")
+              : (t().performance?.dataSource?.system || "Data: System")}
           </div>
         </div>
       </div>

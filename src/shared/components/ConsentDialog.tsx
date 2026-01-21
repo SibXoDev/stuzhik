@@ -2,6 +2,7 @@ import { createSignal, Show } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "../i18n";
 import { ModalWrapper } from "../ui/ModalWrapper";
+import { formatSize } from "../utils/format-size";
 
 export interface ConsentRequest {
   request_id: string;
@@ -22,6 +23,7 @@ export function ConsentDialog(props: ConsentDialogProps) {
   const { t } = useI18n();
   const [remember, setRemember] = createSignal(false);
   const [responding, setResponding] = createSignal(false);
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   const handleResponse = async (approved: boolean) => {
     setResponding(true);
@@ -53,13 +55,6 @@ export function ConsentDialog(props: ConsentDialogProps) {
   const getRequestTypeLabel = () => {
     const types = t().connect.consent.types as Record<string, string>;
     return types[props.request.request_type] || props.request.request_type;
-  };
-
-  const formatSize = (bytes?: number) => {
-    if (!bytes) return null;
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   return (
@@ -95,7 +90,7 @@ export function ConsentDialog(props: ConsentDialogProps) {
                 </p>
                 <p class="text-sm font-medium truncate">{props.request.content_name}</p>
                 <Show when={props.request.content_size}>
-                  <p class="text-xs text-gray-500">{formatSize(props.request.content_size)}</p>
+                  <p class="text-xs text-gray-500">{fmtSize(props.request.content_size!)}</p>
                 </Show>
               </div>
             </div>

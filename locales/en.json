@@ -37,10 +37,17 @@
     "connect": "Friends",
     "docs": "Documentation",
     "changelog": "Changelog",
+    "sourceCode": "Source Code",
     "minimize": "Minimize",
     "maximize": "Maximize",
     "restore": "Restore",
-    "close": "Close"
+    "close": "Close",
+    "closeConfirm": {
+      "title": "Close application?",
+      "message": "Are you sure you want to close the application?",
+      "confirm": "Close",
+      "cancel": "Cancel"
+    }
   },
   "changelog": {
     "title": "Changelog",
@@ -67,7 +74,62 @@
     "forge": "Forge",
     "neoforge": "NeoForge",
     "quilt": "Quilt",
-    "vanilla": "Vanilla"
+    "vanilla": "Vanilla",
+    "descriptions": {
+      "vanilla": "Pure Minecraft without mods",
+      "forge": "Classic loader for Minecraft mods",
+      "neoforge": "Modern Forge fork with improvements",
+      "fabric": "Lightweight and fast mod loader",
+      "quilt": "Fabric fork with additional features"
+    }
+  },
+  "versions": {
+    "select": "Select version",
+    "notFound": "No versions found",
+    "showingOf": "Showing {shown} of {total} versions",
+    "loaderNotSupported": "{loader} does not support Minecraft {version}",
+    "compatibilityCheckFailed": "Failed to check compatibility: {error}",
+    "types": {
+      "release": "Release",
+      "snapshot": "Snapshot",
+      "old_beta": "Beta",
+      "old_alpha": "Alpha"
+    },
+    "filters": {
+      "snapshots": "Snapshots",
+      "oldBeta": "Old beta",
+      "oldAlpha": "Old alpha"
+    }
+  },
+  "dragDrop": {
+    "mixedFiles": "Mixed files",
+    "mixedFilesDesc": "Drop files of the same type",
+    "manifestDesc": "An instance will be created and all mods downloaded",
+    "mod": "Mod",
+    "mods": "{count} mods",
+    "modDesc": "Drag to an instance in the list or open one",
+    "modpackStuzhik": "Stuzhik Modpack",
+    "modpackModrinth": "Modrinth Modpack",
+    "modpackDesc": "Modpack browser will open for import",
+    "archive": "Archive",
+    "archives": "{count} archives",
+    "archiveDesc": "CurseForge modpack or resource pack",
+    "resources": "Resources",
+    "resourcesDesc": "Resource packs or textures",
+    "unsupportedFormat": "Unsupported format",
+    "unsupportedDesc": "Supported: .jar, .stzhk, .mrpack, .zip, manifest.json",
+    "verifying": "Verifying...",
+    "verifyFailed": "Failed to verify",
+    "notFoundOnPlatforms": "Not found on platforms",
+    "verifyingAuthenticity": "Verifying authenticity",
+    "unknown": "unknown",
+    "modWillBeInstalled": "Mod will be installed to current instance",
+    "releaseToInstall": "Release to install",
+    "releaseToCancel": "Release to cancel",
+    "moreFiles": "+{count} more files...",
+    "dragToInstance": "Drag to an instance below",
+    "authenticity": "Authenticity:",
+    "files": "files"
   },
   "quickPlay": {
     "installing": "Installing...",
@@ -215,6 +277,55 @@
     "downloads": "downloads",
     "incompatible": "Incompatible",
     "hideIncompatible": "Hide incompatible",
+    "browser": {
+      "searchByName": "Search by mod name...",
+      "searchById": "Search by mod ID (e.g.: jei, create)...",
+      "searchAll": "Search by name or mod ID...",
+      "searchBy": "Search by:",
+      "searchByNameBtn": "Name",
+      "searchByIdBtn": "Mod ID",
+      "searchByAllBtn": "All",
+      "showIncompatible": "Show incompatible",
+      "hideCategories": "Hide categories",
+      "showCategories": "Show categories",
+      "allCategories": "All",
+      "searching": "Searching mods...",
+      "noResults": "Nothing found",
+      "noResultsHint": "Try changing your query or select a different category",
+      "byAuthor": "by",
+      "matchedById": "By ID",
+      "conflictInstalled": "installed, but conflicts detected:",
+      "deleteMod": "Delete",
+      "goToInstalled": "Go to installed",
+      "sortOptions": {
+        "relevance": "Relevance",
+        "downloads": "Popular",
+        "follows": "By follows",
+        "newest": "Newest",
+        "updated": "Updated"
+      },
+      "categories": {
+        "adventure": "Adventure",
+        "cursed": "Cursed",
+        "decoration": "Decoration",
+        "economy": "Economy",
+        "equipment": "Equipment",
+        "food": "Food",
+        "game-mechanics": "Game mechanics",
+        "library": "Libraries",
+        "magic": "Magic",
+        "management": "Management",
+        "minigame": "Minigames",
+        "mobs": "Mobs",
+        "optimization": "Optimization",
+        "social": "Social",
+        "storage": "Storage",
+        "technology": "Technology",
+        "transportation": "Transportation",
+        "utility": "Utilities",
+        "worldgen": "World generation"
+      }
+    },
     "recommendations": {
       "title": "Recommended for you",
       "basedOn": "Based on your installed mods",
@@ -308,6 +419,124 @@
         "unverified": "Mod not found on Modrinth or CurseForge",
         "local": "Local mod without verification"
       }
+    },
+    "list": {
+      "header": {
+        "modsCount": "Mods",
+        "catalog": "Catalog"
+      },
+      "tabs": {
+        "installed": "Installed",
+        "browse": "Catalog"
+      },
+      "actions": {
+        "filters": "Filters",
+        "forceRefresh": "Force refresh data",
+        "addLocalMod": "Add local mod (.jar file)",
+        "localMod": "Local Mod",
+        "updates": "Updates",
+        "checking": "Checking...",
+        "updatesAvailable": "updates available - click to view",
+        "checkUpdates": "Check for updates",
+        "recheckUpdates": "Recheck for updates",
+        "graph": "Graph",
+        "graphTooltip": "Visual dependency graph between mods",
+        "changelogTooltip": "View changes in recently updated mods",
+        "verifyingMods": "Verifying mod authenticity...",
+        "loadingDeps": "Loading dependency information..."
+      },
+      "search": {
+        "placeholder": "Search by name, mod ID, version or source...",
+        "selectAll": "Select all",
+        "selectMod": "Select mod"
+      },
+      "filters": {
+        "title": "Filters",
+        "resetAll": "Reset all",
+        "state": "State",
+        "allStates": "All",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "source": "Source",
+        "allSources": "All sources",
+        "local": "Local",
+        "security": "Security",
+        "anyStatus": "Any status",
+        "verified": "Verified",
+        "unverified": "Unverified",
+        "modified": "Modified",
+        "autoUpdate": "Auto-update",
+        "any": "Any",
+        "updates": "Updates",
+        "anyUpdates": "Any",
+        "hasUpdate": "Available",
+        "noUpdate": "No updates",
+        "activeFilters": "Active filters:",
+        "autoUpdateYes": "Auto-update: Yes",
+        "autoUpdateNo": "Auto-update: No",
+        "hasUpdates": "Has updates",
+        "noUpdates": "No updates"
+      },
+      "conflicts": {
+        "title": "Conflicts detected",
+        "autoResolve": "Auto-resolve",
+        "resolving": "Resolving..."
+      },
+      "empty": {
+        "noMods": "No mods installed",
+        "noModsHint": "Browse the catalog to find mods",
+        "openCatalog": "Open catalog",
+        "noResults": "Nothing found",
+        "noResultsHint": "No mods matching"
+      },
+      "loading": "Loading...",
+      "modActions": {
+        "updateAvailable": "Update available",
+        "updateTo": "Update to",
+        "autoUpdateEnabled": "Auto-update enabled",
+        "autoUpdateDisabled": "Auto-update disabled",
+        "modInfo": "Mod information",
+        "showInFolder": "Show in folder",
+        "deleteMod": "Delete mod"
+      },
+      "verification": {
+        "verifiedTooltip": "Verified: hash matches official source. Click to open mod page.",
+        "modifiedTooltip": "Modified: file changed after download. Click to open mod page.",
+        "unknownTooltip": "Not found on platforms: local mod or from another source."
+      },
+      "confirm": {
+        "deleteTitle": "Delete mod?",
+        "deleteMessage": "Delete mod \"{name}\"? The file will be removed from the mods folder.",
+        "deleteBulkTitle": "Delete selected mods?",
+        "deleteBulkMessage": "Mods to delete: {count}. Files will be removed from the mods folder.",
+        "delete": "Delete"
+      },
+      "fileDialog": {
+        "title": "Select mod files (.jar)"
+      }
+    },
+    "updates": {
+      "title": "Available Updates",
+      "updating": "Updating",
+      "selected": "Selected",
+      "of": "of",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "changelog": "Changelog",
+      "viewChangelog": "View changelog",
+      "changelogFor": "Changelog for version",
+      "willUpdate": "Selected mods will be updated to latest versions",
+      "withChangelogs": "mods with changelog available",
+      "update": "Update"
+    },
+    "changelog": {
+      "title": "What's New",
+      "modsUpdated": "mods updated",
+      "withChangelogs": "mods with changelog",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "noChangelogAvailable": "No changelog available",
+      "noUpdates": "No updates have been applied"
     }
   },
   "modpacks": {
@@ -389,6 +618,160 @@
         "atlauncher": "ATLauncher",
         "gdlauncher": "GDLauncher",
         "generic": "Generic Minecraft"
+      }
+    },
+    "browser": {
+      "title": "Install Modpack",
+      "installCancelled": "Installation cancelled",
+      "ready": "Done!",
+      "installingComponents": "Installing components...",
+      "preparing": "Preparing...",
+      "downloadingModpack": "Downloading modpack...",
+      "creatingInstance": "Creating instance...",
+      "analyzingMods": "Analyzing mods",
+      "downloadingMods": "Downloading mods",
+      "extractingFiles": "Extracting files...",
+      "installingLoader": "Installing loader...",
+      "installing": "Installing...",
+      "cancelling": "Cancelling...",
+      "waitingForOperation": "Waiting for current operation to complete",
+      "cancel": "Cancel",
+      "waiting": "Waiting...",
+      "steps": {
+        "modpack": "Modpack",
+        "mods": "Mods",
+        "files": "Files",
+        "javaMc": "Java + MC",
+        "loader": "Loader",
+        "done": "Done"
+      },
+      "summary": {
+        "title": "Installation Summary",
+        "modrinthWarning": "The following mods were found on Modrinth automatically.",
+        "modrinthWarningNote": "Versions may be incorrect! Check compatibility.",
+        "failedMods": "The following mods could NOT be downloaded:",
+        "totalMods": "Total mods",
+        "notDownloaded": "Not downloaded",
+        "understood": "Got it"
+      },
+      "confirm": {
+        "title": "Install Modpack",
+        "instanceName": "Instance name"
+      },
+      "tabs": {
+        "search": "Search",
+        "fromFile": "From file",
+        "byLink": "By link",
+        "compare": "Compare"
+      },
+      "file": {
+        "supportedFormats": "Supported formats:",
+        "modpackFile": "Modpack file",
+        "selectFile": "Select file...",
+        "clear": "Clear",
+        "reading": "Reading modpack...",
+        "readError": "Failed to read modpack information",
+        "minecraft": "Minecraft",
+        "loader": "Loader",
+        "modsCount": "Mods",
+        "inManifest": "in manifest",
+        "inOverrides": "in overrides",
+        "details": "Details",
+        "install": "Install"
+      },
+      "url": {
+        "description": "Paste a link to .stzhk modpack from cloud storage",
+        "yandexDisk": "Yandex.Disk",
+        "googleDrive": "Google Drive",
+        "dropbox": "Dropbox",
+        "directLink": "Direct link",
+        "modpackLink": "Modpack link",
+        "instanceName": "Instance name",
+        "installByLink": "Install by link"
+      },
+      "search": {
+        "searching": "Searching...",
+        "by": "by",
+        "notFound": "No modpacks found",
+        "tryDifferent": "Try a different query",
+        "enterQuery": "Enter a search query",
+        "findModpacks": "Find modpacks on Modrinth or CurseForge"
+      },
+      "preview": {
+        "name": "Name:"
+      }
+    },
+    "export": {
+      "title": "Export to STZHK",
+      "subtitle": "Creating modpack from",
+      "success": "Export completed",
+      "metadata": {
+        "title": "Modpack Information",
+        "name": "Name",
+        "version": "Version",
+        "author": "Author",
+        "description": "Description"
+      },
+      "options": {
+        "embedMods": "Embed mods in archive",
+        "embedModsHint": "Mods will be included in the file. Otherwise, Modrinth links will be added",
+        "includeOverrides": "Include configs and resources",
+        "includeOverridesHint": "Add config, resourcepacks, shaderpacks folders"
+      },
+      "preview": {
+        "toggle": "Preview files",
+        "loading": "Loading preview..."
+      },
+      "previewProgress": {
+        "hashing": "Computing hashes...",
+        "modrinth": "Searching Modrinth...",
+        "processing": "Processing results..."
+      },
+      "summary": {
+        "mods": "Mods",
+        "archiveSize": "Archive size",
+        "fromModrinth": "from Modrinth",
+        "local": "local"
+      },
+      "warnings": {
+        "localModsEmbedded": "Local mods will be embedded",
+        "localModsEmbeddedHint": "mods not found on Modrinth and will be embedded in the archive"
+      },
+      "mods": {
+        "title": "Mods",
+        "selectAll": "Select all",
+        "deselectAll": "Deselect all",
+        "all": "All",
+        "local": "Local",
+        "noModsWithFilter": "No mods with selected source",
+        "embedded": "embedded",
+        "sourceModrinth": "Modrinth",
+        "sourceLocal": "Local",
+        "sourceEmbedded": "Embedded"
+      },
+      "overrides": {
+        "title": "Instance files",
+        "generated": "generated",
+        "filesCount": "files",
+        "generatedHint": "Generated data (worlds, screenshots) can be excluded to reduce archive size."
+      },
+      "progress": {
+        "manifest": "Creating manifest...",
+        "mods": "Embedding mods...",
+        "overrides": "Adding overrides...",
+        "finishing": "Finishing..."
+      },
+      "exclusions": {
+        "title": "Selected items",
+        "modsCount": "Mods",
+        "filesCount": "Files",
+        "hint": "Excluded items will not be included in the archive."
+      },
+      "buttons": {
+        "close": "Close",
+        "cancel": "Cancel",
+        "export": "Export",
+        "exporting": "Exporting..."
       }
     }
   },
@@ -936,6 +1319,51 @@
       "chunkLoading": "Chunk Loading",
       "garbageCollection": "Garbage Collection",
       "diskIO": "Disk I/O"
+    },
+    "history": "History",
+    "maxRam": "Max RAM",
+    "maxCpu": "Max CPU",
+    "coresThreads": "{cores} cores / {threads} threads",
+    "threadUsage": "Thread usage (system)",
+    "thread": "Thread",
+    "priority": "Priority",
+    "applying": "Applying...",
+    "snapshots": "snapshots",
+    "instanceClosed": "Instance closed. Monitoring data saved.",
+    "dataSource": {
+      "spark": "Data: Spark",
+      "systemLogs": "Data: System + Logs",
+      "system": "Data: System"
+    },
+    "toast": {
+      "memoryIncreased": "Memory increased",
+      "memoryIncreasedMessage": "{memory}. Restart the instance.",
+      "modDisabled": "Mod disabled",
+      "modDisabledMessage": "{modId}. Restart the instance.",
+      "modInstalled": "Mod installed",
+      "modInstalledMessage": "{name}. Restart the instance.",
+      "addJvmArgManually": "Add JVM argument manually",
+      "executeManually": "Execute manually",
+      "error": "Error"
+    },
+    "actions": {
+      "increaseTo": "Increase to {memory}",
+      "disableMod": "Disable mod",
+      "install": "Install {name}",
+      "updateMod": "Update mod",
+      "copyArgument": "Copy argument",
+      "reduceTo": "Reduce to {value}",
+      "changeSetting": "Change setting",
+      "apply": "Apply"
+    },
+    "modPerformanceInfo": {
+      "title": "How to get mod performance data",
+      "intro": "Spark is installed, but you need to create a profiling report:",
+      "step1": "In game chat, type:",
+      "step2": "Play for 30-60 seconds (load chunks, open mod inventories)",
+      "step3": "Stop profiling:",
+      "step4": "Spark will create a report link in chat",
+      "otherCommands": "Other useful commands:"
     }
   },
   "modpackCompare": {
@@ -1654,7 +2082,171 @@
     "visualToolsDescription": "Visual tools for creating modpack content",
     "recipeBuilderDesc": "Create recipes for KubeJS, CraftTweaker, datapacks",
     "metadataEditorDesc": "Edit pack.mcmeta and mod metadata",
-    "externalEditorTip": "For editing files, use an external editor (VS Code, Notepad++). Open the instance folder using the 'Open folder' button on the 'Files' tab."
+    "externalEditorTip": "For editing files, use an external editor (VS Code, Notepad++). Open the instance folder using the 'Open folder' button on the 'Files' tab.",
+    "fileBrowser": {
+      "title": "File Browser",
+      "description": "Navigate instance files. Select a file for preview",
+      "folder": "Folder",
+      "openFolderOrFile": "Open folder / file",
+      "back": "Back",
+      "goUpLevel": "Go up one level",
+      "openInExplorer": "Open in file manager",
+      "showHiddenFiles": "Show hidden files",
+      "hideHiddenFiles": "Hide hidden files",
+      "searchGlobal": "Search in all folders",
+      "global": "Global",
+      "regex": "Regex",
+      "useRegex": "Use regular expressions",
+      "file": "file",
+      "files": "files",
+      "emptyFolder": "Folder is empty",
+      "noResults": "Nothing found",
+      "tryDifferentQuery": "Try a different search query",
+      "previewUnavailable": "Preview unavailable",
+      "fileNotText": "File {name} is not text and cannot be displayed in the editor",
+      "supportedFormats": "Supported: .toml, .json, .properties, .cfg, .txt, .java, .js, .py and other text formats",
+      "openInVSCode": "Open in VS Code",
+      "openInDefaultEditor": "Open in default editor",
+      "showInFileManager": "Show file in file manager",
+      "renameFile": "Rename file",
+      "copyFile": "Create file copy",
+      "deleteFile": "Delete file",
+      "renameDialog": {
+        "title": "Rename",
+        "newName": "New name",
+        "confirm": "Rename",
+        "cancel": "Cancel"
+      },
+      "copyDialog": {
+        "title": "Copy",
+        "copyName": "Copy name",
+        "confirm": "Copy",
+        "cancel": "Cancel"
+      },
+      "confirmDelete": {
+        "title": "Delete file?",
+        "message": "File \"{name}\" will be deleted. This action cannot be undone.",
+        "confirm": "Delete"
+      },
+      "toast": {
+        "fileDeleted": "File deleted",
+        "fileDeletedMessage": "{name} successfully deleted",
+        "fileRenamed": "File renamed",
+        "fileRenamedMessage": "{from} → {to}",
+        "fileCopied": "File copied",
+        "fileCopiedMessage": "Copy created: {name}",
+        "searchError": "Search error",
+        "error": "Error",
+        "failedToOpenFolder": "Failed to open folder in file manager",
+        "failedToShowFile": "Failed to show file in file manager",
+        "vscodeNotFound": "VS Code not found",
+        "vscodeNotFoundMessage": "Make sure VS Code is installed and the 'code' command is available in PATH",
+        "failedToOpenInVSCode": "Failed to open file in VS Code",
+        "failedToOpenInEditor": "Failed to open file in editor",
+        "renameError": "Rename error",
+        "copyError": "Copy error"
+      },
+      "errors": {
+        "failedToLoad": "Failed to load file content",
+        "fileTooLarge": "File is too large for editing ({size})",
+        "editingNotSupported": "Editing is not available for this file type"
+      }
+    },
+    "metadataEditor": {
+      "title": "Metadata Editor",
+      "metadataFiles": "Metadata Files",
+      "createPackMcmeta": "Create pack.mcmeta",
+      "noFilesFound": "No metadata files found",
+      "selectFileToEdit": "Select a file to edit",
+      "close": "Close",
+      "save": "Save",
+      "saving": "Saving...",
+      "create": "Create",
+      "cancel": "Cancel",
+      "location": "Location",
+      "packFormat": "Pack Format",
+      "description": "Description",
+      "descriptionPlaceholder": "Pack description...",
+      "packMetadata": "Pack Metadata",
+      "compatibleWith": "Compatible with Minecraft {versions}",
+      "formattingHint": "Supports Minecraft formatting codes (e.g., §c for red)",
+      "supportedFormats": "Supported Formats",
+      "filters": "Filters",
+      "forgeModMetadata": "Forge/NeoForge Mod Metadata",
+      "modLoader": "Mod Loader",
+      "loaderVersion": "Loader Version",
+      "license": "License",
+      "mods": "Mods",
+      "modsTomlReadOnly": "mods.toml editing is read-only. Use the source editor for changes.",
+      "fabricModMetadata": "Fabric Mod Metadata",
+      "modId": "Mod ID",
+      "version": "Version",
+      "name": "Name",
+      "authors": "Authors",
+      "dependencies": "Dependencies",
+      "environment": "Environment",
+      "fabricReadOnly": "fabric.mod.json editing is read-only. Use the source editor for changes.",
+      "defaultDescription": "A custom pack",
+      "toast": {
+        "failedToLoad": "Failed to load metadata",
+        "saved": "Saved",
+        "savedMessage": "{file} saved",
+        "failedToSave": "Failed to save",
+        "created": "Created",
+        "createdMessage": "pack.mcmeta created successfully",
+        "failedToCreate": "Failed to create"
+      }
+    },
+    "modProfiles": {
+      "title": "Create Profile",
+      "name": "Name",
+      "description": "Description",
+      "descriptionOptional": "(optional)",
+      "descriptionPlaceholder": "Profile description...",
+      "currentStateInfo": "Profile will save current mod state ({count} enabled)",
+      "saveProfile": "Save Profile",
+      "saving": "Saving...",
+      "currentState": "Current State",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "savedProfiles": "Saved Profiles",
+      "import": "Import",
+      "importTitle": "Import profile from file",
+      "noProfiles": "No saved profiles",
+      "noProfilesHint": "Create a profile to save current mod configuration and quickly switch between them",
+      "exportTitle": "Export profile",
+      "deleteTitle": "Delete profile",
+      "created": "Created",
+      "applyProfile": "Apply Profile",
+      "applying": "Applying...",
+      "toast": {
+        "error": "Error",
+        "enterName": "Enter profile name",
+        "profileSaved": "Profile saved",
+        "profileSavedMessage": "\"{name}\" successfully created",
+        "profileApplied": "Profile applied",
+        "profileAppliedMessage": "\"{name}\" successfully applied",
+        "profileDeleted": "Profile deleted",
+        "profileDeletedMessage": "\"{name}\" successfully deleted",
+        "profileExported": "Profile exported",
+        "profileExportedMessage": "\"{name}\" saved to {path}",
+        "exportError": "Export error",
+        "profileImported": "Profile imported",
+        "profileImportedMessage": "Profile successfully added",
+        "importError": "Import error"
+      },
+      "confirm": {
+        "noEnabledMods": "No enabled mods",
+        "noEnabledModsMessage": "Are you sure you want to save a profile without enabled mods?",
+        "save": "Save",
+        "applyProfile": "Apply profile?",
+        "applyProfileMessage": "{count} mods will be enabled, the rest will be disabled. Continue?",
+        "apply": "Apply",
+        "deleteProfile": "Delete profile?",
+        "deleteProfileMessage": "Profile \"{name}\" will be deleted. This action cannot be undone.",
+        "delete": "Delete"
+      }
+    }
   },
   "console": {
     "title": "Console",
@@ -2307,10 +2899,75 @@
       "createManifest": "Create manifest for tracking changes",
       "previous": "Previous",
       "next": "Next",
+      "goToPage": "Go to page",
+      "pagination": "Pagination",
       "deselect": "Deselect",
       "modConfigs": "Mod configs from config/ folder",
       "rootConfigs": "Configs from instance root",
       "hasQuickPresets": "Has quick presets"
+    },
+    "bulkOperations": {
+      "selected": "Selected:",
+      "enable": "Enable",
+      "enableAll": "Enable all",
+      "disable": "Disable",
+      "disableAll": "Disable all",
+      "delete": "Delete",
+      "deleteAll": "Delete all",
+      "deselect": "Deselect",
+      "cancel": "Cancel"
+    },
+    "units": {
+      "bytes": "B",
+      "kilobytes": "KB",
+      "megabytes": "MB",
+      "gigabytes": "GB",
+      "terabytes": "TB"
     }
+  },
+  "launchChanges": {
+    "title": "Changes since last launch",
+    "lastLaunch": "Last launch",
+    "changesCount": "changes",
+    "daysAgo": "days ago",
+    "hoursAgo": "hours ago",
+    "recently": "recently",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "mods": "mods",
+    "updated": "updated",
+    "enabled": "enabled",
+    "disabled": "disabled",
+    "configs": "configs",
+    "expand": "Show details",
+    "collapse": "Hide details",
+    "addedMods": "Added mods",
+    "removedMods": "Removed mods",
+    "updatedMods": "Updated mods",
+    "enabledMods": "Enabled mods",
+    "disabledMods": "Disabled mods",
+    "configChanges": "Config changes",
+    "fileChanges": "Other files",
+    "files": "files",
+    "crashTitle": "Changes before crash",
+    "rollback": "Rollback",
+    "rollbackHint": "Rollback changes using backups",
+    "reset": "Reset",
+    "resetHint": "Reset baseline state for tracking",
+    "historyTitle": "Launch history",
+    "showHistory": "History",
+    "hideHistory": "Hide history",
+    "comparingWith": "Comparing with old snapshot",
+    "snapshotFrom": "Snapshot from",
+    "compareLatest": "Latest",
+    "noSnapshots": "No snapshots",
+    "latest": "Latest",
+    "hasBackup": "Has backup",
+    "statusUnknown": "Status unknown",
+    "statusSuccess": "Successful launch",
+    "statusCrashed": "Crashed",
+    "modsShort": "m",
+    "configsShort": "c",
+    "filesShort": "f"
   }
 }

@@ -78,10 +78,14 @@ const ChangelogModal: Component<Props> = (props) => {
               <span class="text-xs text-gray-500">{changelog.length} {t().changelog?.versions || "versions"}</span>
             </div>
           </div>
-          <button class="btn-close" onClick={() => {
-            markAsViewed();
-            props.onClose();
-          }}>
+          <button
+            class="btn-close"
+            onClick={() => {
+              markAsViewed();
+              props.onClose();
+            }}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
+          >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>
         </div>

@@ -163,6 +163,7 @@ fn preview_mrpack(
         mods_size,
         overrides_size,
         archive_size,
+        optional_mods: None, // Modrinth не поддерживает optional mods
     })
 }
 
@@ -236,6 +237,13 @@ fn preview_stzhk(
         }
     }
 
+    // Извлекаем optional_mods только если они есть
+    let optional_mods = if manifest.optional_mods.is_empty() {
+        None
+    } else {
+        Some(manifest.optional_mods)
+    };
+
     Ok(ModpackPreview {
         format: ModpackFormat::Stzhk,
         name: manifest.modpack.name,
@@ -250,6 +258,7 @@ fn preview_stzhk(
         mods_size,
         overrides_size,
         archive_size,
+        optional_mods,
     })
 }
 
@@ -349,6 +358,7 @@ fn preview_curseforge(
         mods_size: 0, // Unknown for CurseForge without API
         overrides_size,
         archive_size,
+        optional_mods: None, // CurseForge не поддерживает optional mods
     })
 }
 

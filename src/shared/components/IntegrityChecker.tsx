@@ -4,6 +4,8 @@ import type {
   IntegrityCheckResult,
   RepairResult,
 } from "../types";
+import { formatSize } from "../utils/format-size";
+import { useI18n } from "../i18n";
 
 interface IntegrityCheckerProps {
   instanceId: string;
@@ -12,12 +14,14 @@ interface IntegrityCheckerProps {
 }
 
 export function IntegrityChecker(props: IntegrityCheckerProps) {
+  const { t } = useI18n();
   const [loading, setLoading] = createSignal(false);
   const [result, setResult] = createSignal<IntegrityCheckResult | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [repairing, setRepairing] = createSignal(false);
   const [repairResult, setRepairResult] = createSignal<RepairResult | null>(null);
   const [selectedFiles, setSelectedFiles] = createSignal<string[]>([]);
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   async function checkIntegrity() {
     setLoading(true);
@@ -129,12 +133,6 @@ export function IntegrityChecker(props: IntegrityCheckerProps) {
       ...res.missing_files.filter(f => f.recoverable).map(f => f.path),
     ];
     setSelectedFiles(recoverableFiles);
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} Б`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
   }
 
   return (
@@ -267,7 +265,7 @@ export function IntegrityChecker(props: IntegrityCheckerProps) {
                             {file.path}
                           </div>
                           <div class="text-xs text-muted inline-flex items-center gap-2">
-                            <span>Размер: {formatSize(file.size)}</span>
+                            <span>Размер: {fmtSize(file.size)}</span>
                             <Show when={!file.recoverable}>
                               <span class="text-red-400">Невозможно восстановить</span>
                             </Show>
@@ -303,7 +301,7 @@ export function IntegrityChecker(props: IntegrityCheckerProps) {
                             {file.path}
                           </div>
                           <div class="text-xs text-muted inline-flex items-center gap-2">
-                            <span>Ожидаемый размер: {formatSize(file.expected_size)}</span>
+                            <span>Ожидаемый размер: {fmtSize(file.expected_size)}</span>
                             <Show when={!file.recoverable}>
                               <span class="text-yellow-400">Невозможно восстановить</span>
                             </Show>

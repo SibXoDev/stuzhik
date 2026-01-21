@@ -22,6 +22,9 @@ import { EditorPanel } from "../../editor";
 import { StzhkExportDialog } from "../../modpacks/components/StzhkExportDialog";
 import { useSafeTimers } from "../../../shared/hooks";
 import { Tabs } from "../../../shared/ui";
+import LaunchChangesAlert from "./LaunchChangesAlert";
+import SnapshotHistory from "./SnapshotHistory";
+import { useLaunchChanges } from "../hooks/useLaunchChanges";
 
 export type Tab = "mods" | "resources" | "logs" | "collections" | "performance" | "backups" | "patches" | "console" | "settings" | "editor" | "profiles";
 
@@ -90,10 +93,30 @@ const InstanceDetail: Component<Props> = (props) => {
   const [showEulaModal, setShowEulaModal] = createSignal(false);
   const [acceptingEula, setAcceptingEula] = createSignal(false);
 
+  // Launch history modal
+  const [showHistoryModal, setShowHistoryModal] = createSignal(false);
+
   // Installation progress state
   const [installStep, setInstallStep] = createSignal<InstallProgress["step"] | null>(null);
   const [installMessage, setInstallMessage] = createSignal("");
   const [downloads, setDownloads] = createSignal<DownloadProgress[]>([]);
+
+  // Launch changes tracking
+  const {
+    changes,
+    loading: changesLoading,
+    loadChanges,
+    dismissChanges,
+    resetTracking,
+    // Multi-snapshot history
+    history,
+    historyLoading,
+    loadHistory,
+    selectedSnapshotId,
+    loadChangesWithSnapshot,
+    markSnapshotResult,
+    setMaxSnapshots,
+  } = useLaunchChanges(() => inst()?.id ?? "");
 
   // Update tab when initialTab prop changes
   createEffect(() => {
@@ -118,6 +141,23 @@ const InstanceDetail: Component<Props> = (props) => {
           setInstallStep(null);
           setInstallMessage("");
           setDownloads([]);
+        }
+        // Mark snapshot result and reload changes when game stops
+        if (event.payload.status === "stopped") {
+          // Mark last snapshot as successful
+          const hist = history();
+          if (hist?.snapshots?.length) {
+            markSnapshotResult(hist.snapshots[0].id, true);
+          }
+          loadChanges();
+        }
+        // Mark snapshot as crashed
+        if (event.payload.status === "crashed" || event.payload.status === "error") {
+          const hist = history();
+          if (hist?.snapshots?.length) {
+            markSnapshotResult(hist.snapshots[0].id, false);
+          }
+          loadChanges();
         }
       }
     });
@@ -413,6 +453,20 @@ const InstanceDetail: Component<Props> = (props) => {
               <i class="i-hugeicons-game-controller-03 w-5 h-5" />
             </button>
 
+            <button
+              class="btn-ghost"
+              onClick={() => {
+                loadHistory();
+                setShowHistoryModal(true);
+              }}
+              title={t().launchChanges?.historyTitle || "История запусков"}
+            >
+              <i class="i-hugeicons-time-02 w-5 h-5" />
+              <Show when={history()?.snapshots?.length}>
+                <span class="text-[10px] font-bold bg-gray-600/50 px-1 rounded">{history()?.snapshots?.length}</span>
+              </Show>
+            </button>
+
             <button class="btn-ghost" onClick={() => inst() && props.onConfigure(inst()!)} title={t().common.edit}>
               <i class="i-hugeicons-settings-02 w-5 h-5" />
             </button>
@@ -568,6 +622,24 @@ const InstanceDetail: Component<Props> = (props) => {
         </div>
       </Show>
 
+      {/* Launch Changes Alert - shown when there are changes since last launch */}
+      <Show when={changes() && !changesLoading()}>
+        <LaunchChangesAlert
+          changes={changes()!}
+          onDismiss={dismissChanges}
+          onReset={resetTracking}
+          onRollback={() => setActiveTab("backups")}
+          isCrashed={status() === "crashed" || status() === "error"}
+          // Multi-snapshot history
+          history={history()}
+          selectedSnapshotId={selectedSnapshotId()}
+          onSelectSnapshot={loadChangesWithSnapshot}
+          onCompareLatest={loadChanges}
+          onSetMaxSnapshots={setMaxSnapshots}
+          historyLoading={historyLoading()}
+        />
+      </Show>
+
       {/* Tabs - wrapper with min-w-0 to allow shrinking in flex column */}
       <div class="min-w-0 w-full flex-shrink-0">
         <Tabs
@@ -695,6 +767,59 @@ const InstanceDetail: Component<Props> = (props) => {
           instanceName={inst()?.name ?? ""}
           onClose={() => setShowExportDialog(false)}
         />
+      </Show>
+
+      {/* Launch History Modal */}
+      <Show when={showHistoryModal()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/70" onClick={() => setShowHistoryModal(false)} />
+          <div class="bg-gray-850 rounded-2xl border border-gray-700 p-6 max-w-lg w-full mx-4 shadow-2xl z-10">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                  <i class="i-hugeicons-time-02 w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold">{t().launchChanges?.historyTitle || "История запусков"}</h3>
+                  <p class="text-sm text-gray-400">{inst()?.name}</p>
+                </div>
+              </div>
+              <button class="btn-ghost" onClick={() => setShowHistoryModal(false)}>
+                <i class="i-hugeicons-cancel-01 w-5 h-5" />
+              </button>
+            </div>
+
+            <SnapshotHistory
+              history={history()}
+              selectedSnapshotId={selectedSnapshotId()}
+              onSelectSnapshot={(id) => {
+                loadChangesWithSnapshot(id);
+                setShowHistoryModal(false);
+              }}
+              onCompareLatest={() => {
+                loadChanges();
+                setShowHistoryModal(false);
+              }}
+              onNavigate={(id) => {
+                // Navigation without closing modal
+                if (id === null) {
+                  loadChanges();
+                } else {
+                  loadChangesWithSnapshot(id);
+                }
+              }}
+              onSetMaxSnapshots={setMaxSnapshots}
+              loading={historyLoading()}
+            />
+
+            <Show when={!history()?.snapshots?.length && !historyLoading()}>
+              <div class="text-center py-8 text-gray-500">
+                <i class="i-hugeicons-time-02 w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>{t().launchChanges?.noSnapshots || "Нет снимков. Запустите игру чтобы создать первый снимок."}</p>
+              </div>
+            </Show>
+          </div>
+        </div>
       </Show>
 
       {/* EULA Modal for servers */}

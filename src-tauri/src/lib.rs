@@ -15,6 +15,14 @@ static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 // Global P2P Connect service
 static CONNECT_SERVICE: OnceLock<tokio::sync::RwLock<p2p::ConnectService>> = OnceLock::new();
 
+// Global pending modpack file (for file association handling)
+// This stores the file path when app is launched via double-click on .stzhk file
+static PENDING_MODPACK_FILE: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn get_pending_modpack_storage() -> &'static Mutex<Option<String>> {
+    PENDING_MODPACK_FILE.get_or_init(|| Mutex::new(None))
+}
+
 fn get_connect_service() -> &'static tokio::sync::RwLock<p2p::ConnectService> {
     CONNECT_SERVICE.get_or_init(|| {
         // Используем cache dir для истории P2P (если BASE_DIR ещё не инициализирован)
@@ -94,6 +102,7 @@ mod gpu;
 mod instances;
 mod integrity;
 mod java;
+mod launch_tracker;
 mod launchers;
 mod loaders;
 mod log_analyzer;
@@ -154,6 +163,18 @@ fn cancel_operation(operation_id: String, app_handle: tauri::AppHandle) -> Resul
 #[tauri::command]
 fn list_active_operations() -> Vec<String> {
     cancellation::list_active_operations()
+}
+
+/// Get and clear pending modpack file (for file association handling)
+/// Returns the file path if one was pending, and clears it to prevent reopening
+#[tauri::command]
+fn get_pending_modpack_file() -> Option<String> {
+    let storage = get_pending_modpack_storage();
+    if let Ok(mut guard) = storage.lock() {
+        guard.take() // Returns Some(path) and sets to None
+    } else {
+        None
+    }
 }
 
 /// Check if query looks like a mod ID/slug (lowercase, no spaces, alphanumeric/hyphens/underscores)
@@ -2195,6 +2216,134 @@ async fn create_patch_from_instance_changes(
     )
 }
 
+// ========== Launch Tracker — изменения с последнего запуска ==========
+
+/// Получить изменения с последнего успешного запуска
+/// Использует blake3 для быстрого хэширования
+#[tauri::command]
+async fn get_launch_changes(instance_id: String) -> Result<launch_tracker::LaunchChanges> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+
+    launch_tracker::detect_changes_since_launch(
+        &instance_dir,
+        &instance.version,
+        instance.loader.as_str(),
+        instance.loader_version.as_deref(),
+    )
+    .await
+}
+
+/// Сохранить snapshot после успешного запуска
+#[tauri::command]
+async fn save_launch_snapshot(instance_id: String) -> Result<String> {
+    log::info!("[save_launch_snapshot] Starting for instance: {}", instance_id);
+
+    let instance = instances::lifecycle::get_instance(instance_id.clone()).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+
+    log::info!("[save_launch_snapshot] Instance dir: {}", instance_dir.display());
+
+    let result = launch_tracker::on_successful_launch(
+        &instance_id,
+        &instance_dir,
+        &instance.version,
+        instance.loader.as_str(),
+        instance.loader_version.as_deref(),
+    )
+    .await;
+
+    match &result {
+        Ok(snapshot_id) => log::info!("[save_launch_snapshot] Created snapshot: {}", snapshot_id),
+        Err(e) => log::error!("[save_launch_snapshot] Failed: {:?}", e),
+    }
+
+    result
+}
+
+/// Удалить launch snapshot (сбросить отслеживание)
+#[tauri::command]
+async fn delete_launch_snapshot(instance_id: String) -> Result<()> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+    launch_tracker::delete_launch_snapshot(&instance_dir)
+}
+
+/// Получить историю снимков экземпляра
+#[tauri::command]
+async fn get_snapshot_history(instance_id: String) -> Result<launch_tracker::SnapshotHistory> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+    Ok(launch_tracker::load_history(&instance_dir))
+}
+
+/// Получить список снимков (только метаданные)
+#[tauri::command]
+async fn get_snapshot_list(instance_id: String) -> Result<Vec<launch_tracker::SnapshotMeta>> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+    Ok(launch_tracker::get_snapshot_list(&instance_dir))
+}
+
+/// Получить изменения относительно конкретного снимка
+#[tauri::command]
+async fn get_launch_changes_with_snapshot(
+    instance_id: String,
+    snapshot_id: String,
+) -> Result<launch_tracker::LaunchChanges> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+
+    launch_tracker::detect_changes_with_snapshot(
+        &instance_dir,
+        Some(&snapshot_id),
+        &instance.version,
+        instance.loader.as_str(),
+        instance.loader_version.as_deref(),
+    )
+    .await
+}
+
+/// Пометить снимок как успешный/неуспешный
+#[tauri::command]
+async fn mark_snapshot_result(
+    instance_id: String,
+    snapshot_id: String,
+    was_successful: bool,
+) -> Result<()> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+    launch_tracker::mark_snapshot_result(&instance_dir, &snapshot_id, was_successful)
+}
+
+/// Связать снимок с бэкапом
+#[tauri::command]
+async fn link_snapshot_to_backup(
+    instance_id: String,
+    snapshot_id: String,
+    backup_id: String,
+) -> Result<()> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+    launch_tracker::link_snapshot_to_backup(&instance_dir, &snapshot_id, &backup_id)
+}
+
+/// Установить максимальное количество снимков
+#[tauri::command]
+async fn set_max_snapshots(instance_id: String, max_count: usize) -> Result<()> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+    launch_tracker::set_max_snapshots(&instance_dir, max_count)
+}
+
+/// Загрузить конкретный снимок по ID
+#[tauri::command]
+async fn load_snapshot(instance_id: String, snapshot_id: String) -> Result<Option<launch_tracker::LaunchSnapshot>> {
+    let instance = instances::lifecycle::get_instance(instance_id).await?;
+    let instance_dir = std::path::PathBuf::from(&instance.dir);
+    Ok(launch_tracker::load_snapshot(&instance_dir, &snapshot_id))
+}
+
 /// Поиск мода по имени на указанной платформе
 #[tauri::command]
 async fn search_mod_by_name(
@@ -4038,6 +4187,7 @@ pub fn run() {
             }
 
             // Handle file arguments on first launch (double-click on .stzhk file)
+            // Store in global state - frontend will request it when ready
             let args: Vec<String> = std::env::args().collect();
             if args.len() > 1 {
                 let file_path = &args[1];
@@ -4045,14 +4195,12 @@ pub fn run() {
                     || file_path.ends_with(".mrpack")
                     || file_path.ends_with(".zip")
                 {
-                    log::info!("Opening modpack file from command line: {}", file_path);
-                    let app_handle = app.handle().clone();
-                    let file_path = file_path.clone();
-                    // Delay emit to ensure frontend is ready
-                    tauri::async_runtime::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                        let _ = app_handle.emit("open-modpack-file", &file_path);
-                    });
+                    log::info!("Storing pending modpack file from command line: {}", file_path);
+                    // Store in global state for frontend to retrieve when ready
+                    let storage = get_pending_modpack_storage();
+                    if let Ok(mut guard) = storage.lock() {
+                        *guard = Some(file_path.clone());
+                    }
                 }
             }
 
@@ -4106,6 +4254,9 @@ pub fn run() {
             instances::installation::retry_instance_installation,
             instances::utilities::open_instance_folder,
             instances::utilities::reveal_instance_file,
+            instances::utilities::open_file_in_editor,
+            instances::utilities::open_file_in_vscode,
+            instances::utilities::open_folder_in_vscode,
             instances::lifecycle::reset_instance_version,
             // Mods
             search_mods,
@@ -4176,6 +4327,17 @@ pub fn run() {
             delete_instance_snapshot,
             detect_instance_changes,
             create_patch_from_instance_changes,
+            // Launch Tracker (blake3)
+            get_launch_changes,
+            save_launch_snapshot,
+            delete_launch_snapshot,
+            get_snapshot_history,
+            get_snapshot_list,
+            get_launch_changes_with_snapshot,
+            mark_snapshot_result,
+            link_snapshot_to_backup,
+            set_max_snapshots,
+            load_snapshot,
             search_mod_by_name,
             download_mod_to_path,
             get_modpack_mod_list,
@@ -4216,6 +4378,8 @@ pub fn run() {
             // Cancellation
             cancel_operation,
             list_active_operations,
+            // File association
+            get_pending_modpack_file,
             // Storage & Paths
             paths::get_storage_info,
             paths::get_app_paths,

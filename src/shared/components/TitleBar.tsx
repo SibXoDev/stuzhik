@@ -85,6 +85,7 @@ const TitleBar = (props: TitleBarProps) => {
             class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
             onClick={props.onConnectClick}
             title={t().titleBar.connect}
+            aria-label={t().titleBar.connect}
           >
             <div class="i-hugeicons-user-group w-4 h-4" />
           </button>
@@ -99,6 +100,7 @@ const TitleBar = (props: TitleBarProps) => {
             class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
             onClick={props.onConsoleClick}
             title={t().titleBar.devConsole}
+            aria-label={t().titleBar.devConsole}
           >
             <div class="i-hugeicons-command-line w-4 h-4" />
           </button>
@@ -110,6 +112,7 @@ const TitleBar = (props: TitleBarProps) => {
             class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
             onClick={props.onDocsClick}
             title={t().titleBar.docs}
+            aria-label={t().titleBar.docs}
           >
             <div class="i-hugeicons-book-open-01 w-4 h-4" />
           </button>
@@ -121,6 +124,7 @@ const TitleBar = (props: TitleBarProps) => {
             class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
             onClick={props.onChangelogClick}
             title={t().titleBar.changelog}
+            aria-label={t().titleBar.changelog}
           >
             <div class="i-hugeicons-git-branch w-4 h-4" />
           </button>
@@ -131,7 +135,8 @@ const TitleBar = (props: TitleBarProps) => {
           <button
             class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
             onClick={props.onSourceCodeClick}
-            title="Исходный код"
+            title={t().titleBar.sourceCode}
+            aria-label={t().titleBar.sourceCode}
           >
             <div class="i-hugeicons-source-code w-4 h-4" />
           </button>
@@ -143,6 +148,7 @@ const TitleBar = (props: TitleBarProps) => {
             class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
             onClick={props.onSettingsClick}
             title={t().titleBar.settings}
+            aria-label={t().titleBar.settings}
           >
             <div class="i-hugeicons-settings-02 w-4 h-4" />
           </button>
@@ -156,6 +162,7 @@ const TitleBar = (props: TitleBarProps) => {
           class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
           onClick={handleMinimize}
           title={t().titleBar.minimize}
+          aria-label={t().titleBar.minimize}
         >
           <div class="i-fluent:minimize-24-regular w-4 h-4" />
         </button>
@@ -164,6 +171,7 @@ const TitleBar = (props: TitleBarProps) => {
           class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
           onClick={handleMaximize}
           title={isMaximized() ? t().titleBar.restore : t().titleBar.maximize}
+          aria-label={isMaximized() ? t().titleBar.restore : t().titleBar.maximize}
         >
           <div class={isMaximized() ? 'i-fluent:full-screen-minimize-16-filled w-4 h-4' : 'i-fluent:full-screen-maximize-16-filled w-4 h-4'} />
         </button>
@@ -172,6 +180,7 @@ const TitleBar = (props: TitleBarProps) => {
           class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-red-500/80 transition-colors duration-75"
           onClick={handleClose}
           title={t().titleBar.close}
+          aria-label={t().titleBar.close}
         >
           <div class="i-clarity:close-line w-4 h-4" />
         </button>
@@ -180,11 +189,11 @@ const TitleBar = (props: TitleBarProps) => {
       {/* Close confirmation dialog */}
       <ConfirmDialog
         open={showCloseConfirm()}
-        title={closeReason()?.title || "Закрыть приложение?"}
-        message={closeReason()?.message || "Вы уверены что хотите закрыть приложение?"}
+        title={closeReason()?.title || t().titleBar.closeConfirm.title}
+        message={closeReason()?.message || t().titleBar.closeConfirm.message}
         variant={closeReason()?.variant || "warning"}
-        confirmText="Закрыть"
-        cancelText="Отмена"
+        confirmText={t().titleBar.closeConfirm.confirm}
+        cancelText={t().titleBar.closeConfirm.cancel}
         onConfirm={handleConfirmClose}
         onCancel={handleCancelClose}
       />

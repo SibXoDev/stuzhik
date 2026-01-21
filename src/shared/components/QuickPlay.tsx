@@ -311,8 +311,8 @@ export default function QuickPlay(props: Props) {
     const labels = t().quickPlay?.steps || {
       java: "Java",
       minecraft: "Minecraft",
-      loader: "Загрузчик",
-      complete: "Готово",
+      loader: "Loader",
+      complete: "Complete",
     };
     return step ? labels[step] || step : "";
   };
@@ -366,7 +366,7 @@ export default function QuickPlay(props: Props) {
           onClick={handlePlay}
           disabled={isLoading() || loadingVersions() || checkingLoader() || isInstalling() || (!loaderAvailable() && selectedLoader() !== "vanilla")}
           title={!loaderAvailable() && selectedLoader() !== "vanilla"
-            ? t().loaders?.notSupportedHint || `${LOADERS.find(l => l.id === selectedLoader())?.name} не поддерживает эту версию Minecraft`
+            ? t().loaders?.notSupportedHint || `${LOADERS.find(l => l.id === selectedLoader())?.name} does not support this Minecraft version`
             : undefined}
         >
           <Show when={showInstallingState() || checkingLoader()}>
@@ -386,10 +386,10 @@ export default function QuickPlay(props: Props) {
             {isRunning()
               ? t().common.stop
               : showInstallingState()
-                ? t().quickPlay?.installing || "Установка..."
+                ? t().quickPlay?.installing || "Installing..."
                 : !loaderAvailable() && selectedLoader() !== "vanilla"
-                  ? t().loaders?.notSupported || "Не поддерживается"
-                  : t().common.play || "Играть"}
+                  ? t().loaders?.notSupported || "Not supported"
+                  : t().common.play || "Play"}
           </span>
         </button>
       </div>

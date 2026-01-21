@@ -4,8 +4,8 @@
 //! Позволяет делиться изменениями в модпаке без распространения всего содержимого.
 
 use super::types::{
-    ModpackComparison, ModpackPatch, PatchApplyResult, PatchBaseInfo, PatchChanges, PatchConfigAdd,
-    PatchFileAdd, PatchModAdd, PatchModRemove, PatchPreview, STZHK_FORMAT_VERSION,
+    ConfigPatchType, ModpackComparison, ModpackPatch, PatchApplyResult, PatchBaseInfo, PatchChanges,
+    PatchConfigAdd, PatchFileAdd, PatchModAdd, PatchModRemove, PatchPreview, STZHK_FORMAT_VERSION,
 };
 use crate::api::modrinth::ModrinthClient;
 use crate::downloader::DownloadManager;
@@ -73,6 +73,7 @@ pub fn create_patch_from_comparison(
             configs_to_add.push(PatchConfigAdd {
                 path: config.path.clone(),
                 content_base64: String::new(), // Placeholder - заполняется отдельно
+                patch_type: ConfigPatchType::default(),
             });
         }
 
@@ -81,6 +82,7 @@ pub fn create_patch_from_comparison(
             configs_to_add.push(PatchConfigAdd {
                 path: diff.path.clone(),
                 content_base64: String::new(),
+                patch_type: ConfigPatchType::default(),
             });
         }
 
@@ -520,8 +522,35 @@ async fn install_mod_from_patch(
     Ok(())
 }
 
+/// Применить JSON merge patch (RFC 7396)
+fn json_merge(target: &mut serde_json::Value, patch: &serde_json::Value) {
+    if patch.is_object() {
+        if !target.is_object() {
+            *target = serde_json::Value::Object(serde_json::Map::new());
+        }
+        let target_obj = target.as_object_mut().unwrap();
+        for (key, value) in patch.as_object().unwrap() {
+            if value.is_null() {
+                // null означает удаление ключа
+                target_obj.remove(key);
+            } else {
+                // Рекурсивно мержим вложенные объекты
+                let entry = target_obj
+                    .entry(key.clone())
+                    .or_insert(serde_json::Value::Null);
+                json_merge(entry, value);
+            }
+        }
+    } else {
+        // Для не-объектов просто заменяем значение
+        *target = patch.clone();
+    }
+}
+
 /// Применить конфиг из патча
 fn apply_config(instance_dir: &Path, config: &PatchConfigAdd) -> Result<()> {
+    use super::types::ConfigPatchType;
+
     let config_path = instance_dir.join(&config.path);
 
     // Создаем родительские директории
@@ -529,12 +558,73 @@ fn apply_config(instance_dir: &Path, config: &PatchConfigAdd) -> Result<()> {
         std::fs::create_dir_all(parent)?;
     }
 
-    // Декодируем и записываем
-    let content = BASE64.decode(&config.content_base64).map_err(|e| {
+    // Декодируем патч/содержимое
+    let patch_content = BASE64.decode(&config.content_base64).map_err(|e| {
         LauncherError::InvalidConfig(format!("Invalid base64 in config {}: {}", config.path, e))
     })?;
 
-    std::fs::write(&config_path, content)?;
+    match config.patch_type {
+        ConfigPatchType::Replace => {
+            // Просто записываем файл
+            std::fs::write(&config_path, patch_content)?;
+        }
+        ConfigPatchType::JsonMerge => {
+            // Читаем существующий файл (или создаём пустой объект)
+            let existing_content = if config_path.exists() {
+                std::fs::read_to_string(&config_path)?
+            } else {
+                "{}".to_string()
+            };
+
+            // Парсим оба JSON
+            let mut target: serde_json::Value = serde_json::from_str(&existing_content)
+                .map_err(|e| {
+                    LauncherError::InvalidConfig(format!(
+                        "Failed to parse existing JSON config {}: {}",
+                        config.path, e
+                    ))
+                })?;
+
+            let patch_str = String::from_utf8(patch_content).map_err(|e| {
+                LauncherError::InvalidConfig(format!(
+                    "Patch content is not valid UTF-8 for {}: {}",
+                    config.path, e
+                ))
+            })?;
+
+            let patch: serde_json::Value = serde_json::from_str(&patch_str).map_err(|e| {
+                LauncherError::InvalidConfig(format!(
+                    "Failed to parse JSON patch for {}: {}",
+                    config.path, e
+                ))
+            })?;
+
+            // Применяем merge patch
+            json_merge(&mut target, &patch);
+
+            // Записываем результат с форматированием
+            let result = serde_json::to_string_pretty(&target).map_err(|e| {
+                LauncherError::InvalidConfig(format!(
+                    "Failed to serialize merged JSON for {}: {}",
+                    config.path, e
+                ))
+            })?;
+
+            std::fs::write(&config_path, result)?;
+            log::info!("Applied JSON merge patch to {}", config.path);
+        }
+        ConfigPatchType::Diff => {
+            // TODO: Реализовать unified diff патчи
+            // Требует внешнюю библиотеку (например, diffy или similar)
+            // Пока просто заменяем файл с предупреждением
+            log::warn!(
+                "Diff patch type not yet implemented for {}, falling back to replace",
+                config.path
+            );
+            std::fs::write(&config_path, patch_content)?;
+        }
+    }
+
     Ok(())
 }
 
@@ -794,7 +884,9 @@ pub fn create_instance_snapshot(
             let entry = entry?;
             let path = entry.path();
             if path.extension().map(|e| e == "jar").unwrap_or(false) {
-                let filename = path.file_name().unwrap().to_string_lossy().to_string();
+                let Some(filename) = path.file_name().map(|n| n.to_string_lossy().to_string()) else {
+                    continue;
+                };
                 let metadata = std::fs::metadata(&path)?;
                 let content = std::fs::read(&path)?;
                 let hash = format!("{:x}", Sha256::digest(&content));
@@ -1000,7 +1092,11 @@ fn collect_config_paths_recursive(dir: &Path, paths: &mut Vec<PathBuf>) -> Resul
 /// Хешировать один мод файл (spawn_blocking для CPU-bound операции)
 async fn hash_mod_file(path: PathBuf) -> Result<SnapshotModInfo> {
     tokio::task::spawn_blocking(move || {
-        let filename = path.file_name().unwrap().to_string_lossy().to_string();
+        let filename = path
+            .file_name()
+            .ok_or_else(|| LauncherError::InvalidConfig("Path has no filename".to_string()))?
+            .to_string_lossy()
+            .to_string();
         let content = std::fs::read(&path)?;
         let size = content.len() as u64;
         let hash = format!("{:x}", Sha256::digest(&content));
@@ -1065,7 +1161,9 @@ pub fn detect_instance_changes(
             let entry = entry?;
             let path = entry.path();
             if path.extension().map(|e| e == "jar").unwrap_or(false) {
-                let filename = path.file_name().unwrap().to_string_lossy().to_string();
+                let Some(filename) = path.file_name().map(|n| n.to_string_lossy().to_string()) else {
+                    continue;
+                };
                 current_mods.insert(filename.clone());
 
                 if !snapshot_mods.contains_key(&filename) {
@@ -1190,6 +1288,7 @@ pub fn create_patch_from_changes(
                 configs_to_add.push(PatchConfigAdd {
                     path: format!("config/{}", path),
                     content_base64: BASE64.encode(&content),
+                    patch_type: ConfigPatchType::default(),
                 });
             }
         }

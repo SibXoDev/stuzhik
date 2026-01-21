@@ -1043,6 +1043,7 @@ const InstanceList: Component<Props> = (props) => {
                   setShowIntegrityChecker(false);
                   setIntegrityInstance(null);
                 }}
+                aria-label={t().ui?.tooltips?.close ?? "Close"}
               >
                 <i class="i-hugeicons-cancel-01 w-5 h-5" />
               </button>

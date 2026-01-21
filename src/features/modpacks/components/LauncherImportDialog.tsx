@@ -12,6 +12,7 @@ import type {
 } from "../../../shared/types";
 import { ModalWrapper } from "../../../shared/ui";
 import { useI18n } from "../../../shared/i18n";
+import { formatSize } from "../../../shared/utils/format-size";
 
 interface Props {
   isOpen: boolean;
@@ -201,13 +202,8 @@ const LauncherImportDialog: Component<Props> = (props) => {
     }
   }
 
-  // Format file size
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-  }
+  // Localized size formatter
+  const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
   // Get launcher icon
   function getLauncherIcon(type: string): string {
@@ -398,7 +394,7 @@ const LauncherImportDialog: Component<Props> = (props) => {
                           </div>
                         </div>
                         <div class="text-xs text-gray-500 flex-shrink-0">
-                          {formatSize(instance.total_size)}
+                          {fmtSize(instance.total_size)}
                         </div>
                       </button>
                     )}
@@ -548,8 +544,8 @@ const LauncherImportDialog: Component<Props> = (props) => {
                 {importProgress()!.current} / {importProgress()!.total}
               </span>
               <span>
-                {formatSize(importProgress()!.bytes_copied)} /{" "}
-                {formatSize(importProgress()!.total_bytes)}
+                {fmtSize(importProgress()!.bytes_copied)} /{" "}
+                {fmtSize(importProgress()!.total_bytes)}
               </span>
             </div>
 
@@ -580,7 +576,7 @@ const LauncherImportDialog: Component<Props> = (props) => {
               </div>
               <div>
                 <span class="text-gray-400">{t().modpacks.launcherImport.totalSize}:</span>{" "}
-                <span class="font-medium">{formatSize(importResult()?.total_size || 0)}</span>
+                <span class="font-medium">{fmtSize(importResult()?.total_size || 0)}</span>
               </div>
             </div>
 

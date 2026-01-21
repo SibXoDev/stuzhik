@@ -387,6 +387,15 @@ pub const MIGRATIONS: &[Migration] = &[
             CREATE INDEX IF NOT EXISTS idx_mods_file_hash ON mods(file_hash);
         "#,
     },
+    Migration {
+        version: 18,
+        description: "Add latest_changelog column for update changelog aggregation",
+        sql: r#"
+            -- Store changelog text when checking for updates
+            -- This allows showing "What's New" after updating mods
+            ALTER TABLE mods ADD COLUMN latest_changelog TEXT;
+        "#,
+    },
 ];
 
 /// Initialize migrations table
@@ -520,6 +529,13 @@ fn repair_schema(conn: &Connection) -> rusqlite::Result<()> {
         log::info!("Repaired: added mods.update_checked_at");
     }
 
+    // Check mods.latest_changelog (v18) - for changelog aggregation
+    if !column_exists(conn, "mods", "latest_changelog")? {
+        log::warn!("Missing column mods.latest_changelog - repairing...");
+        conn.execute("ALTER TABLE mods ADD COLUMN latest_changelog TEXT", [])?;
+        log::info!("Repaired: added mods.latest_changelog");
+    }
+
     Ok(())
 }
 
@@ -629,6 +645,11 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
                 "CREATE INDEX IF NOT EXISTS idx_mods_update_available ON mods(instance_id, update_available)",
                 [],
             )?;
+        } else if migration.version == 18 {
+            // Special handling for v18 - add latest_changelog column if it doesn't exist
+            if !column_exists(conn, "mods", "latest_changelog")? {
+                conn.execute("ALTER TABLE mods ADD COLUMN latest_changelog TEXT", [])?;
+            }
         } else {
             // Normal migration - just execute SQL
             conn.execute_batch(migration.sql)?;

@@ -843,6 +843,7 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                 <button
                   class="btn-close"
                   onClick={() => setSelectedProblem(null)}
+                  aria-label={t().ui?.tooltips?.close ?? "Close"}
                 >
                   <i class="i-hugeicons-cancel-01 w-5 h-5" />
                 </button>
@@ -963,6 +964,7 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
               <button
                 onClick={() => setShowFixPreview(false)}
                 class="btn-close"
+                aria-label={t().ui?.tooltips?.close ?? "Close"}
               >
                 <i class="i-hugeicons-cancel-01 w-5 h-5" />
               </button>

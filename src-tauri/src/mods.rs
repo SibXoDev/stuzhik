@@ -1989,8 +1989,8 @@ impl ModManager {
         );
 
         // STEP 2: Batch request to Modrinth
-        // Collect updates to batch-save to DB
-        let mut updates_to_save: Vec<(String, String, i64)> = Vec::new(); // (version, version_id, mod_id)
+        // Collect updates to batch-save to DB: (version, version_id, changelog, mod_id)
+        let mut updates_to_save: Vec<(String, String, Option<String>, i64)> = Vec::new();
         let mut no_updates: Vec<i64> = Vec::new(); // mod_ids with no updates
 
         if !modrinth_hashes.is_empty() {
@@ -2023,6 +2023,9 @@ impl ModManager {
                             let same_loader = version_loaders.contains(&loader_normalized);
 
                             if is_update && same_loader {
+                                // Modrinth includes changelog in batch response
+                                let changelog = latest_version.changelog.clone();
+
                                 updates_available += 1;
                                 mods_with_updates.push(ModUpdateInfo {
                                     mod_id: mod_item.id,
@@ -2032,10 +2035,12 @@ impl ModManager {
                                     latest_version: latest_version.version_number.clone(),
                                     latest_version_id: latest_version.id.clone(),
                                     source: "modrinth".to_string(),
+                                    changelog: changelog.clone(),
                                 });
                                 updates_to_save.push((
                                     latest_version.version_number.clone(),
                                     latest_version.id.clone(),
+                                    changelog,
                                     mod_item.id,
                                 ));
                             } else {
@@ -2070,6 +2075,13 @@ impl ModManager {
                         .await
                     {
                         Ok(Some(latest_file)) => {
+                            // Fetch changelog for CurseForge update (separate API call)
+                            let changelog = client
+                                .get_file_changelog(cf_mod_id, latest_file.id)
+                                .await
+                                .ok()
+                                .flatten();
+
                             updates_available += 1;
                             mods_with_updates.push(ModUpdateInfo {
                                 mod_id: mod_item.id,
@@ -2079,10 +2091,12 @@ impl ModManager {
                                 latest_version: latest_file.file_name.clone(),
                                 latest_version_id: latest_file.id.to_string(),
                                 source: "curseforge".to_string(),
+                                changelog: changelog.clone(),
                             });
                             updates_to_save.push((
                                 latest_file.file_name.clone(),
                                 latest_file.id.to_string(),
+                                changelog,
                                 mod_item.id,
                             ));
                         }
@@ -2105,10 +2119,10 @@ impl ModManager {
 
             if !updates_to_save.is_empty() {
                 let mut stmt = conn.prepare(
-                    "UPDATE mods SET latest_version = ?1, latest_version_id = ?2, update_available = 1, update_checked_at = ?3 WHERE id = ?4"
+                    "UPDATE mods SET latest_version = ?1, latest_version_id = ?2, latest_changelog = ?3, update_available = 1, update_checked_at = ?4 WHERE id = ?5"
                 )?;
-                for (version, version_id, mod_id) in &updates_to_save {
-                    stmt.execute(params![version, version_id, now, mod_id])?;
+                for (version, version_id, changelog, mod_id) in &updates_to_save {
+                    stmt.execute(params![version, version_id, changelog, now, mod_id])?;
                 }
             }
 
@@ -5263,6 +5277,8 @@ pub struct ModUpdateInfo {
     pub latest_version: String,
     pub latest_version_id: String,
     pub source: String, // modrinth/curseforge
+    /// Changelog text for this update (markdown format)
+    pub changelog: Option<String>,
 }
 
 // ============================================================================

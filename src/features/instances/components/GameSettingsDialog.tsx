@@ -2,6 +2,7 @@ import { createSignal, Show, For, onMount } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { createConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { ModalWrapper } from "../../../shared/ui/ModalWrapper";
+import { useI18n } from "../../../shared/i18n";
 
 interface Props {
   instanceId: string;
@@ -11,6 +12,7 @@ interface Props {
 
 function GameSettingsDialog(props: Props) {
   const { confirm, ConfirmDialogComponent } = createConfirmDialog();
+  const { t } = useI18n();
   const [templates, setTemplates] = createSignal<string[]>([]);
   const [selectedTemplate, setSelectedTemplate] = createSignal("");
   const [newTemplateName, setNewTemplateName] = createSignal("");
@@ -141,6 +143,7 @@ function GameSettingsDialog(props: Props) {
             type="button"
             class="btn-close"
             onClick={props.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
           >
             <i class="i-hugeicons-cancel-01 w-5 h-5" />
           </button>

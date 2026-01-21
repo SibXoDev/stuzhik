@@ -180,7 +180,7 @@ const ModpackBrowser: Component<Props> = (props) => {
         setInstalling(false);
         setOperationId(null);
         setCancelling(false);
-        setError("Установка отменена");
+        setError(t().modpacks.browser.installCancelled);
       }
     });
 
@@ -237,7 +237,7 @@ const ModpackBrowser: Component<Props> = (props) => {
       // 2. We're installing but ID wasn't tracked yet (fallback)
       if (isInstalling && (instId === event.payload.id || !instId)) {
         setInstanceInstallStep("complete");
-        setInstanceInstallMessage("Готово!");
+        setInstanceInstallMessage(t().modpacks.browser.ready);
         // Close the entire dialog after showing "complete" for a moment
         safeTimeout(() => {
           setInstalling(false);
@@ -389,32 +389,31 @@ const ModpackBrowser: Component<Props> = (props) => {
     const instMsg = instanceInstallMessage();
     if (instStep && instStep !== "complete") {
       // Show instance installation message (Java/Minecraft/Loader)
-      return instMsg || "Установка компонентов...";
+      return instMsg || t().modpacks.browser.installingComponents;
     }
     if (instStep === "complete") {
-      return "Готово!";
+      return t().modpacks.browser.ready;
     }
 
     const progress = installProgress();
-    if (!progress) return "Подготовка...";
+    if (!progress) return t().modpacks.browser.preparing;
 
     switch (progress.stage) {
       case "downloading":
-        return `Скачивание модпака...`;
+        return t().modpacks.browser.downloadingModpack;
       case "creating_instance":
-        return "Создание экземпляра...";
+        return t().modpacks.browser.creatingInstance;
       case "resolving_mods":
-        return progress.current_file || `Анализ модов (${progress.current}/${progress.total})...`;
+        return progress.current_file || `${t().modpacks.browser.analyzingMods} (${progress.current}/${progress.total})...`;
       case "downloading_mods":
-        return `Скачивание модов (${progress.current}/${progress.total})${progress.current_file ? `: ${progress.current_file}` : ""}`;
+        return `${t().modpacks.browser.downloadingMods} (${progress.current}/${progress.total})${progress.current_file ? `: ${progress.current_file}` : ""}`;
       case "extracting_overrides":
-        return "Распаковка файлов...";
+        return t().modpacks.browser.extractingFiles;
       case "completed":
         // Mods downloaded, but loader installation may still be in progress
-        // Only show "Готово!" if instance installation hasn't started yet
-        return "Установка загрузчика...";
+        return t().modpacks.browser.installingLoader;
       default:
-        return "Установка...";
+        return t().modpacks.browser.installing;
     }
   };
 
@@ -618,8 +617,12 @@ const ModpackBrowser: Component<Props> = (props) => {
     <div class="flex flex-col h-full max-h-[calc(100vh-8rem)]">
       {/* Header */}
       <div class="flex items-center justify-between p-4 border-b border-gray-750 flex-shrink-0">
-        <h2 class="text-xl font-bold">Установка модпака</h2>
-        <button class="btn-close" onClick={props.onClose}>
+        <h2 class="text-xl font-bold">{t().modpacks.browser.title}</h2>
+        <button
+          class="btn-close"
+          onClick={props.onClose}
+          aria-label={t().ui?.tooltips?.close ?? "Close"}
+        >
           <i class="i-hugeicons-cancel-01 w-5 h-5" />
         </button>
       </div>
@@ -634,11 +637,11 @@ const ModpackBrowser: Component<Props> = (props) => {
             <Show when={!cancelling()} fallback={
               <>
                 <i class="i-svg-spinners-6-dots-scale w-12 h-12 mx-auto mb-4" />
-                <h3 class="text-xl font-semibold mb-2">Отмена...</h3>
-                <p class="text-muted mb-4">Ожидание завершения текущей операции</p>
+                <h3 class="text-xl font-semibold mb-2">{t().modpacks.browser.cancelling}</h3>
+                <p class="text-muted mb-4">{t().modpacks.browser.waitingForOperation}</p>
               </>
             }>
-              <h3 class="text-xl font-semibold mb-4">Установка модпака</h3>
+              <h3 class="text-xl font-semibold mb-4">{t().modpacks.browser.title}</h3>
 
               {/* Unified progress indicator - all steps */}
               <div class="flex flex-wrap items-center justify-center gap-1.5 text-xs font-medium mb-4">
@@ -649,7 +652,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                     : installProgress() || instanceInstallStep()
                       ? "bg-green-600/20 text-green-400"
                       : "bg-gray-800 text-gray-500"
-                }`}>Модпак</span>
+                }`}>{t().modpacks.browser.steps.modpack}</span>
                 <span class={installProgress() || instanceInstallStep() ? "text-green-400" : "text-gray-600"}>→</span>
 
                 {/* Моды */}
@@ -659,7 +662,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                     : ["extracting_overrides", "completed"].includes(installProgress()?.stage || "") || instanceInstallStep()
                       ? "bg-green-600/20 text-green-400"
                       : "bg-gray-800 text-gray-500"
-                }`}>Моды</span>
+                }`}>{t().modpacks.browser.steps.mods}</span>
                 <span class={["extracting_overrides", "completed"].includes(installProgress()?.stage || "") || instanceInstallStep() ? "text-green-400" : "text-gray-600"}>→</span>
 
                 {/* Распаковка */}
@@ -669,7 +672,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                     : installProgress()?.stage === "completed" || instanceInstallStep()
                       ? "bg-green-600/20 text-green-400"
                       : "bg-gray-800 text-gray-500"
-                }`}>Файлы</span>
+                }`}>{t().modpacks.browser.steps.files}</span>
                 <span class={installProgress()?.stage === "completed" || instanceInstallStep() ? "text-green-400" : "text-gray-600"}>→</span>
 
                 {/* Java + Minecraft (параллельно) */}
@@ -679,7 +682,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                     : ["loader", "complete"].includes(instanceInstallStep() || "")
                       ? "bg-green-600/20 text-green-400"
                       : "bg-gray-800 text-gray-500"
-                }`}>Java + MC</span>
+                }`}>{t().modpacks.browser.steps.javaMc}</span>
                 <span class={["loader", "complete"].includes(instanceInstallStep() || "") ? "text-green-400" : "text-gray-600"}>→</span>
 
                 {/* Загрузчик */}
@@ -689,7 +692,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                     : instanceInstallStep() === "complete"
                       ? "bg-green-600/20 text-green-400"
                       : "bg-gray-800 text-gray-500"
-                }`}>Загрузчик</span>
+                }`}>{t().modpacks.browser.steps.loader}</span>
                 <span class={instanceInstallStep() === "complete" ? "text-green-400" : "text-gray-600"}>→</span>
 
                 {/* Готово */}
@@ -697,7 +700,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                   instanceInstallStep() === "complete"
                     ? "bg-green-600 text-white"
                     : "bg-gray-800 text-gray-500"
-                }`}>Готово</span>
+                }`}>{t().modpacks.browser.steps.done}</span>
               </div>
 
               {/* Current step details */}
@@ -748,7 +751,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                 disabled={cancelling() || !operationId()}
               >
                 <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                {operationId() ? "Отменить" : "Ожидание..."}
+                {operationId() ? t().modpacks.browser.cancel : t().modpacks.browser.waiting}
               </button>
             </Show>
           </div>
@@ -761,15 +764,15 @@ const ModpackBrowser: Component<Props> = (props) => {
           <div class="card max-w-lg w-full max-h-[80vh] overflow-y-auto">
             <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
               <i class="i-hugeicons-alert-02 w-5 h-5 text-yellow-500" />
-              Сводка установки
+              {t().modpacks.browser.summary.title}
             </h3>
 
             <Show when={installSummary()!.from_modrinth.length > 0}>
               <div class="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl">
                 <p class="text-sm font-medium text-yellow-400 mb-2">
-                  ⚠️ Следующие моды были найдены на Modrinth автоматически.
+                  ⚠️ {t().modpacks.browser.summary.modrinthWarning}
                   <br />
-                  <span class="text-yellow-500/80">Возможно скачаны НЕ ТЕ версии! Проверьте совместимость.</span>
+                  <span class="text-yellow-500/80">{t().modpacks.browser.summary.modrinthWarningNote}</span>
                 </p>
                 <ul class="text-xs text-muted space-y-1 max-h-32 overflow-y-auto">
                   <For each={installSummary()!.from_modrinth}>
@@ -782,7 +785,7 @@ const ModpackBrowser: Component<Props> = (props) => {
             <Show when={installSummary()!.failed.length > 0}>
               <div class="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-2xl">
                 <p class="text-sm font-medium text-red-400 mb-2">
-                  ❌ Следующие моды НЕ удалось скачать:
+                  ❌ {t().modpacks.browser.summary.failedMods}
                 </p>
                 <ul class="text-xs text-muted space-y-1 max-h-32 overflow-y-auto">
                   <For each={installSummary()!.failed}>
@@ -793,17 +796,17 @@ const ModpackBrowser: Component<Props> = (props) => {
             </Show>
 
             <div class="text-xs text-dimmer mb-4">
-              Всего модов: {installSummary()!.total_mods} |
+              {t().modpacks.browser.summary.totalMods}: {installSummary()!.total_mods} |
               CurseForge: {installSummary()!.from_curseforge.length} |
               Modrinth: {installSummary()!.from_modrinth.length} |
-              Не скачано: {installSummary()!.failed.length}
+              {t().modpacks.browser.summary.notDownloaded}: {installSummary()!.failed.length}
             </div>
 
             <button
               class="btn-primary w-full"
               onClick={() => setInstallSummary(null)}
             >
-              Понятно
+              {t().modpacks.browser.summary.understood}
             </button>
           </div>
         </div>
@@ -813,7 +816,7 @@ const ModpackBrowser: Component<Props> = (props) => {
       <Show when={selectedModpack() && !installing()}>
         <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center p-4">
           <div class="card max-w-md w-full">
-            <h3 class="text-lg font-semibold mb-4">Установить модпак</h3>
+            <h3 class="text-lg font-semibold mb-4">{t().modpacks.browser.confirm.title}</h3>
 
             <div class="flex items-center gap-3 mb-4">
               <Show when={sanitizeImageUrl(selectedModpack()?.icon_url)}>
@@ -830,7 +833,7 @@ const ModpackBrowser: Component<Props> = (props) => {
             </div>
 
             <label class="block mb-4">
-              <span class="text-sm text-muted mb-1 block">Название экземпляра</span>
+              <span class="text-sm text-muted mb-1 block">{t().modpacks.browser.confirm.instanceName}</span>
               <input
                 type="text"
                 value={instanceName()}
@@ -842,7 +845,7 @@ const ModpackBrowser: Component<Props> = (props) => {
 
             <div class="flex gap-2 justify-end">
               <button class="btn-secondary" onClick={() => setSelectedModpack(null)}>
-                Отмена
+                {t().common.cancel}
               </button>
               <button
                 class="btn-primary"
@@ -850,7 +853,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                 disabled={!instanceName()}
               >
                 <i class="i-hugeicons-download-02 w-4 h-4" />
-                Установить
+                {t().common.install}
               </button>
             </div>
           </div>
@@ -868,7 +871,7 @@ const ModpackBrowser: Component<Props> = (props) => {
           onClick={() => { setShowFileInstall(false); setShowUrlInstall(false); }}
         >
           <i class="i-hugeicons-search-01 w-4 h-4" />
-          Поиск
+          {t().modpacks.browser.tabs.search}
         </button>
         <button
           class={`flex-1 px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
@@ -879,7 +882,7 @@ const ModpackBrowser: Component<Props> = (props) => {
           onClick={() => { setShowFileInstall(true); setShowUrlInstall(false); }}
         >
           <i class="i-hugeicons-folder-01 w-4 h-4" />
-          Из файла
+          {t().modpacks.browser.tabs.fromFile}
         </button>
         <button
           class={`flex-1 px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
@@ -890,15 +893,15 @@ const ModpackBrowser: Component<Props> = (props) => {
           onClick={() => { setShowFileInstall(false); setShowUrlInstall(true); }}
         >
           <i class="i-hugeicons-link-01 w-4 h-4" />
-          По ссылке
+          {t().modpacks.browser.tabs.byLink}
         </button>
         <button
           class="px-4 py-2 rounded-2xl font-medium transition-colors duration-100 bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border border-purple-600/30 inline-flex items-center justify-center gap-2"
           onClick={() => setShowCompareDialog(true)}
-          title="Сравнить два модпака"
+          title={t().modpacks.browser.tabs.compare}
         >
           <i class="i-hugeicons-git-compare w-4 h-4" />
-          Сравнить
+          {t().modpacks.browser.tabs.compare}
         </button>
       </div>
 
@@ -914,11 +917,11 @@ const ModpackBrowser: Component<Props> = (props) => {
       <Show when={showFileInstall()}>
         <div class="card">
           <p class="text-sm text-muted mb-4">
-            Поддерживаются форматы: <strong>.mrpack</strong> (Modrinth), <strong>.zip</strong> (CurseForge) и <strong>.stzhk</strong> (Stuzhik)
+            {t().modpacks.browser.file.supportedFormats} <strong>.mrpack</strong> (Modrinth), <strong>.zip</strong> (CurseForge), <strong>.stzhk</strong> (Stuzhik)
           </p>
 
           <div class="mb-4">
-            <span class="text-sm text-muted mb-2 block">Файл модпака</span>
+            <span class="text-sm text-muted mb-2 block">{t().modpacks.browser.file.modpackFile}</span>
             <div class="flex gap-2">
               <button
                 class="btn-secondary flex-1 justify-start text-left"
@@ -926,14 +929,14 @@ const ModpackBrowser: Component<Props> = (props) => {
               >
                 <i class="i-hugeicons-folder-01 w-4 h-4 flex-shrink-0" />
                 <span class="truncate">
-                  {filePath() || "Выбрать файл..."}
+                  {filePath() || t().modpacks.browser.file.selectFile}
                 </span>
               </button>
               <Show when={filePath()}>
                 <button
                   class="btn-ghost px-2"
                   onClick={clearFile}
-                  title="Очистить"
+                  title={t().modpacks.browser.file.clear}
                 >
                   <i class="i-hugeicons-cancel-01 w-4 h-4" />
                 </button>
@@ -945,7 +948,7 @@ const ModpackBrowser: Component<Props> = (props) => {
           <Show when={filePreviewLoading()}>
             <div class="flex-center gap-2 py-4">
               <i class="i-svg-spinners-6-dots-scale w-5 h-5" />
-              <span class="text-muted text-sm">Чтение модпака...</span>
+              <span class="text-muted text-sm">{t().modpacks.browser.file.reading}</span>
             </div>
           </Show>
 
@@ -954,7 +957,7 @@ const ModpackBrowser: Component<Props> = (props) => {
             <div class="card bg-yellow-600/10 border-yellow-600/30 mb-4">
               <p class="text-yellow-400 text-sm inline-flex items-center gap-1">
                 <i class="i-hugeicons-alert-02 w-4 h-4" />
-                Не удалось прочитать информацию о модпаке
+                {t().modpacks.browser.file.readError}
               </p>
             </div>
           </Show>
@@ -979,24 +982,24 @@ const ModpackBrowser: Component<Props> = (props) => {
 
               <div class="grid grid-cols-3 gap-3 text-center">
                 <div class="card bg-gray-alpha-50">
-                  <p class="text-xs text-dimmer">Minecraft</p>
+                  <p class="text-xs text-dimmer">{t().modpacks.browser.file.minecraft}</p>
                   <p class="font-medium">{filePreview()!.minecraft_version}</p>
                 </div>
                 <div class="card bg-gray-alpha-50">
-                  <p class="text-xs text-dimmer">Загрузчик</p>
+                  <p class="text-xs text-dimmer">{t().modpacks.browser.file.loader}</p>
                   <p class="font-medium">{filePreview()!.loader}</p>
                   <Show when={filePreview()!.loader_version}>
                     <p class="text-xs text-muted">{filePreview()!.loader_version}</p>
                   </Show>
                 </div>
                 <div class="card bg-gray-alpha-50">
-                  <p class="text-xs text-dimmer">Модов</p>
+                  <p class="text-xs text-dimmer">{t().modpacks.browser.file.modsCount}</p>
                   <p class="font-medium">
                     {filePreview()!.mod_count + filePreview()!.overrides_mods_count}
                   </p>
                   <Show when={filePreview()!.overrides_mods_count > 0}>
                     <p class="text-xs text-muted">
-                      ({filePreview()!.mod_count} в манифесте + {filePreview()!.overrides_mods_count} в overrides)
+                      ({filePreview()!.mod_count} {t().modpacks.browser.file.inManifest} + {filePreview()!.overrides_mods_count} {t().modpacks.browser.file.inOverrides})
                     </p>
                   </Show>
                 </div>
@@ -1005,7 +1008,7 @@ const ModpackBrowser: Component<Props> = (props) => {
           </Show>
 
           <label class="block mb-4">
-            <span class="text-sm text-muted mb-1 block">Название экземпляра</span>
+            <span class="text-sm text-muted mb-1 block">{t().modpacks.browser.confirm.instanceName}</span>
             <input
               type="text"
               value={fileInstanceName()}
@@ -1020,10 +1023,10 @@ const ModpackBrowser: Component<Props> = (props) => {
               class="btn-secondary flex-1"
               onClick={() => setShowDetailedPreview(true)}
               disabled={!filePath() || installing() || filePreviewLoading()}
-              title="Просмотреть содержимое модпака"
+              title={t().modpacks.browser.file.details}
             >
               <i class="i-hugeicons-view w-4 h-4" />
-              Подробнее
+              {t().modpacks.browser.file.details}
             </button>
             <button
               class="btn-primary flex-1"
@@ -1031,7 +1034,7 @@ const ModpackBrowser: Component<Props> = (props) => {
               disabled={!filePath() || !fileInstanceName() || installing() || filePreviewLoading()}
             >
               <i class="i-hugeicons-download-02 w-4 h-4" />
-              Установить
+              {t().modpacks.browser.file.install}
             </button>
           </div>
         </div>
@@ -1041,30 +1044,30 @@ const ModpackBrowser: Component<Props> = (props) => {
       <Show when={showUrlInstall()}>
         <div class="card">
           <p class="text-sm text-muted mb-4">
-            Вставьте ссылку на модпак <strong>.stzhk</strong> с облачного хранилища
+            {t().modpacks.browser.url.description}
           </p>
 
           <div class="flex flex-wrap gap-2 mb-4">
             <span class="badge bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
               <i class="i-hugeicons-youtube w-3 h-3" />
-              Яндекс.Диск
+              {t().modpacks.browser.url.yandexDisk}
             </span>
             <span class="badge bg-blue-600/20 text-blue-400 border-blue-600/30">
               <i class="i-hugeicons-google w-3 h-3" />
-              Google Drive
+              {t().modpacks.browser.url.googleDrive}
             </span>
             <span class="badge bg-sky-600/20 text-sky-400 border-sky-600/30">
               <i class="i-hugeicons-cloud w-3 h-3" />
-              Dropbox
+              {t().modpacks.browser.url.dropbox}
             </span>
             <span class="badge bg-gray-600/20 text-gray-400 border-gray-600/30">
               <i class="i-hugeicons-link-01 w-3 h-3" />
-              Прямая ссылка
+              {t().modpacks.browser.url.directLink}
             </span>
           </div>
 
           <label class="block mb-4">
-            <span class="text-sm text-muted mb-1 block">Ссылка на модпак</span>
+            <span class="text-sm text-muted mb-1 block">{t().modpacks.browser.url.modpackLink}</span>
             <input
               type="text"
               value={urlInput()}
@@ -1075,7 +1078,7 @@ const ModpackBrowser: Component<Props> = (props) => {
           </label>
 
           <label class="block mb-4">
-            <span class="text-sm text-muted mb-1 block">Название экземпляра</span>
+            <span class="text-sm text-muted mb-1 block">{t().modpacks.browser.url.instanceName}</span>
             <input
               type="text"
               value={urlInstanceName()}
@@ -1091,7 +1094,7 @@ const ModpackBrowser: Component<Props> = (props) => {
             disabled={!urlInput() || !urlInstanceName() || installing()}
           >
             <i class="i-hugeicons-download-02 w-4 h-4" />
-            Установить по ссылке
+            {t().modpacks.browser.url.installByLink}
           </button>
         </div>
       </Show>
@@ -1145,7 +1148,7 @@ const ModpackBrowser: Component<Props> = (props) => {
         <Show when={loading()}>
           <div class="flex-center gap-2 py-8">
             <i class="i-svg-spinners-6-dots-scale w-6 h-6" />
-            <span class="text-muted">Поиск...</span>
+            <span class="text-muted">{t().modpacks.browser.search.searching}</span>
           </div>
         </Show>
 
@@ -1169,7 +1172,7 @@ const ModpackBrowser: Component<Props> = (props) => {
 
                   <div class="flex-1 min-w-0">
                     <h3 class="font-semibold truncate">{modpack.title}</h3>
-                    <p class="text-xs text-muted mb-1">от {modpack.author}</p>
+                    <p class="text-xs text-muted mb-1">{t().modpacks.browser.search.by} {modpack.author}</p>
                     <p class="text-sm text-muted line-clamp-2 mb-2">{modpack.description}</p>
 
                     <div class="flex items-center gap-2 flex-wrap">
@@ -1194,7 +1197,7 @@ const ModpackBrowser: Component<Props> = (props) => {
                       }}
                     >
                       <i class="i-hugeicons-download-02 w-4 h-4" />
-                      Установить
+                      {t().common.install}
                     </button>
                   </div>
                 </div>
@@ -1216,8 +1219,8 @@ const ModpackBrowser: Component<Props> = (props) => {
         <Show when={!loading() && results().length === 0 && debouncedQuery()}>
           <div class="card flex-col-center py-12 text-center">
             <i class="i-hugeicons-search-01 w-12 h-12 text-gray-600 mb-3" />
-            <p class="text-muted">Модпаки не найдены</p>
-            <p class="text-sm text-dimmer">Попробуйте изменить запрос</p>
+            <p class="text-muted">{t().modpacks.browser.search.notFound}</p>
+            <p class="text-sm text-dimmer">{t().modpacks.browser.search.tryDifferent}</p>
           </div>
         </Show>
 
@@ -1225,8 +1228,8 @@ const ModpackBrowser: Component<Props> = (props) => {
         <Show when={!loading() && results().length === 0 && !debouncedQuery()}>
           <div class="card flex-col-center py-12 text-center">
             <i class="i-hugeicons-package w-12 h-12 text-gray-600 mb-3" />
-            <p class="text-muted">Введите запрос для поиска</p>
-            <p class="text-sm text-dimmer">Найдите модпаки на Modrinth или CurseForge</p>
+            <p class="text-muted">{t().modpacks.browser.search.enterQuery}</p>
+            <p class="text-sm text-dimmer">{t().modpacks.browser.search.findModpacks}</p>
           </div>
         </Show>
       </Show>
@@ -1243,7 +1246,7 @@ const ModpackBrowser: Component<Props> = (props) => {
           contentFormat={previewModpack()?.source === "curseforge" ? "html" : "markdown"}
           actions={() => (
             <div class="flex items-center gap-2">
-              <label class="text-sm text-gray-400">Название:</label>
+              <label class="text-sm text-gray-400">{t().modpacks.browser.preview.name}</label>
               <input
                 type="text"
                 value={previewInstanceName()}

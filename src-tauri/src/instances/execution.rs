@@ -221,6 +221,31 @@ pub async fn start_instance(
         )?;
     }
 
+    // Save launch snapshot in background (for tracking changes since last launch)
+    // Uses blake3 for fast hashing
+    {
+        let instance_id_snapshot = id.clone();
+        let instance_for_snapshot = instance.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = crate::launch_tracker::on_successful_launch(
+                &instance_id_snapshot,
+                &std::path::PathBuf::from(&instance_for_snapshot.dir),
+                &instance_for_snapshot.version,
+                instance_for_snapshot.loader.as_str(),
+                instance_for_snapshot.loader_version.as_deref(),
+            )
+            .await
+            {
+                log::warn!("Failed to save launch snapshot: {}", e);
+            } else {
+                log::info!(
+                    "Launch snapshot saved for instance {}",
+                    instance_id_snapshot
+                );
+            }
+        });
+    }
+
     // Emit status change
     let _ = app_handle.emit(
         "instance-status-changed",
@@ -2056,8 +2081,9 @@ pub fn cleanup_orphaned_processes() {
 
     // Find instances with running/starting/stopping status and a PID
     // 'stopping' is included because graceful_stop may fail to complete
+    // Also fetch 'dir' for snapshot marking
     let mut stmt = match conn.prepare(
-        "SELECT id, name, pid FROM instances WHERE status IN ('running', 'starting', 'stopping') AND pid IS NOT NULL"
+        "SELECT id, name, pid, dir FROM instances WHERE status IN ('running', 'starting', 'stopping') AND pid IS NOT NULL"
     ) {
         Ok(s) => s,
         Err(e) => {
@@ -2066,8 +2092,8 @@ pub fn cleanup_orphaned_processes() {
         }
     };
 
-    let orphans: Vec<(String, String, i64)> = stmt
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+    let orphans: Vec<(String, String, i64, String)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
         .ok()
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default();
@@ -2079,15 +2105,40 @@ pub fn cleanup_orphaned_processes() {
 
     log::info!("Found {} orphaned instance(s)", orphans.len());
 
-    for (id, name, pid) in orphans {
+    for (id, name, pid, dir) in orphans {
         log::info!("Cleaning up orphaned instance '{}' (PID: {})", name, pid);
+
+        let instance_dir = std::path::PathBuf::from(&dir);
+        let was_killed;
 
         // Check if process is still running
         if is_process_running(pid as u32) {
             log::info!("Process {} is still running, killing it", pid);
             kill_process_by_pid(pid as u32);
+            was_killed = true;
         } else {
             log::info!("Process {} is no longer running", pid);
+            was_killed = false;
+        }
+
+        // Mark the last snapshot as unsuccessful if we had to kill the process
+        // (app was closed while game was running - forced termination)
+        // If process was already dead, leave was_successful as None (unknown)
+        if was_killed {
+            let history = crate::launch_tracker::load_history(&instance_dir);
+            if let Some(last_snapshot) = history.snapshots.first() {
+                log::info!(
+                    "Marking snapshot {} as unsuccessful (orphaned process killed)",
+                    last_snapshot.id
+                );
+                if let Err(e) = crate::launch_tracker::mark_snapshot_result(
+                    &instance_dir,
+                    &last_snapshot.id,
+                    false, // was_successful = false (forced kill)
+                ) {
+                    log::warn!("Failed to mark snapshot result: {}", e);
+                }
+            }
         }
 
         // Update DB to stopped status
