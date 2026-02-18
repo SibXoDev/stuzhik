@@ -134,7 +134,7 @@ function InstallProgressModal(props: Props) {
       try {
         await invoke<boolean>("cancel_operation", { operationId: `instance-install-${props.instanceId}` });
       } catch (e) {
-        console.error("Failed to cancel:", e);
+        if (import.meta.env.DEV) console.error("Failed to cancel:", e);
         setCancelling(false);
       }
       return;
@@ -144,17 +144,17 @@ function InstallProgressModal(props: Props) {
     try {
       await invoke<boolean>("cancel_operation", { operationId: opId });
     } catch (e) {
-      console.error("Failed to cancel:", e);
+      if (import.meta.env.DEV) console.error("Failed to cancel:", e);
       setCancelling(false);
     }
   };
 
   return (
     <ModalWrapper maxWidth="max-w-3xl">
-      <div class="p-6">
+      <div class="flex flex-col gap-6 p-6">
         {/* Header */}
-        <div class="mb-6">
-          <h2 class="text-2xl font-bold mb-1">
+        <div class="flex flex-col gap-1">
+          <h2 class="text-2xl font-bold">
             {completed() ? "Установка завершена!" : "Установка экземпляра"}
           </h2>
           <p class="text-sm text-muted">{props.instanceName}</p>
@@ -162,11 +162,11 @@ function InstallProgressModal(props: Props) {
 
         {/* Error */}
         <Show when={error()}>
-          <div class="card bg-red-600/10 border-red-600/30 mb-6">
+          <div class="card bg-red-600/10 border-red-600/30">
             <div class="flex items-start gap-3">
               <i class="i-hugeicons-alert-02 text-red-400 w-5 h-5 flex-shrink-0" />
-              <div class="flex-1">
-                <h3 class="font-medium text-red-400 mb-1">Ошибка установки</h3>
+              <div class="flex flex-col gap-1 flex-1">
+                <h3 class="font-medium text-red-400">Ошибка установки</h3>
                 <p class="text-sm text-red-300">{error()}</p>
               </div>
             </div>
@@ -174,8 +174,8 @@ function InstallProgressModal(props: Props) {
         </Show>
 
         {/* Steps Progress */}
-        <div class="mb-6">
-          <div class="flex items-center justify-between mb-4">
+        <div class="flex flex-col gap-4">
+          <div class="flex items-center justify-between">
             <For each={steps}>
               {(step, index) => {
                 const currentIndex = getStepIndex(currentStep());
@@ -192,7 +192,7 @@ function InstallProgressModal(props: Props) {
                           isCompleted
                             ? "bg-green-600 text-white"
                             : isActive
-                            ? "bg-blue-600 text-white animate-pulse"
+                            ? "bg-[var(--color-primary)] text-white animate-pulse"
                             : "bg-gray-700 text-gray-500"
                         }`}
                       >
@@ -237,29 +237,31 @@ function InstallProgressModal(props: Props) {
 
         {/* Downloads Progress */}
         <Show when={downloads().length > 0}>
-          <div class="space-y-2 mb-4">
-            <h3 class="text-sm font-medium text-gray-400 mb-2">Загрузки:</h3>
+          <div class="space-y-2">
+            <h3 class="text-sm font-medium text-gray-400">Загрузки:</h3>
             <For each={downloads()}>
               {(download) => (
-                <div class="bg-gray-800 rounded-2xl p-3">
-                  <div class="flex items-center justify-between mb-2">
+                <div class="flex flex-col gap-2 bg-gray-800 rounded-2xl p-3">
+                  <div class="flex items-center justify-between">
                     <span class="text-sm font-medium truncate flex-1">{download.name}</span>
                     <span class="text-xs text-muted">
                       {(download.speed / 1024 / 1024).toFixed(2)} MB/s
                     </span>
                   </div>
-                  <div class="w-full bg-gray-700 rounded-full h-2">
-                    <div
-                      class="bg-blue-600 h-2 rounded-full transition-all"
-                      style={{ width: `${download.percentage}%` }}
-                    />
-                  </div>
-                  <div class="flex items-center justify-between mt-1">
-                    <span class="text-xs text-muted">
-                      {(download.downloaded / 1024 / 1024).toFixed(2)} /{" "}
-                      {(download.total / 1024 / 1024).toFixed(2)} MB
-                    </span>
-                    <span class="text-xs text-muted">{download.percentage.toFixed(0)}%</span>
+                  <div class="flex flex-col gap-1">
+                    <div class="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        class="bg-[var(--color-primary)] h-2 rounded-full transition-all"
+                        style={{ width: `${download.percentage}%` }}
+                      />
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-muted">
+                        {(download.downloaded / 1024 / 1024).toFixed(2)} /{" "}
+                        {(download.total / 1024 / 1024).toFixed(2)} MB
+                      </span>
+                      <span class="text-xs text-muted">{download.percentage.toFixed(0)}%</span>
+                    </div>
                   </div>
                 </div>
               )}

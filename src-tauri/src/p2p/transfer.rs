@@ -108,7 +108,7 @@ impl TransferManager {
 
         for folder in sync_folders {
             let folder_path = instance_path.join(folder);
-            if folder_path.exists() {
+            if tokio::fs::try_exists(&folder_path).await.unwrap_or(false) {
                 Self::scan_directory(&folder_path, &folder_path, &mut files).await?;
             }
         }
@@ -149,8 +149,10 @@ impl TransferManager {
 
             if metadata.is_file() {
                 // Вычисляем относительный путь
+                // Safety: unwrap_or(base_path) handles case when base_path is root (has no parent)
+                let prefix = base_path.parent().unwrap_or(base_path);
                 let relative_path = path
-                    .strip_prefix(base_path.parent().unwrap_or(base_path))
+                    .strip_prefix(prefix)
                     .map_err(|e| format!("Failed to compute relative path: {}", e))?
                     .to_string_lossy()
                     .to_string();

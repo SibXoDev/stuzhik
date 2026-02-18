@@ -1,11 +1,14 @@
-import { createSignal, Show, For, createEffect, createMemo } from "solid-js";
+import { createSignal, Show, For, createEffect, createMemo, onCleanup } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
-import { listen } from "@tauri-apps/api/event";
-import { Toggle } from "../../../shared/ui";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { Toggle, Select } from "../../../shared/ui";
 import { ModalWrapper } from "../../../shared/ui/ModalWrapper";
 import { useI18n } from "../../../shared/i18n";
 import { formatSize } from "../../../shared/utils/format-size";
+
+type ExportFormat = "stzhk" | "mrpack" | "universalZip";
+type ReadmeLanguage = "ru" | "en" | "both";
 
 interface StzhkExportDialogProps {
   instanceId: string;
@@ -69,9 +72,27 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
 
   // Memoized size formatter with localized units
   const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
-  // Load saved metadata from localStorage
+
+  // Load saved metadata from localStorage with error handling
   const savedMetadata = localStorage.getItem(`modpack-export-${props.instanceId}`);
-  const initialMetadata = savedMetadata ? JSON.parse(savedMetadata) : {};
+  let initialMetadata: Record<string, string> = {};
+  if (savedMetadata) {
+    try {
+      initialMetadata = JSON.parse(savedMetadata);
+    } catch {
+      // Ignore corrupted data
+      localStorage.removeItem(`modpack-export-${props.instanceId}`);
+    }
+  }
+
+  // Track active listeners for cleanup
+  let previewUnlisten: UnlistenFn | null = null;
+  let exportUnlisten: UnlistenFn | null = null;
+
+  onCleanup(() => {
+    if (previewUnlisten) previewUnlisten();
+    if (exportUnlisten) exportUnlisten();
+  });
 
   const [modpackName, setModpackName] = createSignal(initialMetadata.name || props.instanceName);
   const [modpackVersion, setModpackVersion] = createSignal(initialMetadata.version || "1.0.0");
@@ -84,6 +105,11 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
   const [progress, setProgress] = createSignal<ExportProgress | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [success, setSuccess] = createSignal<string | null>(null);
+
+  // Export format
+  const [exportFormat, setExportFormat] = createSignal<ExportFormat>("stzhk");
+  const [readmeLanguage, setReadmeLanguage] = createSignal<ReadmeLanguage>("ru");
+  const [includeReadme, setIncludeReadme] = createSignal(true);
 
   // Preview state
   const [preview, setPreview] = createSignal<ExportPreview | null>(null);
@@ -149,8 +175,14 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
     setExcludedMods(new Set<string>()); // Reset exclusions
     setExcludedOverrides(new Set<string>());
 
+    // Clean up previous listener if any
+    if (previewUnlisten) {
+      previewUnlisten();
+      previewUnlisten = null;
+    }
+
     // Listen to progress events
-    const unlisten = await listen<PreviewProgress>("stzhk-preview-progress", (event) => {
+    previewUnlisten = await listen<PreviewProgress>("stzhk-preview-progress", (event) => {
       setPreviewProgress(event.payload);
     });
 
@@ -164,7 +196,10 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
     } catch (e) {
       setError(String(e));
     } finally {
-      unlisten();
+      if (previewUnlisten) {
+        previewUnlisten();
+        previewUnlisten = null;
+      }
       setLoadingPreview(false);
       setPreviewProgress(null);
     }
@@ -189,14 +224,27 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
     localStorage.setItem(`modpack-export-${props.instanceId}`, JSON.stringify(metadata));
   });
 
+  // Get file extension and filter name based on format
+  const getExportConfig = () => {
+    switch (exportFormat()) {
+      case "stzhk":
+        return { ext: "stzhk", filter: "STZHK Modpack", extensions: ["stzhk"] };
+      case "mrpack":
+        return { ext: "mrpack", filter: "Modrinth Modpack", extensions: ["mrpack"] };
+      case "universalZip":
+        return { ext: "zip", filter: "ZIP Archive", extensions: ["zip"] };
+    }
+  };
+
   async function handleExport() {
     setError(null);
     setSuccess(null);
 
     const sanitizedName = modpackName().replace(/\s+/g, "_");
+    const config = getExportConfig();
     const outputPath = await save({
-      defaultPath: `${sanitizedName}_v${modpackVersion()}.stzhk`,
-      filters: [{ name: "STZHK Modpack", extensions: ["stzhk"] }],
+      defaultPath: `${sanitizedName}_v${modpackVersion()}.${config.ext}`,
+      filters: [{ name: config.filter, extensions: config.extensions }],
     });
 
     if (!outputPath) return;
@@ -207,43 +255,112 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
     setExporting(true);
     setProgress(null);
 
-    const unlisten = await listen<ExportProgress>("stzhk-export-progress", (event) => {
+    // Clean up previous listener if any
+    if (exportUnlisten) {
+      exportUnlisten();
+      exportUnlisten = null;
+    }
+
+    const progressEvent = exportFormat() === "universalZip"
+      ? "universal-zip-export-progress"
+      : "stzhk-export-progress";
+
+    exportUnlisten = await listen<ExportProgress>(progressEvent, (event) => {
       setProgress(event.payload);
     });
 
     try {
-      const resultPath = await invoke<string>("export_stzhk", {
-        instanceId: props.instanceId,
-        outputPath: outputDir,
-        options: {
-          name: modpackName(),
-          version: modpackVersion(),
-          author: modpackAuthor(),
-          description: modpackDescription() || null,
-          embedMods: embedMods(),
-          includeOverrides: includeOverrides(),
-          excludedMods: Array.from(excludedMods()),
-          excludedOverrides: Array.from(excludedOverrides()),
-        },
-      });
+      let resultPath: string;
+
+      if (exportFormat() === "universalZip") {
+        // Universal ZIP export for friends without launcher
+        resultPath = await invoke<string>("export_universal_zip", {
+          instanceId: props.instanceId,
+          outputPath: outputDir,
+          options: {
+            name: modpackName(),
+            version: modpackVersion(),
+            author: modpackAuthor(),
+            description: modpackDescription() || null,
+            include_readme: includeReadme(),
+            readme_language: readmeLanguage(),
+            excluded_mods: Array.from(excludedMods()),
+            excluded_overrides: Array.from(excludedOverrides()),
+          },
+        });
+      } else if (exportFormat() === "mrpack") {
+        // Modrinth .mrpack export
+        resultPath = await invoke<string>("export_mrpack", {
+          instanceId: props.instanceId,
+          outputPath: outputDir,
+          options: {
+            name: modpackName(),
+            version: modpackVersion(),
+            summary: modpackDescription() || null,
+            include_overrides: true,
+            excluded_mods: Array.from(excludedMods()),
+            excluded_overrides: Array.from(excludedOverrides()),
+          },
+        });
+      } else {
+        // STZHK export
+        resultPath = await invoke<string>("export_stzhk", {
+          instanceId: props.instanceId,
+          outputPath: outputDir,
+          options: {
+            name: modpackName(),
+            version: modpackVersion(),
+            author: modpackAuthor(),
+            description: modpackDescription() || null,
+            embedMods: embedMods(),
+            includeOverrides: includeOverrides(),
+            excludedMods: Array.from(excludedMods()),
+            excludedOverrides: Array.from(excludedOverrides()),
+          },
+        });
+      }
       setSuccess(resultPath);
     } catch (e) {
       setError(String(e));
     } finally {
-      unlisten();
+      if (exportUnlisten) {
+        exportUnlisten();
+        exportUnlisten = null;
+      }
       setExporting(false);
       setProgress(null);
     }
   }
 
+  // Dynamic title based on format
+  const exportTitle = () => {
+    switch (exportFormat()) {
+      case "universalZip":
+        return t().modpacks.export.universalZip?.title ?? "Export for Friends";
+      case "mrpack":
+        return t().modpacks.export.mrpack?.title ?? "Export to Modrinth";
+      default:
+        return t().modpacks.export.title;
+    }
+  };
+
+  const exportSubtitle = () => {
+    switch (exportFormat()) {
+      case "universalZip":
+        return t().modpacks.export.universalZip?.subtitle ?? "Creating archive from";
+      default:
+        return t().modpacks.export.subtitle;
+    }
+  };
+
   return (
     <ModalWrapper maxWidth="max-w-3xl" backdrop>
       <div class="max-h-[90vh] overflow-hidden flex flex-col p-4">
         {/* Header */}
-        <div class="flex items-center justify-between mb-6 flex-shrink-0">
-          <div>
-            <h2 class="text-xl font-bold">{t().modpacks.export.title}</h2>
-            <p class="text-sm text-muted mt-1">{t().modpacks.export.subtitle} {props.instanceName}</p>
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+          <div class="flex flex-col gap-1">
+            <h2 class="text-xl font-bold">{exportTitle()}</h2>
+            <p class="text-sm text-muted">{exportSubtitle()} {props.instanceName}</p>
           </div>
           <button
             class="btn-close"
@@ -274,6 +391,66 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
         </Show>
 
         <Show when={!success()}>
+          {/* Format Selection */}
+          <div class="flex gap-2 mb-4 flex-shrink-0">
+            <button
+              class={`flex-1 px-3 py-2.5 rounded-xl border transition-all ${
+                exportFormat() === "stzhk"
+                  ? "bg-[var(--color-primary-bg)] border-[var(--color-primary)] text-[var(--color-primary)]"
+                  : "bg-gray-800/50 border-gray-700 hover:border-gray-600 text-gray-300"
+              }`}
+              onClick={() => setExportFormat("stzhk")}
+              disabled={exporting()}
+            >
+              <div class="flex items-center justify-center gap-2">
+                <i class="i-hugeicons-package w-4 h-4" />
+                <span class="font-medium">{t().modpacks.export.format?.stzhk?.name ?? "STZHK"}</span>
+              </div>
+              <p class="text-[10px] text-muted mt-1">{t().modpacks.export.format?.stzhk?.hint ?? "For Stuzhik"}</p>
+            </button>
+            <button
+              class={`flex-1 px-3 py-2.5 rounded-xl border transition-all ${
+                exportFormat() === "mrpack"
+                  ? "bg-green-500/20 border-green-500 text-green-400"
+                  : "bg-gray-800/50 border-gray-700 hover:border-gray-600 text-gray-300"
+              }`}
+              onClick={() => setExportFormat("mrpack")}
+              disabled={exporting()}
+            >
+              <div class="flex items-center justify-center gap-2">
+                <i class="i-hugeicons-upload-02 w-4 h-4" />
+                <span class="font-medium">{t().modpacks.export.format?.mrpack?.name ?? "Modrinth"}</span>
+              </div>
+              <p class="text-[10px] text-muted mt-1">{t().modpacks.export.format?.mrpack?.hint ?? "For Prism, MultiMC"}</p>
+            </button>
+            <button
+              class={`flex-1 px-3 py-2.5 rounded-xl border transition-all ${
+                exportFormat() === "universalZip"
+                  ? "bg-amber-500/20 border-amber-500 text-amber-400"
+                  : "bg-gray-800/50 border-gray-700 hover:border-gray-600 text-gray-300"
+              }`}
+              onClick={() => setExportFormat("universalZip")}
+              disabled={exporting()}
+            >
+              <div class="flex items-center justify-center gap-2">
+                <i class="i-hugeicons-user-multiple w-4 h-4" />
+                <span class="font-medium">{t().modpacks.export.format?.universalZip?.name ?? "Universal ZIP"}</span>
+              </div>
+              <p class="text-[10px] text-muted mt-1">{t().modpacks.export.format?.universalZip?.hint ?? "For friends"}</p>
+            </button>
+          </div>
+
+          {/* Warning for Universal ZIP */}
+          <Show when={exportFormat() === "universalZip"}>
+            <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-4 flex items-start gap-3 flex-shrink-0">
+              <i class="i-hugeicons-alert-02 w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div class="text-sm">
+                <p class="text-amber-400 font-medium">{t().modpacks.export.universalZip?.warning?.title ?? "Warning: large file size"}</p>
+                <p class="text-muted mt-1">{t().modpacks.export.universalZip?.warning?.hint ?? "Archive contains ALL mods and files."}</p>
+              </div>
+            </div>
+          </Show>
+
           {/* Modpack Metadata Card */}
           <div class="bg-gradient-to-br from-gray-800/50 to-gray-750/50 rounded-xl p-4 mb-4 border border-gray-700 flex-shrink-0">
             <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -289,7 +466,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   onInput={(e) => setModpackName(e.currentTarget.value)}
                   placeholder={t().ui.placeholders.modpackName}
                   disabled={exporting()}
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors disabled:opacity-50"
                 />
               </div>
               <div>
@@ -300,7 +477,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   onInput={(e) => setModpackVersion(e.currentTarget.value)}
                   placeholder={t().ui.placeholders.versionNumber}
                   disabled={exporting()}
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors disabled:opacity-50"
                 />
               </div>
               <div class="col-span-2">
@@ -311,7 +488,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   onInput={(e) => setModpackAuthor(e.currentTarget.value)}
                   placeholder={t().ui.placeholders.yourNameOrNick}
                   disabled={exporting()}
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors disabled:opacity-50"
                 />
               </div>
               <div class="col-span-2">
@@ -322,47 +499,97 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   placeholder={t().ui.placeholders.shortDescription}
                   disabled={exporting()}
                   rows={2}
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-50 resize-none"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors disabled:opacity-50 resize-none"
                 />
               </div>
             </div>
           </div>
 
-          {/* Options */}
+          {/* Options - different based on format */}
           <div class="space-y-4 mb-4 flex-shrink-0">
-            {/* Embed mods option */}
-            <div class="flex items-start gap-3">
-              <Toggle
-                checked={embedMods()}
-                onChange={setEmbedMods}
-                disabled={exporting()}
-              />
-              <div class="flex-1">
-                <span class="font-medium">
-                  {t().modpacks.export.options.embedMods}
-                </span>
-                <p class="text-sm text-muted mt-0.5">
-                  {t().modpacks.export.options.embedModsHint}
-                </p>
+            {/* STZHK options */}
+            <Show when={exportFormat() === "stzhk"}>
+              {/* Embed mods option */}
+              <div class="flex items-start gap-3">
+                <Toggle
+                  checked={embedMods()}
+                  onChange={setEmbedMods}
+                  disabled={exporting()}
+                />
+                <div class="flex-1">
+                  <span class="font-medium">
+                    {t().modpacks.export.options.embedMods}
+                  </span>
+                  <p class="text-sm text-muted mt-0.5">
+                    {t().modpacks.export.options.embedModsHint}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            {/* Include overrides option */}
-            <div class="flex items-start gap-3">
-              <Toggle
-                checked={includeOverrides()}
-                onChange={setIncludeOverrides}
-                disabled={exporting()}
-              />
-              <div class="flex-1">
-                <span class="font-medium">
-                  {t().modpacks.export.options.includeOverrides}
-                </span>
-                <p class="text-sm text-muted mt-0.5">
-                  {t().modpacks.export.options.includeOverridesHint}
-                </p>
+              {/* Include overrides option */}
+              <div class="flex items-start gap-3">
+                <Toggle
+                  checked={includeOverrides()}
+                  onChange={setIncludeOverrides}
+                  disabled={exporting()}
+                />
+                <div class="flex-1">
+                  <span class="font-medium">
+                    {t().modpacks.export.options.includeOverrides}
+                  </span>
+                  <p class="text-sm text-muted mt-0.5">
+                    {t().modpacks.export.options.includeOverridesHint}
+                  </p>
+                </div>
               </div>
-            </div>
+            </Show>
+
+            {/* Universal ZIP options */}
+            <Show when={exportFormat() === "universalZip"}>
+              {/* README toggle */}
+              <div class="flex items-start gap-3">
+                <Toggle
+                  checked={includeReadme()}
+                  onChange={setIncludeReadme}
+                  disabled={exporting()}
+                />
+                <div class="flex-1">
+                  <span class="font-medium">
+                    {t().modpacks.export.universalZip?.readme?.include ?? "Include README with instructions"}
+                  </span>
+                  <p class="text-sm text-muted mt-0.5">
+                    {t().modpacks.export.universalZip?.readme?.hint ?? "File with step-by-step installation guide"}
+                  </p>
+                </div>
+              </div>
+
+              {/* README language selector */}
+              <Show when={includeReadme()}>
+                <div class="flex items-center gap-3 pl-12">
+                  <label class="text-sm text-muted whitespace-nowrap">
+                    {t().modpacks.export.universalZip?.readmeLanguage ?? "README Language"}:
+                  </label>
+                  <Select
+                    value={readmeLanguage()}
+                    onChange={(v) => setReadmeLanguage(v as ReadmeLanguage)}
+                    options={[
+                      { value: "ru", label: t().modpacks.export.universalZip?.readmeLanguages?.ru ?? "Russian" },
+                      { value: "en", label: t().modpacks.export.universalZip?.readmeLanguages?.en ?? "English" },
+                      { value: "both", label: t().modpacks.export.universalZip?.readmeLanguages?.both ?? "Both languages" },
+                    ]}
+                    disabled={exporting()}
+                  />
+                </div>
+              </Show>
+            </Show>
+
+            {/* MRPACK has no special options - just uses CDN links */}
+            <Show when={exportFormat() === "mrpack"}>
+              <div class="flex items-start gap-2 text-sm text-muted bg-gray-800/30 rounded-lg p-3">
+                <i class="i-hugeicons-information-circle w-4 h-4 flex-shrink-0 mt-0.5 text-blue-400" />
+                <span>{t().modpacks.export.mrpack?.info ?? "Modrinth format uses CDN links for mods. Compatible with Prism Launcher, MultiMC, and Modrinth App."}</span>
+              </div>
+            </Show>
           </div>
 
           {/* Preview toggle */}
@@ -384,7 +611,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
             <div class="mb-4 flex-shrink-0">
               <div class="h-1.5 bg-gray-700 rounded-full overflow-hidden">
                 <div
-                  class="h-full bg-blue-500 transition-all duration-150"
+                  class="h-full bg-[var(--color-primary)] transition-all duration-150"
                   style={{
                     width: `${previewProgress()!.total > 0
                       ? (previewProgress()!.current / previewProgress()!.total) * 100
@@ -414,9 +641,9 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   <div class="text-sm text-muted">{t().modpacks.export.summary.mods}</div>
                   <div class="text-lg font-semibold">{preview()!.mods.length}</div>
                   <Show when={!embedMods()}>
-                    <div class="text-xs text-muted mt-1">
-                      <span class="text-green-400">{preview()!.modrinth_mods_count}</span> {t().modpacks.export.summary.fromModrinth},
-                      <span class="text-yellow-400 ml-1">{preview()!.local_mods_count}</span> {t().modpacks.export.summary.local}
+                    <div class="flex flex-wrap gap-1 text-xs text-muted mt-1">
+                      <span><span class="text-green-400">{preview()!.modrinth_mods_count}</span> {t().modpacks.export.summary.fromModrinth},</span>
+                      <span><span class="text-yellow-400">{preview()!.local_mods_count}</span> {t().modpacks.export.summary.local}</span>
                     </div>
                   </Show>
                 </div>
@@ -466,7 +693,7 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                     <button
                       class={`text-xs px-2 py-1 rounded-lg transition-colors ${
                         sourceFilter() === "all"
-                          ? "bg-blue-500/20 text-blue-400"
+                          ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]"
                           : "text-gray-400 hover:text-gray-200 hover:bg-gray-700/50"
                       }`}
                       onClick={() => setSourceFilter("all")}
@@ -628,9 +855,9 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
                   {/* Hint about generated files */}
                   <Show when={preview()!.overrides.some(o => o.category === "generated" && !excludedOverrides().has(o.path))}>
                     <div class="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                      <p class="text-xs text-amber-400">
-                        <i class="i-hugeicons-information-circle w-3 h-3 inline-block mr-1" />
-                        {t().modpacks.export.overrides.generatedHint}
+                      <p class="flex items-center gap-1 text-xs text-amber-400">
+                        <i class="i-hugeicons-information-circle w-3 h-3 flex-shrink-0" />
+                        <span>{t().modpacks.export.overrides.generatedHint}</span>
                       </p>
                     </div>
                   </Show>
@@ -653,8 +880,8 @@ export function StzhkExportDialog(props: StzhkExportDialogProps) {
               </div>
               <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
                 <div
-                  class="h-full bg-blue-500 transition-all duration-150"
-                  style={{ width: `${(progress()!.current / progress()!.total) * 100}%` }}
+                  class="h-full bg-[var(--color-primary)] transition-all duration-150"
+                  style={{ width: `${progress()!.total > 0 ? (progress()!.current / progress()!.total) * 100 : 0}%` }}
                 />
               </div>
               <Show when={progress()!.filename}>

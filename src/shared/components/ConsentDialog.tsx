@@ -35,7 +35,7 @@ export function ConsentDialog(props: ConsentDialogProps) {
       });
       props.onResponse(approved, remember());
     } catch (e) {
-      console.error("Failed to respond to consent:", e);
+      if (import.meta.env.DEV) console.error("Failed to respond to consent:", e);
     } finally {
       setResponding(false);
       props.onClose();
@@ -61,7 +61,7 @@ export function ConsentDialog(props: ConsentDialogProps) {
     <ModalWrapper maxWidth="max-w-md" backdrop>
       <div class="overflow-hidden">
         {/* Header */}
-        <div class="p-4 border-b border-gray-700 bg-gray-800/50">
+        <div class="p-4 border-b border-[var(--color-border)] bg-gray-800/50">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
               <i class="i-hugeicons-alert-02 w-5 h-5 text-white" />

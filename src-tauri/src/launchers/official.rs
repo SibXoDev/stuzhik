@@ -35,7 +35,7 @@ pub async fn parse_launcher_profiles(
 ) -> LauncherResult<Vec<LauncherInstance>> {
     let profiles_path = minecraft_dir.join("launcher_profiles.json");
 
-    if !profiles_path.exists() {
+    if !fs::try_exists(&profiles_path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "launcher_profiles.json not found in {}",
             minecraft_dir.display()
@@ -130,7 +130,7 @@ fn detect_loader_from_version(version: &str) -> (&'static str, Option<String>) {
 /// Count mods in mods folder
 async fn count_mods(game_dir: &Path) -> usize {
     let mods_dir = game_dir.join("mods");
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return 0;
     }
 
@@ -152,7 +152,7 @@ async fn calculate_dir_size(dir: &Path) -> u64 {
 
     // Just count mods folder size for now
     let mods_dir = dir.join("mods");
-    if mods_dir.exists() {
+    if fs::try_exists(&mods_dir).await.unwrap_or(false) {
         if let Ok(mut entries) = fs::read_dir(&mods_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 if let Ok(meta) = entry.metadata().await {
@@ -164,7 +164,7 @@ async fn calculate_dir_size(dir: &Path) -> u64 {
 
     // Add config folder size
     let config_dir = dir.join("config");
-    if config_dir.exists() {
+    if fs::try_exists(&config_dir).await.unwrap_or(false) {
         if let Ok(mut entries) = fs::read_dir(&config_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 if let Ok(meta) = entry.metadata().await {
@@ -228,7 +228,7 @@ pub async fn detect_installations() -> Vec<DetectedLauncher> {
         if let Some(path) = path_opt {
             // Check for launcher_profiles.json
             let profiles_path = path.join("launcher_profiles.json");
-            if profiles_path.exists() {
+            if fs::try_exists(&profiles_path).await.unwrap_or(false) {
                 // Count profiles
                 let instance_count = match parse_launcher_profiles(&path).await {
                     Ok(instances) => instances.len(),

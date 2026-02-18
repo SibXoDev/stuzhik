@@ -3,11 +3,16 @@ import type { Component } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { ModpackSearchResult, ModpackSearchResponse, ModpackInstallProgress, ModpackFilePreview, ModpackInstallSummary, Instance, InstallProgress, DownloadProgress, ModpackVersionInfo, ModpackDetails, VersionChangelog, ProjectInfo } from "../../../shared/types";
+import type { ModpackSearchResult, ModpackSearchResponse, ModpackInstallProgress, ModpackFilePreview, ModpackInstallSummary, FailedModInfo, ModSearchInfo, Instance, InstallProgress, DownloadProgress, ModpackVersionInfo, ModpackDetails, VersionChangelog, ProjectInfo } from "../../../shared/types";
 import { ProjectInfoDialog } from "../../../shared/components/ProjectInfoDialog";
 import ModpackCompareDialog from "./ModpackCompareDialog";
 import ModpackImportPreview from "./ModpackImportPreview";
-import { Pagination } from "../../../shared/ui";
+import { InstallProgressModal } from "./InstallProgressModal";
+import { InstallSummaryDialog } from "./InstallSummaryDialog";
+import type { ModResolution } from "./InstallSummaryDialog";
+import { FileInstallPanel } from "./FileInstallPanel";
+import { UrlInstallPanel } from "./UrlInstallPanel";
+import { Pagination, Tooltip } from "../../../shared/ui";
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import { useSafeTimers, useDebounce } from "../../../shared/hooks";
 import { useI18n } from "../../../shared/i18n";
@@ -36,6 +41,9 @@ const ModpackBrowser: Component<Props> = (props) => {
   const [selectedModpack, setSelectedModpack] = createSignal<ModpackSearchResult | null>(null);
   const [instanceName, setInstanceName] = createSignal("");
   const [operationId, setOperationId] = createSignal<string | null>(null);
+  // Separate signal for modpack-level operation ID (mod downloads).
+  // Both tokens must be cancelled to fully stop installation.
+  const [modpackOperationId, setModpackOperationId] = createSignal<string | null>(null);
   const [cancelling, setCancelling] = createSignal(false);
 
   // File install
@@ -65,12 +73,20 @@ const ModpackBrowser: Component<Props> = (props) => {
   // Install summary (shows after installation completes)
   const [installSummary, setInstallSummary] = createSignal<ModpackInstallSummary | null>(null);
 
+  // Resolution state for failed mods: tracks search results and install status per mod
+  const [modResolutions, setModResolutions] = createSignal<Record<string, ModResolution>>({});
+
   // Instance installation progress (Java → Minecraft → Loader)
   const [instanceInstallStep, setInstanceInstallStep] = createSignal<string | null>(null);
   const [instanceInstallMessage, setInstanceInstallMessage] = createSignal<string>("");
+  // installedInstanceId is set ONLY when invoke returns (mods downloaded) — used as guard for dialog close
   const [installedInstanceId, setInstalledInstanceId] = createSignal<string | null>(null);
+  // progressInstanceId tracks which instance's progress events to display (set early from progress events)
+  const [progressInstanceId, setProgressInstanceId] = createSignal<string | null>(null);
   const [, setInstalledInstanceName] = createSignal<string>("");
   const [downloads, setDownloads] = createSignal<DownloadProgress[]>([]);
+  // Track instance-created event that arrived before install_modpack returned
+  const [earlyInstanceCreatedId, setEarlyInstanceCreatedId] = createSignal<string | null>(null);
 
   // Compare dialog
   const [showCompareDialog, setShowCompareDialog] = createSignal(false);
@@ -144,6 +160,29 @@ const ModpackBrowser: Component<Props> = (props) => {
     }
   });
 
+  // Helper: close the install dialog with "complete" state
+  const closeInstallDialog = () => {
+    setInstanceInstallStep("complete");
+    setInstanceInstallMessage(t().modpacks.browser.ready);
+    safeTimeout(() => {
+      // Don't close if install summary is showing — user needs to see failed mods
+      if (installSummary()) {
+        // Mark as ready to close but wait for user to dismiss summary
+        setInstalling(false);
+        return;
+      }
+      setInstalling(false);
+      setOperationId(null);
+      setInstanceInstallStep(null);
+      setInstalledInstanceId(null);
+      setProgressInstanceId(null);
+      setInstalledInstanceName("");
+      setDownloads([]);
+      setEarlyInstanceCreatedId(null);
+      props.onClose();
+    }, 1500);
+  };
+
   // Setup event listeners on mount (NOT in createEffect to avoid duplicates!)
   onMount(() => {
     // Listen for install progress
@@ -157,29 +196,37 @@ const ModpackBrowser: Component<Props> = (props) => {
         setCancelling(false);
         setInstanceInstallStep(null);
         setInstalledInstanceId(null);
+        setProgressInstanceId(null);
         setInstalledInstanceName("");
         setDownloads([]);
+        setEarlyInstanceCreatedId(null);
+        setModpackOperationId(null);
       }
     });
 
-    // Listen for modpack operation started (to get operation ID for cancellation)
+    // Listen for modpack operation started (mod downloads — separate token from instance install)
     const unlistenOperationStarted = listen<{ operation_id: string }>("modpack-operation-started", (event) => {
+      setModpackOperationId(event.payload.operation_id);
+      // Set as primary operationId too (used for cancel button state / operation-cancelled matching)
       setOperationId(event.payload.operation_id);
     });
 
-    // Listen for instance operation started (when loader installation begins after modpack install)
-    // This is important because the modpack's operation_id is different from the instance's
+    // Listen for instance operation started (Java/MC/Loader — runs in parallel with mod downloads)
+    // Store as primary operationId so cancel button targets it, but do NOT clear modpackOperationId
     const unlistenInstanceOperationStarted = listen<{ operation_id: string }>("instance-operation-started", (event) => {
-      // Update operation ID when instance installation starts (Java/MC/Loader)
       setOperationId(event.payload.operation_id);
     });
 
-    // Listen for operation cancelled
+    // Listen for operation cancelled — match either modpack or instance token
     const unlistenOperationCancelled = listen<{ id: string }>("operation-cancelled", (event) => {
-      if (event.payload.id === operationId()) {
+      const cancelledId = event.payload.id;
+      if (cancelledId === operationId() || cancelledId === modpackOperationId()) {
         setInstalling(false);
         setOperationId(null);
+        setModpackOperationId(null);
         setCancelling(false);
+        setProgressInstanceId(null);
+        setEarlyInstanceCreatedId(null);
         setError(t().modpacks.browser.installCancelled);
       }
     });
@@ -190,16 +237,22 @@ const ModpackBrowser: Component<Props> = (props) => {
       // Показываем сводку если есть моды с Modrinth (потенциально не те версии) или failed
       if (summary.from_modrinth.length > 0 || summary.failed.length > 0) {
         setInstallSummary(summary);
+        // Auto-search for failed mods
+        if (summary.failed.length > 0) {
+          autoSearchFailedMods(summary);
+        }
       }
     });
 
     // Listen for instance installation progress (Java → Minecraft → Loader)
+    // Uses progressInstanceId (NOT installedInstanceId) to avoid premature dialog close.
+    // installedInstanceId is only set when invoke returns (mods downloaded).
     const unlistenInstanceProgress = listen<InstallProgress>("instance-install-progress", (event) => {
-      const instId = installedInstanceId();
-      // Only track if we have an instance ID or this is the first progress event
-      if (!instId || event.payload.id === instId) {
-        if (!instId) {
-          setInstalledInstanceId(event.payload.id);
+      const progId = progressInstanceId();
+      // Accept progress from our tracked instance, or from any instance if we haven't identified one yet
+      if (!progId || event.payload.id === progId) {
+        if (!progId) {
+          setProgressInstanceId(event.payload.id);
         }
         setInstanceInstallStep(event.payload.step);
         setInstanceInstallMessage(event.payload.message);
@@ -211,11 +264,28 @@ const ModpackBrowser: Component<Props> = (props) => {
       const progress = event.payload;
       setDownloads(prev => {
         const existing = prev.findIndex(d => d.id === progress.id);
-        if (progress.status === "completed" || progress.status === "cancelled" || progress.status === "failed") {
-          // Remove completed/cancelled/failed downloads after 1 second delay
+
+        // Preserve source from previous update if new event doesn't include it
+        // (only the first Connecting event includes source, subsequent events have source=null)
+        if (!progress.source && existing >= 0 && prev[existing].source) {
+          progress.source = prev[existing].source;
+        }
+
+        if (progress.status === "completed" || progress.status === "cancelled" || progress.status === "failed" || progress.status === "stalled") {
+          // Update status in array so user sees the terminal state visually
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = progress;
+            // Remove after 1.5s delay so user can see the failed/stalled state
+            safeTimeout(() => {
+              setDownloads(current => current.filter(d => d.id !== progress.id));
+            }, 1500);
+            return updated;
+          }
+          // Not in array yet — schedule removal anyway
           safeTimeout(() => {
             setDownloads(current => current.filter(d => d.id !== progress.id));
-          }, 1000);
+          }, 1500);
           return prev;
         }
         if (existing >= 0) {
@@ -232,36 +302,30 @@ const ModpackBrowser: Component<Props> = (props) => {
     const unlistenCreated = listen<{ id: string }>("instance-created", (event) => {
       const instId = installedInstanceId();
       const isInstalling = installing();
-      // Close modal if we're installing and either:
-      // 1. ID matches (strict check)
-      // 2. We're installing but ID wasn't tracked yet (fallback)
-      if (isInstalling && (instId === event.payload.id || !instId)) {
-        setInstanceInstallStep("complete");
-        setInstanceInstallMessage(t().modpacks.browser.ready);
-        // Close the entire dialog after showing "complete" for a moment
-        safeTimeout(() => {
-          setInstalling(false);
-          setOperationId(null);
-          setInstanceInstallStep(null);
-          setInstalledInstanceId(null);
-          setInstalledInstanceName("");
-          setDownloads([]);
-          // Close the ModpackBrowser dialog itself
-          props.onClose();
-        }, 1500);
+      if (!isInstalling) return;
+
+      if (instId && instId === event.payload.id) {
+        // Normal case: install_modpack already returned, ID matches → close dialog
+        closeInstallDialog();
+      } else if (!instId) {
+        // Race condition: instance-created arrived BEFORE install_modpack returned
+        // (loader installed faster than mods downloaded). Remember the event ID
+        // and close later when install_modpack finishes.
+        setEarlyInstanceCreatedId(event.payload.id);
       }
     });
 
     // Cleanup all listeners on unmount
+    const safeUnlisten = (p: Promise<() => void>) => p.then(fn => fn()).catch(() => {});
     onCleanup(() => {
-      unlistenProgress.then(fn => fn());
-      unlistenOperationStarted.then(fn => fn());
-      unlistenInstanceOperationStarted.then(fn => fn());
-      unlistenOperationCancelled.then(fn => fn());
-      unlistenInstallSummary.then(fn => fn());
-      unlistenInstanceProgress.then(fn => fn());
-      unlistenDownload.then(fn => fn());
-      unlistenCreated.then(fn => fn());
+      safeUnlisten(unlistenProgress);
+      safeUnlisten(unlistenOperationStarted);
+      safeUnlisten(unlistenInstanceOperationStarted);
+      safeUnlisten(unlistenOperationCancelled);
+      safeUnlisten(unlistenInstallSummary);
+      safeUnlisten(unlistenInstanceProgress);
+      safeUnlisten(unlistenDownload);
+      safeUnlisten(unlistenCreated);
     });
   });
 
@@ -287,6 +351,117 @@ const ModpackBrowser: Component<Props> = (props) => {
       setLoading(false);
     }
   };
+
+  // === Failed mod resolution ===
+
+  const autoSearchFailedMods = async (summary: ModpackInstallSummary) => {
+    // Initialize resolution state for each failed mod
+    const initial: Record<string, ModResolution> = {};
+    for (const mod of summary.failed) {
+      initial[mod.file_name] = { status: "searching", results: [], selectedIndex: 0 };
+    }
+    setModResolutions(initial);
+
+    // Search for each failed mod on both platforms
+    for (const mod of summary.failed) {
+      try {
+        // Try Modrinth first, then CurseForge
+        let results: ModSearchInfo[] = [];
+        try {
+          const modrinthResults = await invoke<ModSearchInfo[]>("search_mod_by_name", {
+            name: mod.display_name,
+            source: "modrinth",
+            minecraftVersion: summary.minecraft_version,
+            loader: summary.loader !== "vanilla" ? summary.loader : null,
+          });
+          results.push(...modrinthResults);
+        } catch {
+          // Modrinth search failed, continue
+        }
+        try {
+          const cfResults = await invoke<ModSearchInfo[]>("search_mod_by_name", {
+            name: mod.display_name,
+            source: "curseforge",
+            minecraftVersion: summary.minecraft_version,
+            loader: summary.loader !== "vanilla" ? summary.loader : null,
+          });
+          results.push(...cfResults);
+        } catch {
+          // CurseForge search failed, continue
+        }
+
+        setModResolutions((prev) => ({
+          ...prev,
+          [mod.file_name]: {
+            status: results.length > 0 ? "found" : "not_found",
+            results,
+            selectedIndex: 0,
+          },
+        }));
+      } catch {
+        setModResolutions((prev) => ({
+          ...prev,
+          [mod.file_name]: { status: "error", results: [], selectedIndex: 0 },
+        }));
+      }
+    }
+  };
+
+  const installResolvedMod = async (failedMod: FailedModInfo, searchResult: ModSearchInfo) => {
+    const summary = installSummary();
+    if (!summary) return;
+
+    // Mark as installing
+    setModResolutions((prev) => ({
+      ...prev,
+      [failedMod.file_name]: { ...prev[failedMod.file_name], status: "installing" },
+    }));
+
+    try {
+      await invoke("install_mod_by_slug", {
+        instanceId: summary.instance_id,
+        slug: searchResult.source === "curseforge"
+          ? searchResult.project_id
+          : searchResult.slug,
+        source: searchResult.source,
+      });
+
+      setModResolutions((prev) => ({
+        ...prev,
+        [failedMod.file_name]: { ...prev[failedMod.file_name], status: "installed" },
+      }));
+    } catch {
+      setModResolutions((prev) => ({
+        ...prev,
+        [failedMod.file_name]: { ...prev[failedMod.file_name], status: "error" },
+      }));
+    }
+  };
+
+  const installAllResolved = async () => {
+    const summary = installSummary();
+    if (!summary) return;
+
+    const resolutions = modResolutions();
+    for (const mod of summary.failed) {
+      const resolution = resolutions[mod.file_name];
+      if (resolution?.status === "found" && resolution.results.length > 0) {
+        await installResolvedMod(mod, resolution.results[resolution.selectedIndex]);
+      }
+    }
+  };
+
+  const resolvedCount = createMemo(() => {
+    const resolutions = modResolutions();
+    return Object.values(resolutions).filter((r) => r.status === "found" || r.status === "installed").length;
+  });
+
+  const installedResolvedCount = createMemo(() => {
+    const resolutions = modResolutions();
+    return Object.values(resolutions).filter((r) => r.status === "installed").length;
+  });
+
+  // === End failed mod resolution ===
 
   const handleInstall = async (modpack: ModpackSearchResult) => {
     setSelectedModpack(modpack);
@@ -318,6 +493,12 @@ const ModpackBrowser: Component<Props> = (props) => {
       // Call onInstalled IMMEDIATELY so instance appears in the list
       // Modal stays open showing loader installation progress
       props.onInstalled(instanceId, name);
+
+      // If instance-created arrived BEFORE install_modpack returned (race condition),
+      // close the dialog now since mods are done downloading
+      if (earlyInstanceCreatedId() === instanceId) {
+        closeInstallDialog();
+      }
     } catch (e) {
       setError(String(e));
       setInstalling(false);
@@ -346,6 +527,11 @@ const ModpackBrowser: Component<Props> = (props) => {
 
       // Call onInstalled IMMEDIATELY so instance appears in the list
       props.onInstalled(instanceId, name);
+
+      // If instance-created arrived early, close now
+      if (earlyInstanceCreatedId() === instanceId) {
+        closeInstallDialog();
+      }
     } catch (e) {
       setError(String(e));
       setInstalling(false);
@@ -377,6 +563,11 @@ const ModpackBrowser: Component<Props> = (props) => {
 
       // Call onInstalled IMMEDIATELY so instance appears in the list
       props.onInstalled(instanceId, name);
+
+      // If instance-created arrived early, close now
+      if (earlyInstanceCreatedId() === instanceId) {
+        closeInstallDialog();
+      }
     } catch (e) {
       setError(String(e));
       setInstalling(false);
@@ -384,19 +575,25 @@ const ModpackBrowser: Component<Props> = (props) => {
   };
 
   const getProgressText = () => {
-    // If instance installation is in progress, show that instead
     const instStep = instanceInstallStep();
     const instMsg = instanceInstallMessage();
+    const progress = installProgress();
+
+    // Instance installation in progress (Java/Minecraft/Loader) — show that
+    // BUT if mods are already downloading, prefer showing mod progress
     if (instStep && instStep !== "complete") {
-      // Show instance installation message (Java/Minecraft/Loader)
+      if (progress && progress.stage === "downloading_mods") {
+        // Mods are downloading in parallel with loader — show mod progress
+        return `${t().modpacks.browser.downloadingMods} (${progress.current}/${progress.total})${progress.current_file ? `: ${progress.current_file}` : ""}`;
+      }
       return instMsg || t().modpacks.browser.installingComponents;
     }
-    if (instStep === "complete") {
-      return t().modpacks.browser.ready;
-    }
 
-    const progress = installProgress();
-    if (!progress) return t().modpacks.browser.preparing;
+    if (!progress) {
+      if (instStep === "complete" && installedInstanceId()) return t().modpacks.browser.ready;
+      if (instStep === "complete") return t().modpacks.browser.installingLoader;
+      return t().modpacks.browser.preparing;
+    }
 
     switch (progress.stage) {
       case "downloading":
@@ -410,8 +607,11 @@ const ModpackBrowser: Component<Props> = (props) => {
       case "extracting_overrides":
         return t().modpacks.browser.extractingFiles;
       case "completed":
-        // Mods downloaded, but loader installation may still be in progress
-        return t().modpacks.browser.installingLoader;
+        // Mods downloaded — check if loader is still installing
+        if (instStep && instStep !== "complete") {
+          return t().modpacks.browser.installingLoader;
+        }
+        return t().modpacks.browser.ready;
       default:
         return t().modpacks.browser.installing;
     }
@@ -424,14 +624,24 @@ const ModpackBrowser: Component<Props> = (props) => {
   };
 
   const handleCancel = async () => {
-    const opId = operationId();
-    if (!opId) return;
+    const instanceOpId = operationId();
+    const modpackOpId = modpackOperationId();
+    if (!instanceOpId && !modpackOpId) return;
 
     setCancelling(true);
     try {
-      await invoke<boolean>("cancel_operation", { operationId: opId });
+      // Cancel BOTH tokens: instance (Java/MC/Loader) AND modpack (mod downloads).
+      // They run in parallel, so both must be cancelled to fully stop installation.
+      const promises: Promise<boolean>[] = [];
+      if (instanceOpId) {
+        promises.push(invoke<boolean>("cancel_operation", { operationId: instanceOpId }));
+      }
+      if (modpackOpId && modpackOpId !== instanceOpId) {
+        promises.push(invoke<boolean>("cancel_operation", { operationId: modpackOpId }));
+      }
+      await Promise.all(promises);
     } catch (e) {
-      console.error("Failed to cancel:", e);
+      if (import.meta.env.DEV) console.error("Failed to cancel:", e);
       setCancelling(false);
     }
   };
@@ -568,10 +778,10 @@ const ModpackBrowser: Component<Props> = (props) => {
       const selected = await open({
         multiple: false,
         filters: [{
-          name: "Модпаки",
+          name: t().ui?.dialogs?.modpackFilter ?? "Modpacks",
           extensions: ["mrpack", "zip", "stzhk"]
         }],
-        title: "Выберите файл модпака"
+        title: t().ui?.dialogs?.selectModpackFile ?? "Select modpack file"
       });
 
       if (selected && typeof selected === "string") {
@@ -602,7 +812,7 @@ const ModpackBrowser: Component<Props> = (props) => {
         }
       }
     } catch (e) {
-      console.error("File selection error:", e);
+      if (import.meta.env.DEV) console.error("File selection error:", e);
     }
   };
 
@@ -632,184 +842,48 @@ const ModpackBrowser: Component<Props> = (props) => {
 
       {/* Installing Overlay */}
       <Show when={installing()}>
-        <div class="fixed inset-0 bg-black/70 backdrop-blur-sm z-60 flex items-center justify-center">
-          <div class="card max-w-lg w-full text-center p-8">
-            <Show when={!cancelling()} fallback={
-              <>
-                <i class="i-svg-spinners-6-dots-scale w-12 h-12 mx-auto mb-4" />
-                <h3 class="text-xl font-semibold mb-2">{t().modpacks.browser.cancelling}</h3>
-                <p class="text-muted mb-4">{t().modpacks.browser.waitingForOperation}</p>
-              </>
-            }>
-              <h3 class="text-xl font-semibold mb-4">{t().modpacks.browser.title}</h3>
-
-              {/* Unified progress indicator - all steps */}
-              <div class="flex flex-wrap items-center justify-center gap-1.5 text-xs font-medium mb-4">
-                {/* Модпак */}
-                <span class={`px-2.5 py-1 rounded-lg transition-all duration-100 ${
-                  installProgress()?.stage === "downloading"
-                    ? "bg-blue-600 text-white animate-pulse"
-                    : installProgress() || instanceInstallStep()
-                      ? "bg-green-600/20 text-green-400"
-                      : "bg-gray-800 text-gray-500"
-                }`}>{t().modpacks.browser.steps.modpack}</span>
-                <span class={installProgress() || instanceInstallStep() ? "text-green-400" : "text-gray-600"}>→</span>
-
-                {/* Моды */}
-                <span class={`px-2.5 py-1 rounded-lg transition-all duration-100 ${
-                  ["resolving_mods", "downloading_mods"].includes(installProgress()?.stage || "")
-                    ? "bg-blue-600 text-white animate-pulse"
-                    : ["extracting_overrides", "completed"].includes(installProgress()?.stage || "") || instanceInstallStep()
-                      ? "bg-green-600/20 text-green-400"
-                      : "bg-gray-800 text-gray-500"
-                }`}>{t().modpacks.browser.steps.mods}</span>
-                <span class={["extracting_overrides", "completed"].includes(installProgress()?.stage || "") || instanceInstallStep() ? "text-green-400" : "text-gray-600"}>→</span>
-
-                {/* Распаковка */}
-                <span class={`px-2.5 py-1 rounded-lg transition-all duration-100 ${
-                  installProgress()?.stage === "extracting_overrides"
-                    ? "bg-blue-600 text-white animate-pulse"
-                    : installProgress()?.stage === "completed" || instanceInstallStep()
-                      ? "bg-green-600/20 text-green-400"
-                      : "bg-gray-800 text-gray-500"
-                }`}>{t().modpacks.browser.steps.files}</span>
-                <span class={installProgress()?.stage === "completed" || instanceInstallStep() ? "text-green-400" : "text-gray-600"}>→</span>
-
-                {/* Java + Minecraft (параллельно) */}
-                <span class={`px-2.5 py-1 rounded-lg transition-all duration-100 ${
-                  ["java", "minecraft"].includes(instanceInstallStep() || "")
-                    ? "bg-blue-600 text-white animate-pulse"
-                    : ["loader", "complete"].includes(instanceInstallStep() || "")
-                      ? "bg-green-600/20 text-green-400"
-                      : "bg-gray-800 text-gray-500"
-                }`}>{t().modpacks.browser.steps.javaMc}</span>
-                <span class={["loader", "complete"].includes(instanceInstallStep() || "") ? "text-green-400" : "text-gray-600"}>→</span>
-
-                {/* Загрузчик */}
-                <span class={`px-2.5 py-1 rounded-lg transition-all duration-100 ${
-                  instanceInstallStep() === "loader"
-                    ? "bg-blue-600 text-white animate-pulse"
-                    : instanceInstallStep() === "complete"
-                      ? "bg-green-600/20 text-green-400"
-                      : "bg-gray-800 text-gray-500"
-                }`}>{t().modpacks.browser.steps.loader}</span>
-                <span class={instanceInstallStep() === "complete" ? "text-green-400" : "text-gray-600"}>→</span>
-
-                {/* Готово */}
-                <span class={`px-2.5 py-1 rounded-lg transition-all duration-100 ${
-                  instanceInstallStep() === "complete"
-                    ? "bg-green-600 text-white"
-                    : "bg-gray-800 text-gray-500"
-                }`}>{t().modpacks.browser.steps.done}</span>
-              </div>
-
-              {/* Current step details */}
-              <p class="text-muted text-sm mb-2">{getProgressText()}</p>
-
-              {/* Progress bar for mod downloads */}
-              <Show when={installProgress()?.stage === "downloading_mods"}>
-                <div class="w-full bg-gray-800 rounded-full h-2 mt-3">
-                  <div
-                    class="bg-blue-600 h-2 rounded-full transition-all duration-100"
-                    style={{ width: `${getProgressPercent()}%` }}
-                  />
-                </div>
-              </Show>
-
-              {/* Active downloads */}
-              <Show when={downloads().length > 0}>
-                <div class="mt-4 max-h-32 overflow-y-auto text-left space-y-2">
-                  <For each={downloads()}>
-                    {(dl) => (
-                      <div class="bg-gray-800/50 rounded-xl p-2">
-                        <div class="flex items-center justify-between text-xs mb-1">
-                          <span class="truncate flex-1 text-gray-300">{dl.name}</span>
-                          <span class="text-dimmer ml-2">
-                            {dl.total > 0 ? `${((dl.downloaded / dl.total) * 100).toFixed(0)}%` : "..."}
-                          </span>
-                        </div>
-                        <div class="w-full bg-gray-800 rounded-full h-1">
-                          <div
-                            class="bg-blue-500 h-1 rounded-full transition-all duration-100"
-                            style={{ width: `${dl.total > 0 ? (dl.downloaded / dl.total) * 100 : 0}%` }}
-                          />
-                        </div>
-                        <Show when={dl.speed > 0}>
-                          <div class="text-[10px] text-dimmer mt-1">
-                            {(dl.speed / (1024 * 1024)).toFixed(1)} MB/s
-                          </div>
-                        </Show>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </Show>
-
-              <button
-                class="btn-secondary mt-6"
-                onClick={handleCancel}
-                disabled={cancelling() || !operationId()}
-              >
-                <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                {operationId() ? t().modpacks.browser.cancel : t().modpacks.browser.waiting}
-              </button>
-            </Show>
-          </div>
-        </div>
+        <InstallProgressModal
+          cancelling={cancelling}
+          installProgress={installProgress}
+          instanceInstallStep={instanceInstallStep}
+          installedInstanceId={installedInstanceId}
+          downloads={downloads}
+          operationId={operationId}
+          modpackOperationId={modpackOperationId}
+          getProgressText={getProgressText}
+          getProgressPercent={getProgressPercent}
+          onCancel={handleCancel}
+          t={t}
+        />
       </Show>
 
       {/* Install Summary Dialog */}
       <Show when={installSummary()}>
-        <div class="fixed inset-0 bg-black/70 backdrop-blur-sm z-60 flex items-center justify-center p-4">
-          <div class="card max-w-lg w-full max-h-[80vh] overflow-y-auto">
-            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-              <i class="i-hugeicons-alert-02 w-5 h-5 text-yellow-500" />
-              {t().modpacks.browser.summary.title}
-            </h3>
-
-            <Show when={installSummary()!.from_modrinth.length > 0}>
-              <div class="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl">
-                <p class="text-sm font-medium text-yellow-400 mb-2">
-                  ⚠️ {t().modpacks.browser.summary.modrinthWarning}
-                  <br />
-                  <span class="text-yellow-500/80">{t().modpacks.browser.summary.modrinthWarningNote}</span>
-                </p>
-                <ul class="text-xs text-muted space-y-1 max-h-32 overflow-y-auto">
-                  <For each={installSummary()!.from_modrinth}>
-                    {(mod) => <li class="truncate">• {mod}</li>}
-                  </For>
-                </ul>
-              </div>
-            </Show>
-
-            <Show when={installSummary()!.failed.length > 0}>
-              <div class="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-2xl">
-                <p class="text-sm font-medium text-red-400 mb-2">
-                  ❌ {t().modpacks.browser.summary.failedMods}
-                </p>
-                <ul class="text-xs text-muted space-y-1 max-h-32 overflow-y-auto">
-                  <For each={installSummary()!.failed}>
-                    {(mod) => <li class="truncate">• {mod}</li>}
-                  </For>
-                </ul>
-              </div>
-            </Show>
-
-            <div class="text-xs text-dimmer mb-4">
-              {t().modpacks.browser.summary.totalMods}: {installSummary()!.total_mods} |
-              CurseForge: {installSummary()!.from_curseforge.length} |
-              Modrinth: {installSummary()!.from_modrinth.length} |
-              {t().modpacks.browser.summary.notDownloaded}: {installSummary()!.failed.length}
-            </div>
-
-            <button
-              class="btn-primary w-full"
-              onClick={() => setInstallSummary(null)}
-            >
-              {t().modpacks.browser.summary.understood}
-            </button>
-          </div>
-        </div>
+        <InstallSummaryDialog
+          installSummary={installSummary}
+          modResolutions={modResolutions}
+          setModResolutions={setModResolutions}
+          resolvedCount={resolvedCount}
+          installedResolvedCount={installedResolvedCount}
+          onAutoSearch={autoSearchFailedMods}
+          onInstallMod={installResolvedMod}
+          onInstallAll={installAllResolved}
+          onDismiss={() => {
+            setInstallSummary(null);
+            setModResolutions({});
+            if (!installing()) {
+              setOperationId(null);
+              setInstanceInstallStep(null);
+              setInstalledInstanceId(null);
+              setProgressInstanceId(null);
+              setInstalledInstanceName("");
+              setDownloads([]);
+              setEarlyInstanceCreatedId(null);
+              props.onClose();
+            }
+          }}
+          t={t}
+        />
       </Show>
 
       {/* Confirm Install Dialog */}
@@ -865,7 +939,7 @@ const ModpackBrowser: Component<Props> = (props) => {
         <button
           class={`flex-1 px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
             !showFileInstall() && !showUrlInstall()
-              ? "bg-blue-600 text-white"
+              ? "bg-[var(--color-primary)] text-white"
               : "bg-gray-800 text-gray-300 hover:bg-gray-750"
           }`}
           onClick={() => { setShowFileInstall(false); setShowUrlInstall(false); }}
@@ -876,7 +950,7 @@ const ModpackBrowser: Component<Props> = (props) => {
         <button
           class={`flex-1 px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
             showFileInstall()
-              ? "bg-blue-600 text-white"
+              ? "bg-[var(--color-primary)] text-white"
               : "bg-gray-800 text-gray-300 hover:bg-gray-750"
           }`}
           onClick={() => { setShowFileInstall(true); setShowUrlInstall(false); }}
@@ -895,14 +969,15 @@ const ModpackBrowser: Component<Props> = (props) => {
           <i class="i-hugeicons-link-01 w-4 h-4" />
           {t().modpacks.browser.tabs.byLink}
         </button>
-        <button
-          class="px-4 py-2 rounded-2xl font-medium transition-colors duration-100 bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border border-purple-600/30 inline-flex items-center justify-center gap-2"
-          onClick={() => setShowCompareDialog(true)}
-          title={t().modpacks.browser.tabs.compare}
-        >
-          <i class="i-hugeicons-git-compare w-4 h-4" />
-          {t().modpacks.browser.tabs.compare}
-        </button>
+        <Tooltip text={t().modpacks.browser.tabs.compare} position="bottom">
+          <button
+            class="px-4 py-2 rounded-2xl font-medium transition-colors duration-100 bg-purple-600/20 text-purple-400 hover:bg-purple-600/30 border border-purple-600/30 inline-flex items-center justify-center gap-2"
+            onClick={() => setShowCompareDialog(true)}
+          >
+            <i class="i-hugeicons-git-compare w-4 h-4" />
+            {t().modpacks.browser.tabs.compare}
+          </button>
+        </Tooltip>
       </div>
 
       {/* Compare Dialog */}
@@ -915,188 +990,33 @@ const ModpackBrowser: Component<Props> = (props) => {
 
       {/* File Install Mode */}
       <Show when={showFileInstall()}>
-        <div class="card">
-          <p class="text-sm text-muted mb-4">
-            {t().modpacks.browser.file.supportedFormats} <strong>.mrpack</strong> (Modrinth), <strong>.zip</strong> (CurseForge), <strong>.stzhk</strong> (Stuzhik)
-          </p>
-
-          <div class="mb-4">
-            <span class="text-sm text-muted mb-2 block">{t().modpacks.browser.file.modpackFile}</span>
-            <div class="flex gap-2">
-              <button
-                class="btn-secondary flex-1 justify-start text-left"
-                onClick={selectFile}
-              >
-                <i class="i-hugeicons-folder-01 w-4 h-4 flex-shrink-0" />
-                <span class="truncate">
-                  {filePath() || t().modpacks.browser.file.selectFile}
-                </span>
-              </button>
-              <Show when={filePath()}>
-                <button
-                  class="btn-ghost px-2"
-                  onClick={clearFile}
-                  title={t().modpacks.browser.file.clear}
-                >
-                  <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                </button>
-              </Show>
-            </div>
-          </div>
-
-          {/* Preview loading */}
-          <Show when={filePreviewLoading()}>
-            <div class="flex-center gap-2 py-4">
-              <i class="i-svg-spinners-6-dots-scale w-5 h-5" />
-              <span class="text-muted text-sm">{t().modpacks.browser.file.reading}</span>
-            </div>
-          </Show>
-
-          {/* Preview error */}
-          <Show when={filePreviewError()}>
-            <div class="card bg-yellow-600/10 border-yellow-600/30 mb-4">
-              <p class="text-yellow-400 text-sm inline-flex items-center gap-1">
-                <i class="i-hugeicons-alert-02 w-4 h-4" />
-                {t().modpacks.browser.file.readError}
-              </p>
-            </div>
-          </Show>
-
-          {/* Preview info */}
-          <Show when={filePreview()}>
-            <div class="card bg-gray-alpha-50 mb-4 space-y-3">
-              <div class="flex items-start justify-between">
-                <div>
-                  <h4 class="font-semibold text-lg">{filePreview()!.name}</h4>
-                  <p class="text-sm text-muted">{filePreview()!.summary || `Версия ${filePreview()!.version}`}</p>
-                </div>
-                <span class={`badge ${
-                  filePreview()!.format === "modrinth" ? "badge-success" :
-                  filePreview()!.format === "stzhk" ? "bg-cyan-600/20 text-cyan-400 border-cyan-600/30" :
-                  "bg-orange-600/20 text-orange-400 border-orange-600/30"
-                }`}>
-                  {filePreview()!.format === "modrinth" ? "Modrinth" :
-                   filePreview()!.format === "stzhk" ? "Stuzhik" : "CurseForge"}
-                </span>
-              </div>
-
-              <div class="grid grid-cols-3 gap-3 text-center">
-                <div class="card bg-gray-alpha-50">
-                  <p class="text-xs text-dimmer">{t().modpacks.browser.file.minecraft}</p>
-                  <p class="font-medium">{filePreview()!.minecraft_version}</p>
-                </div>
-                <div class="card bg-gray-alpha-50">
-                  <p class="text-xs text-dimmer">{t().modpacks.browser.file.loader}</p>
-                  <p class="font-medium">{filePreview()!.loader}</p>
-                  <Show when={filePreview()!.loader_version}>
-                    <p class="text-xs text-muted">{filePreview()!.loader_version}</p>
-                  </Show>
-                </div>
-                <div class="card bg-gray-alpha-50">
-                  <p class="text-xs text-dimmer">{t().modpacks.browser.file.modsCount}</p>
-                  <p class="font-medium">
-                    {filePreview()!.mod_count + filePreview()!.overrides_mods_count}
-                  </p>
-                  <Show when={filePreview()!.overrides_mods_count > 0}>
-                    <p class="text-xs text-muted">
-                      ({filePreview()!.mod_count} {t().modpacks.browser.file.inManifest} + {filePreview()!.overrides_mods_count} {t().modpacks.browser.file.inOverrides})
-                    </p>
-                  </Show>
-                </div>
-              </div>
-            </div>
-          </Show>
-
-          <label class="block mb-4">
-            <span class="text-sm text-muted mb-1 block">{t().modpacks.browser.confirm.instanceName}</span>
-            <input
-              type="text"
-              value={fileInstanceName()}
-              onInput={(e) => setFileInstanceName(e.currentTarget.value)}
-              class="w-full"
-              placeholder={t().ui.placeholders.myModpack}
-            />
-          </label>
-
-          <div class="flex gap-2">
-            <button
-              class="btn-secondary flex-1"
-              onClick={() => setShowDetailedPreview(true)}
-              disabled={!filePath() || installing() || filePreviewLoading()}
-              title={t().modpacks.browser.file.details}
-            >
-              <i class="i-hugeicons-view w-4 h-4" />
-              {t().modpacks.browser.file.details}
-            </button>
-            <button
-              class="btn-primary flex-1"
-              onClick={handleFileInstall}
-              disabled={!filePath() || !fileInstanceName() || installing() || filePreviewLoading()}
-            >
-              <i class="i-hugeicons-download-02 w-4 h-4" />
-              {t().modpacks.browser.file.install}
-            </button>
-          </div>
-        </div>
+        <FileInstallPanel
+          filePath={filePath}
+          fileInstanceName={fileInstanceName}
+          filePreview={filePreview}
+          filePreviewLoading={filePreviewLoading}
+          filePreviewError={filePreviewError}
+          installing={installing}
+          onSelectFile={selectFile}
+          onClearFile={clearFile}
+          onSetInstanceName={setFileInstanceName}
+          onShowDetailedPreview={() => setShowDetailedPreview(true)}
+          onInstall={handleFileInstall}
+          t={t}
+        />
       </Show>
 
       {/* URL Install Mode */}
       <Show when={showUrlInstall()}>
-        <div class="card">
-          <p class="text-sm text-muted mb-4">
-            {t().modpacks.browser.url.description}
-          </p>
-
-          <div class="flex flex-wrap gap-2 mb-4">
-            <span class="badge bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
-              <i class="i-hugeicons-youtube w-3 h-3" />
-              {t().modpacks.browser.url.yandexDisk}
-            </span>
-            <span class="badge bg-blue-600/20 text-blue-400 border-blue-600/30">
-              <i class="i-hugeicons-google w-3 h-3" />
-              {t().modpacks.browser.url.googleDrive}
-            </span>
-            <span class="badge bg-sky-600/20 text-sky-400 border-sky-600/30">
-              <i class="i-hugeicons-cloud w-3 h-3" />
-              {t().modpacks.browser.url.dropbox}
-            </span>
-            <span class="badge bg-gray-600/20 text-gray-400 border-gray-600/30">
-              <i class="i-hugeicons-link-01 w-3 h-3" />
-              {t().modpacks.browser.url.directLink}
-            </span>
-          </div>
-
-          <label class="block mb-4">
-            <span class="text-sm text-muted mb-1 block">{t().modpacks.browser.url.modpackLink}</span>
-            <input
-              type="text"
-              value={urlInput()}
-              onInput={(e) => setUrlInput(e.currentTarget.value)}
-              class="w-full"
-              placeholder={t().ui.placeholders.cloudStorageUrl}
-            />
-          </label>
-
-          <label class="block mb-4">
-            <span class="text-sm text-muted mb-1 block">{t().modpacks.browser.url.instanceName}</span>
-            <input
-              type="text"
-              value={urlInstanceName()}
-              onInput={(e) => setUrlInstanceName(e.currentTarget.value)}
-              class="w-full"
-              placeholder={t().ui.placeholders.myModpack}
-            />
-          </label>
-
-          <button
-            class="btn w-full bg-cyan-600 hover:bg-cyan-500 text-white"
-            onClick={handleUrlInstall}
-            disabled={!urlInput() || !urlInstanceName() || installing()}
-          >
-            <i class="i-hugeicons-download-02 w-4 h-4" />
-            {t().modpacks.browser.url.installByLink}
-          </button>
-        </div>
+        <UrlInstallPanel
+          urlInput={urlInput}
+          urlInstanceName={urlInstanceName}
+          installing={installing}
+          onSetUrl={setUrlInput}
+          onSetInstanceName={setUrlInstanceName}
+          onInstall={handleUrlInstall}
+          t={t}
+        />
       </Show>
 
       {/* Online Search Mode */}

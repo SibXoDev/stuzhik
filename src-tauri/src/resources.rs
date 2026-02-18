@@ -215,20 +215,29 @@ impl ResourceManager {
         let conn = get_db_conn()?;
         let table = resource_type.table_name();
 
+        // Explicit column list to avoid positional index fragility with SELECT *
+        // (tables have extra columns like resolution/features at index 19 that we skip)
+        let columns = "id, instance_id, is_global, slug, name, version, minecraft_version, \
+                        source, source_id, project_url, download_url, \
+                        file_name, file_hash, file_size, \
+                        enabled, auto_update, \
+                        description, author, icon_url, \
+                        installed_at, updated_at";
+
         let query = if let Some(id) = instance_id {
             if include_global {
                 format!(
-                    "SELECT * FROM {} WHERE instance_id = ?1 OR is_global = 1 ORDER BY name",
-                    table
+                    "SELECT {} FROM {} WHERE instance_id = ?1 OR is_global = 1 ORDER BY name",
+                    columns, table
                 )
             } else {
                 format!(
-                    "SELECT * FROM {} WHERE instance_id = ?1 ORDER BY name",
-                    table
+                    "SELECT {} FROM {} WHERE instance_id = ?1 ORDER BY name",
+                    columns, table
                 )
             }
         } else {
-            format!("SELECT * FROM {} WHERE is_global = 1 ORDER BY name", table)
+            format!("SELECT {} FROM {} WHERE is_global = 1 ORDER BY name", columns, table)
         };
 
         let mut stmt = conn.prepare(&query)?;
@@ -272,8 +281,8 @@ impl ResourceManager {
             description: row.get(16)?,
             author: row.get(17)?,
             icon_url: row.get(18)?,
-            installed_at: row.get(20)?,
-            updated_at: row.get(21)?,
+            installed_at: row.get(19)?,
+            updated_at: row.get(20)?,
         })
     }
 
@@ -601,18 +610,20 @@ impl ResourceManager {
         resource_id: i64,
         enabled: bool,
     ) -> Result<()> {
-        let conn = get_db_conn()?;
         let table = resource_type.table_name();
 
-        // Get resource info first
-        let (file_name, instance_id, is_global): (String, Option<String>, bool) = conn.query_row(
-            &format!(
-                "SELECT file_name, instance_id, is_global FROM {} WHERE id = ?1",
-                table
-            ),
-            [resource_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get::<_, i32>(2)? == 1)),
-        )?;
+        // Get resource info (scoped to drop conn before async)
+        let (file_name, instance_id, is_global): (String, Option<String>, bool) = {
+            let conn = get_db_conn()?;
+            conn.query_row(
+                &format!(
+                    "SELECT file_name, instance_id, is_global FROM {} WHERE id = ?1",
+                    table
+                ),
+                [resource_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get::<_, i32>(2)? == 1)),
+            )?
+        }; // conn dropped here
 
         let dir = Self::get_resource_dir(resource_type, instance_id.as_deref(), is_global);
 
@@ -629,12 +640,12 @@ impl ResourceManager {
             dir.join(format!("{}.disabled", file_name))
         };
 
-        // ИСПРАВЛЕНО: Используем tokio::fs для проверки существования и переименования
         if tokio::fs::try_exists(&current_path).await.unwrap_or(false) {
             tokio::fs::rename(&current_path, &new_path).await?;
         }
 
-        // Update database
+        // Update database (re-acquire conn after async)
+        let conn = get_db_conn()?;
         conn.execute(
             &format!(
                 "UPDATE {} SET enabled = ?1, updated_at = ?2 WHERE id = ?3",
@@ -659,11 +670,11 @@ impl ResourceManager {
 
     /// Remove resource
     pub async fn remove_resource(resource_type: ResourceType, resource_id: i64) -> Result<()> {
-        let conn = get_db_conn()?;
         let table = resource_type.table_name();
 
-        // Get resource info
-        let (file_name, instance_id, is_global, _enabled): (String, Option<String>, bool, bool) =
+        // Get resource info (scoped to drop conn before async)
+        let (file_name, instance_id, is_global): (String, Option<String>, bool) = {
+            let conn = get_db_conn()?;
             conn.query_row(
                 &format!(
                     "SELECT file_name, instance_id, is_global, enabled FROM {} WHERE id = ?1",
@@ -675,14 +686,14 @@ impl ResourceManager {
                         row.get(0)?,
                         row.get(1)?,
                         row.get::<_, i32>(2)? == 1,
-                        row.get::<_, i32>(3)? == 1,
                     ))
                 },
-            )?;
+            )?
+        }; // conn dropped here
 
         let dir = Self::get_resource_dir(resource_type, instance_id.as_deref(), is_global);
 
-        // ИСПРАВЛЕНО: Delete file using tokio::fs (check both enabled and disabled versions)
+        // Delete file using tokio::fs (check both enabled and disabled versions)
         let file_path = dir.join(&file_name);
         let disabled_path = dir.join(format!("{}.disabled", file_name));
 
@@ -693,7 +704,8 @@ impl ResourceManager {
             tokio::fs::remove_file(&disabled_path).await?;
         }
 
-        // Delete from database
+        // Delete from database (re-acquire conn after async)
+        let conn = get_db_conn()?;
         conn.execute(
             &format!("DELETE FROM {} WHERE id = ?1", table),
             [resource_id],

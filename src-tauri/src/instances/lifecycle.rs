@@ -1,5 +1,5 @@
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use std::collections::HashMap;
 use std::process::Child;
 use std::sync::{Arc, Mutex};
@@ -12,7 +12,7 @@ use crate::java::JavaManager;
 use crate::modpacks;
 use crate::paths::{create_instance_structure, instance_dir};
 use crate::settings::SettingsManager;
-use crate::types::{CreateInstanceRequest, Instance, InstanceStatus, InstanceType, LoaderType};
+use crate::types::{CreateInstanceRequest, GameType, Instance, InstanceStatus, InstanceType, LoaderType};
 use crate::utils::gen_short_id;
 
 use super::installation::install_instance_async_cancellable;
@@ -25,7 +25,7 @@ pub async fn list_instances() -> Result<Vec<Instance>> {
     let conn = get_db_conn()?;
     let mut stmt = conn.prepare(
         r#"SELECT
-            id, name, version, loader, loader_version, instance_type,
+            id, name, game_type, version, loader, loader_version, instance_type,
             java_version, java_path, memory_min, memory_max, java_args, game_args,
             dir, port, rcon_enabled, rcon_port, rcon_password, username,
             status, pid, auto_restart, last_played, total_playtime, notes,
@@ -36,43 +36,45 @@ pub async fn list_instances() -> Result<Vec<Instance>> {
 
     let instances = stmt
         .query_map([], |row| {
-            let loader_str: String = row.get(3)?;
-            let instance_type_str: String = row.get(5)?;
-            let status_str: String = row.get(18)?;
+            let game_type_str: String = row.get(2)?;
+            let loader_str: String = row.get(4)?;
+            let instance_type_str: String = row.get(6)?;
+            let status_str: String = row.get(19)?;
 
             Ok(Instance {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                version: row.get(2)?,
+                game_type: GameType::parse(&game_type_str).unwrap_or(GameType::Minecraft),
+                version: row.get(3)?,
                 loader: LoaderType::parse(&loader_str).unwrap_or(LoaderType::Vanilla),
-                loader_version: row.get(4)?,
+                loader_version: row.get(5)?,
                 instance_type: if instance_type_str == "server" {
                     InstanceType::Server
                 } else {
                     InstanceType::Client
                 },
-                java_version: row.get(6)?,
-                java_path: row.get(7)?,
-                memory_min: row.get(8)?,
-                memory_max: row.get(9)?,
-                java_args: row.get(10)?,
-                game_args: row.get(11)?,
-                dir: row.get(12)?,
-                port: row.get(13)?,
-                rcon_enabled: row.get::<_, i32>(14)? != 0,
-                rcon_port: row.get(15)?,
-                rcon_password: row.get(16)?,
-                username: row.get(17)?,
+                java_version: row.get(7)?,
+                java_path: row.get(8)?,
+                memory_min: row.get(9)?,
+                memory_max: row.get(10)?,
+                java_args: row.get(11)?,
+                game_args: row.get(12)?,
+                dir: row.get(13)?,
+                port: row.get(14)?,
+                rcon_enabled: row.get::<_, i32>(15)? != 0,
+                rcon_port: row.get(16)?,
+                rcon_password: row.get(17)?,
+                username: row.get(18)?,
                 status: InstanceStatus::parse(&status_str),
-                auto_restart: row.get::<_, i32>(20)? != 0,
-                last_played: row.get(21)?,
-                total_playtime: row.get::<_, Option<i64>>(22)?.unwrap_or(0),
-                notes: row.get(23)?,
-                installation_step: row.get(24)?,
-                installation_error: row.get(25)?,
-                backup_enabled: row.get::<_, Option<i32>>(26)?.map(|v| v != 0),
-                created_at: row.get(27)?,
-                updated_at: row.get(28)?,
+                auto_restart: row.get::<_, i32>(21)? != 0,
+                last_played: row.get(22)?,
+                total_playtime: row.get::<_, Option<i64>>(23)?.unwrap_or(0),
+                notes: row.get(24)?,
+                installation_step: row.get(25)?,
+                installation_error: row.get(26)?,
+                backup_enabled: row.get::<_, Option<i32>>(27)?.map(|v| v != 0),
+                created_at: row.get(28)?,
+                updated_at: row.get(29)?,
             })
         })?
         .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -86,7 +88,7 @@ pub async fn get_instance(id: String) -> Result<Instance> {
     let conn = get_db_conn()?;
 
     conn.query_row(
-        "SELECT id, name, version, loader, loader_version, instance_type,
+        "SELECT id, name, game_type, version, loader, loader_version, instance_type,
                 java_version, java_path, memory_min, memory_max,
                 java_args, game_args, dir, port, rcon_enabled, rcon_port,
                 rcon_password, username, status, auto_restart, last_played,
@@ -96,43 +98,45 @@ pub async fn get_instance(id: String) -> Result<Instance> {
          WHERE id = ?1",
         [id.clone()],
         |row| {
-            let loader_str: String = row.get(3)?;
-            let instance_type_str: String = row.get(5)?;
-            let status_str: String = row.get(18)?;
+            let game_type_str: String = row.get(2)?;
+            let loader_str: String = row.get(4)?;
+            let instance_type_str: String = row.get(6)?;
+            let status_str: String = row.get(19)?;
 
             Ok(Instance {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                version: row.get(2)?,
+                game_type: GameType::parse(&game_type_str).unwrap_or(GameType::Minecraft),
+                version: row.get(3)?,
                 loader: LoaderType::parse(&loader_str).unwrap_or(LoaderType::Vanilla),
-                loader_version: row.get(4)?,
+                loader_version: row.get(5)?,
                 instance_type: if instance_type_str == "server" {
                     InstanceType::Server
                 } else {
                     InstanceType::Client
                 },
-                java_version: row.get(6)?,
-                java_path: row.get(7)?,
-                memory_min: row.get(8)?,
-                memory_max: row.get(9)?,
-                java_args: row.get(10)?,
-                game_args: row.get(11)?,
-                dir: row.get(12)?,
-                port: row.get(13)?,
-                rcon_enabled: row.get(14)?,
-                rcon_port: row.get(15)?,
-                rcon_password: row.get(16)?,
-                username: row.get(17)?,
+                java_version: row.get(7)?,
+                java_path: row.get(8)?,
+                memory_min: row.get(9)?,
+                memory_max: row.get(10)?,
+                java_args: row.get(11)?,
+                game_args: row.get(12)?,
+                dir: row.get(13)?,
+                port: row.get(14)?,
+                rcon_enabled: row.get(15)?,
+                rcon_port: row.get(16)?,
+                rcon_password: row.get(17)?,
+                username: row.get(18)?,
                 status: InstanceStatus::parse(&status_str),
-                auto_restart: row.get(19)?,
-                last_played: row.get(20)?,
-                total_playtime: row.get(21)?,
-                notes: row.get(22)?,
-                installation_step: row.get(23)?,
-                installation_error: row.get(24)?,
-                backup_enabled: row.get::<_, Option<i32>>(25)?.map(|v| v != 0),
-                created_at: row.get(26)?,
-                updated_at: row.get(27)?,
+                auto_restart: row.get(20)?,
+                last_played: row.get(21)?,
+                total_playtime: row.get(22)?,
+                notes: row.get(23)?,
+                installation_step: row.get(24)?,
+                installation_error: row.get(25)?,
+                backup_enabled: row.get::<_, Option<i32>>(26)?.map(|v| v != 0),
+                created_at: row.get(27)?,
+                updated_at: row.get(28)?,
             })
         },
     )
@@ -146,6 +150,9 @@ pub async fn create_instance(
     app_handle: tauri::AppHandle,
 ) -> Result<Instance> {
     let id = gen_short_id(12);
+
+    let game_type_str = req.game_type.clone().unwrap_or_else(|| "minecraft".to_string());
+    let game_type = GameType::parse(&game_type_str).unwrap_or(GameType::Minecraft);
 
     let loader_str = req.loader.clone();
     let instance_type_str = req.instance_type.clone();
@@ -191,6 +198,7 @@ pub async fn create_instance(
     let instance = Instance {
         id: id.clone(),
         name: req.name.clone(),
+        game_type,
         version: req.version.clone(),
         loader,
         loader_version: req.loader_version.clone(),
@@ -222,15 +230,15 @@ pub async fn create_instance(
     let conn = get_db_conn()?;
     conn.execute(
         r#"INSERT INTO instances (
-            id, name, version, loader, loader_version, instance_type,
+            id, name, game_type, version, loader, loader_version, instance_type,
             java_version, java_path, memory_min, memory_max, java_args, game_args,
             dir, port, rcon_enabled, rcon_port, rcon_password, username,
             status, pid, auto_restart, total_playtime, notes,
             installation_step, installation_error, backup_enabled,
             created_at, updated_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28)"#,
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29)"#,
         params![
-            id, req.name, req.version, loader_str, req.loader_version, instance_type_str,
+            id, req.name, game_type_str, req.version, loader_str, req.loader_version, instance_type_str,
             java_version.to_string(), None::<String>, memory_min, memory_max,
             java_args, game_args, dir, req.port, 0, None::<i32>, None::<String>, username,
             "installing", None::<i64>, 0, 0, req.notes,
@@ -295,8 +303,9 @@ pub async fn create_instance(
 
                 if let Ok(conn) = get_db_conn() {
                     // Очищаем поля установки при успехе
+                    // WHERE status check: не перезаписываем если пользователь уже удалил/остановил
                     let _ = conn.execute(
-                        "UPDATE instances SET status = 'stopped', installation_step = NULL, installation_error = NULL, updated_at = ?1 WHERE id = ?2",
+                        "UPDATE instances SET status = 'stopped', installation_step = NULL, installation_error = NULL, updated_at = ?1 WHERE id = ?2 AND status IN ('installing', 'starting', 'running')",
                         params![Utc::now().to_rfc3339(), instance_clone.id],
                     );
                     log::info!(
@@ -358,11 +367,13 @@ pub async fn create_instance(
                     );
                 }
 
+                // instance-removed: frontend удалит экземпляр из списка.
+                // Может быть дубликатом (handle_cancellation уже отправил),
+                // но повторное удаление безопасно — filter просто не найдёт элемент.
                 let _ = app_handle_clone.emit(
-                    "instance-creation-failed",
+                    "instance-removed",
                     serde_json::json!({
-                        "id": instance_clone.id,
-                        "error": "Установка отменена"
+                        "id": instance_clone.id
                     }),
                 );
             }
@@ -370,9 +381,9 @@ pub async fn create_instance(
                 log::error!("Failed to install instance {}: {}", instance_clone.id, e);
 
                 if let Ok(conn) = get_db_conn() {
-                    // Сохраняем ошибку в БД
+                    // Сохраняем ошибку в БД (только если экземпляр ещё существует)
                     let _ = conn.execute(
-                        "UPDATE instances SET status = 'error', installation_error = ?1, updated_at = ?2 WHERE id = ?3",
+                        "UPDATE instances SET status = 'error', installation_error = ?1, updated_at = ?2 WHERE id = ?3 AND status IN ('installing', 'starting')",
                         params![e.to_string(), Utc::now().to_rfc3339(), instance_clone.id],
                     );
                 }
@@ -517,7 +528,15 @@ pub async fn update_instance(id: String, updates: serde_json::Value) -> Result<I
 pub async fn delete_instance(id: String, state: State<'_, ChildMap>) -> Result<()> {
     log::info!("Deleting instance: {}", id);
 
-    // Останавливаем процесс если запущен
+    // 1. Отменяем активную установку если она идёт (предотвращает zombie background tasks)
+    let install_op_id = format!("instance-install-{}", id);
+    let reset_op_id = format!("instance-reset-{}", id);
+    cancellation::cancel(&install_op_id);
+    cancellation::cancel(&reset_op_id);
+    // Также отменяем все операции связанные с этим экземпляром
+    cancellation::cancel_by_prefix(&format!("instance-{}", id));
+
+    // 2. Останавливаем запущенный процесс если есть
     {
         let mut map = state.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(mut child) = map.remove(&id) {
@@ -526,33 +545,207 @@ pub async fn delete_instance(id: String, state: State<'_, ChildMap>) -> Result<(
         }
     }
 
-    // Получаем путь к директории
+    // 3. Получаем путь к директории (может не существовать если отмена при установке)
     let dir_path = {
         let conn = get_db_conn()?;
         let mut stmt = conn.prepare("SELECT dir FROM instances WHERE id = ?1")?;
-        stmt.query_row(params![id.clone()], |row| row.get::<_, String>(0))?
+        stmt.query_row(params![id.clone()], |row| row.get::<_, String>(0))
+            .optional()
     };
 
-    // Удаляем из БД сразу (быстро)
+    // 4. Удаляем из БД (instance + связанные моды и зависимости) в одной транзакции
+    // Выполняем даже если экземпляр не найден в п.3 — для очистки orphaned записей
     {
         let conn = get_db_conn()?;
-        conn.execute("DELETE FROM instances WHERE id = ?1", params![id])?;
+        conn.execute_batch("BEGIN TRANSACTION")?;
+        let _ = conn.execute("DELETE FROM mod_dependencies WHERE mod_id IN (SELECT id FROM mods WHERE instance_id = ?1)", params![id]);
+        let _ = conn.execute("DELETE FROM mods WHERE instance_id = ?1", params![id]);
+        let _ = conn.execute("DELETE FROM instances WHERE id = ?1", params![id]);
+        conn.execute_batch("COMMIT")?;
     }
 
-    // Удаляем файлы в фоне (медленно, но не блокирует UI)
-    let p = std::path::PathBuf::from(dir_path);
-    if p.exists() {
-        tokio::task::spawn_blocking(move || {
-            if let Err(e) = std::fs::remove_dir_all(&p) {
-                log::error!("Failed to remove instance directory: {}", e);
-            } else {
-                log::info!("Instance directory removed successfully");
-            }
-        });
+    // 5. Очищаем токены отмены
+    cancellation::remove_token(&install_op_id);
+    cancellation::remove_token(&reset_op_id);
+
+    // 6. Удаляем файлы в фоне (медленно, но не блокирует UI)
+    if let Ok(Some(dir)) = dir_path {
+        let p = std::path::PathBuf::from(dir);
+        if tokio::fs::try_exists(&p).await.unwrap_or(false) {
+            tokio::task::spawn_blocking(move || {
+                if let Err(e) = std::fs::remove_dir_all(&p) {
+                    log::error!("Failed to remove instance directory: {}", e);
+                } else {
+                    log::info!("Instance directory removed successfully");
+                }
+            });
+        }
     }
 
     log::info!("Instance deleted from DB: {}", id);
     Ok(())
+}
+
+/// Convert a client instance to a server instance
+/// Creates server directories, disables client-only mods, and initializes server files
+#[tauri::command]
+pub async fn convert_client_to_server(
+    instance_id: String,
+    port: Option<i32>,
+    app_handle: tauri::AppHandle,
+) -> Result<Instance> {
+    use crate::server::{client_mods, eula};
+
+    log::info!("Converting client instance {} to server", instance_id);
+
+    // Get current instance
+    let instance = get_instance(instance_id.clone()).await?;
+
+    // Verify it's a client instance
+    if matches!(instance.instance_type, InstanceType::Server) {
+        return Err(LauncherError::InvalidConfig(
+            "Instance is already a server".to_string(),
+        ));
+    }
+
+    // Emit progress: starting conversion
+    let _ = app_handle.emit(
+        "conversion-progress",
+        serde_json::json!({
+            "stage": "preparing",
+            "message": "Preparing conversion..."
+        }),
+    );
+
+    let instance_path = std::path::PathBuf::from(&instance.dir);
+    let server_port = port.unwrap_or(25565);
+
+    // Create server-specific directories
+    let _ = app_handle.emit(
+        "conversion-progress",
+        serde_json::json!({
+            "stage": "directories",
+            "message": "Creating server directories..."
+        }),
+    );
+
+    // Use async fs operations to avoid blocking tokio runtime
+    tokio::fs::create_dir_all(instance_path.join("world")).await?;
+    tokio::fs::create_dir_all(instance_path.join("plugins")).await?;
+
+    // Create eula.txt (not accepted yet - user must accept)
+    let _ = app_handle.emit(
+        "conversion-progress",
+        serde_json::json!({
+            "stage": "eula",
+            "message": "Creating EULA file..."
+        }),
+    );
+    eula::create_eula_file(&instance_path)
+        .await
+        .map_err(|e| LauncherError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+
+    // Create server.properties with defaults
+    let _ = app_handle.emit(
+        "conversion-progress",
+        serde_json::json!({
+            "stage": "properties",
+            "message": "Creating server.properties..."
+        }),
+    );
+
+    let properties_path = instance_path.join("server.properties");
+    if !tokio::fs::try_exists(&properties_path).await.unwrap_or(false) {
+        let default_props = format!(
+            r#"#Minecraft server properties
+#Created by Stuzhik conversion
+server-port={}
+enable-query=false
+query.port={}
+motd=Converted from {} modpack
+max-players=20
+pvp=true
+difficulty=normal
+gamemode=survival
+online-mode=true
+enable-rcon=false
+rcon.password=
+rcon.port={}
+spawn-protection=16
+view-distance=10
+simulation-distance=10
+"#,
+            server_port,
+            server_port,
+            instance.name,
+            server_port + 1
+        );
+        tokio::fs::write(&properties_path, default_props).await?;
+    }
+
+    // Scan and disable client-only mods
+    let _ = app_handle.emit(
+        "conversion-progress",
+        serde_json::json!({
+            "stage": "mods",
+            "message": "Scanning mods for client-only detection..."
+        }),
+    );
+
+    let mods_dir = instance_path.join("mods");
+    let disabled_mods = match client_mods::auto_disable_client_mods(&mods_dir).await {
+        Ok(mods) => mods,
+        Err(e) => {
+            log::warn!("Failed to scan client-only mods: {}", e);
+            Vec::new()
+        }
+    };
+
+    // Update database: change instance_type to server
+    let _ = app_handle.emit(
+        "conversion-progress",
+        serde_json::json!({
+            "stage": "database",
+            "message": "Updating instance type..."
+        }),
+    );
+
+    {
+        let conn = get_db_conn()?;
+        conn.execute(
+            r#"UPDATE instances
+               SET instance_type = 'server',
+                   port = ?2,
+                   rcon_enabled = 0,
+                   rcon_port = ?3,
+                   updated_at = ?4
+               WHERE id = ?1"#,
+            params![
+                instance_id,
+                server_port,
+                server_port + 1,
+                Utc::now().to_rfc3339()
+            ],
+        )?;
+    }
+
+    // Emit completion with summary
+    let _ = app_handle.emit(
+        "conversion-progress",
+        serde_json::json!({
+            "stage": "complete",
+            "message": "Conversion complete!",
+            "disabled_mods": disabled_mods.len()
+        }),
+    );
+
+    log::info!(
+        "Instance {} converted to server. {} client-only mods disabled.",
+        instance_id,
+        disabled_mods.len()
+    );
+
+    get_instance(instance_id).await
 }
 
 /// Files and directories that should be preserved when resetting instance version

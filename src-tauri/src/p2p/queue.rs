@@ -213,7 +213,8 @@ impl TransferQueue {
         // Находим и удаляем передачу
         let pos = queue.iter().position(|t| t.id == queue_id);
         if let Some(pos) = pos {
-            let mut transfer = queue.remove(pos).unwrap();
+            // Safe: pos is valid because we just found it with position()
+            let mut transfer = queue.remove(pos).expect("element exists at found position");
 
             if transfer.status != QueueStatus::Pending {
                 // Возвращаем обратно если не pending

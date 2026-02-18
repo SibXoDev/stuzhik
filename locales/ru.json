@@ -28,7 +28,10 @@
     "documentation": "Документация",
     "browse": "Обзор",
     "loader": "Загрузчик",
-    "mods": "Моды"
+    "mods": "Моды",
+    "skip": "Пропустить",
+    "next": "Далее",
+    "done": "Готово"
   },
   "titleBar": {
     "devConsole": "Консоль разработчика",
@@ -99,6 +102,40 @@
       "snapshots": "Снапшоты",
       "oldBeta": "Старые бета",
       "oldAlpha": "Старые альфа"
+    }
+  },
+  "games": {
+    "title": "Выбор игры",
+    "minecraft": "Minecraft",
+    "hytale": "Hytale",
+    "installed": "Установлена",
+    "notInstalled": "Не установлена",
+    "switchTo": "Переключиться на {game}",
+    "currentGame": "Текущая игра",
+    "detectingInstallation": "Определение установки...",
+    "hytaleDescription": "RPG-песочница нового поколения",
+    "minecraftDescription": "Оригинальная песочница",
+    "modTypes": {
+      "pack": "Пак",
+      "plugin": "Плагин",
+      "earlyPlugin": "Ранний плагин"
+    },
+    "hytale": {
+      "modTypes": {
+        "pack": "Контент-пак",
+        "plugin": "Плагин",
+        "earlyPlugin": "Ранний плагин",
+        "packDesc": "Блоки, мобы, предметы и контент",
+        "pluginDesc": "Плагины игрового API",
+        "earlyPluginDesc": "Загрузочные плагины"
+      },
+      "browser": {
+        "title": "Моды Hytale",
+        "allTypes": "Все типы",
+        "contentPacks": "Контент-паки",
+        "plugins": "Плагины",
+        "earlyPlugins": "Ранние плагины"
+      }
     }
   },
   "dragDrop": {
@@ -213,6 +250,20 @@
     "downloads": "Загрузки",
     "noLoaderVersions": "Нет доступных версий загрузчика",
     "loaderNotSupported": "Загрузчик не поддерживает эту версию Minecraft",
+    "play": "Играть",
+    "launching": "Запуск",
+    "stopShort": "Стоп",
+    "dropToInstall": "Отпустите для установки",
+    "needModLoader": "Нужен загрузчик модов",
+    "hoursShort": "ч",
+    "minutesShort": "м",
+    "cannotInstallMod": "Невозможно установить мод",
+    "noModLoaderMessage": "{name} не поддерживает моды (нужен Fabric, Forge или другой загрузчик)",
+    "modsInstalled": "Установлено {count} модов",
+    "modsVerified": "{count} верифицировано",
+    "modAlreadyInstalled": "Мод уже установлен",
+    "batchInstallError": "Ошибка пакетной установки",
+    "unknownErrorShort": "Неизвестная ошибка",
     "edit": {
       "title": "Редактирование экземпляра",
       "versions": "Версии",
@@ -258,6 +309,37 @@
       "javaCompatible": "Совместима",
       "javaWarning": "Предупреждение",
       "javaIncompatible": "Несовместима"
+    },
+    "conversion": {
+      "title": "Конвертация в сервер",
+      "subtitle": "Преобразовать клиент в сервер",
+      "warning": "Внимание",
+      "warningText": "Клиентские моды (карты, шейдеры, UI) будут автоматически отключены. Вам потребуется принять EULA перед первым запуском.",
+      "port": "Порт сервера",
+      "portHint": "Стандартный порт: 25565",
+      "convert": "Конвертировать",
+      "converting": "Конвертация...",
+      "success": "Экземпляр успешно конвертирован в сервер",
+      "successMods": "Отключено клиентских модов",
+      "alreadyServer": "Экземпляр уже является сервером",
+      "progress": {
+        "preparing": "Подготовка к конвертации...",
+        "directories": "Создание серверных папок...",
+        "eula": "Создание EULA...",
+        "properties": "Создание server.properties...",
+        "mods": "Сканирование модов...",
+        "database": "Обновление базы данных...",
+        "complete": "Конвертация завершена!"
+      }
+    },
+    "reimport": {
+      "title": "Ре-импорт манифеста",
+      "started": "Импорт манифеста...",
+      "complete": "Ре-импорт завершён",
+      "downloaded": "скачано",
+      "alreadyPresent": "уже есть",
+      "failed": "ошибок",
+      "error": "Ошибка ре-импорта"
     }
   },
   "mods": {
@@ -442,6 +524,7 @@
         "graph": "Граф",
         "graphTooltip": "Визуальный граф зависимостей между модами",
         "changelogTooltip": "Просмотреть изменения в недавно обновлённых модах",
+        "changelog": "Changelog",
         "verifyingMods": "Проверка подлинности модов...",
         "loadingDeps": "Загрузка информации о зависимостях..."
       },
@@ -650,9 +733,19 @@
         "modrinthWarning": "Следующие моды были найдены на Modrinth автоматически.",
         "modrinthWarningNote": "Возможно скачаны НЕ ТЕ версии! Проверьте совместимость.",
         "failedMods": "Следующие моды НЕ удалось скачать:",
+        "failedModsHint": "Вы можете найти и установить их вручную.",
         "totalMods": "Всего модов",
         "notDownloaded": "Не скачано",
-        "understood": "Понятно"
+        "understood": "Понятно",
+        "searchingMod": "Поиск...",
+        "installMod": "Установить",
+        "installingMod": "Установка...",
+        "installed": "Установлен",
+        "notFound": "Не найден",
+        "searchFailed": "Ошибка поиска",
+        "retrySearch": "Повторить",
+        "skipAll": "Пропустить все",
+        "installAll": "Установить найденные"
       },
       "confirm": {
         "title": "Установить модпак",
@@ -772,6 +865,42 @@
         "cancel": "Отмена",
         "export": "Экспортировать",
         "exporting": "Экспорт..."
+      },
+      "format": {
+        "title": "Формат экспорта",
+        "stzhk": {
+          "name": "STZHK",
+          "hint": "Для Stuzhik. CDN-ссылки + опциональное встраивание"
+        },
+        "mrpack": {
+          "name": "Modrinth",
+          "hint": "Для Prism, MultiMC, Modrinth App. Стандартный формат"
+        },
+        "universalZip": {
+          "name": "Универсальный ZIP",
+          "hint": "Для друзей без лаунчера. Все файлы + README"
+        }
+      },
+      "universalZip": {
+        "title": "Экспорт для друзей",
+        "subtitle": "Создание архива из",
+        "readmeLanguage": "Язык инструкции",
+        "readmeLanguages": {
+          "ru": "Русский",
+          "en": "English",
+          "both": "Оба языка"
+        },
+        "warning": {
+          "title": "Внимание: большой размер",
+          "hint": "Архив содержит ВСЕ моды и файлы. Размер может быть значительным."
+        },
+        "readme": {
+          "include": "Включить README с инструкцией",
+          "hint": "Файл с пошаговой инструкцией по установке"
+        }
+      },
+      "mrpack": {
+        "info": "Формат Modrinth использует CDN-ссылки для модов. Совместим с Prism Launcher, MultiMC и Modrinth App."
       }
     }
   },
@@ -780,6 +909,94 @@
     "subtitle": "Настройки по умолчанию для новых экземпляров",
     "loading": "Загрузка...",
     "saved": "Настройки сохранены!",
+    "tabs": {
+      "general": "Общие",
+      "interface": "Интерфейс",
+      "connect": "Connect",
+      "game": "Игра",
+      "mods": "Моды",
+      "data": "Данные",
+      "translations": "Переводы"
+    },
+    "interface": {
+      "themeTitle": "Акцентный цвет",
+      "customThemeName": "Название темы...",
+      "deleteTheme": "Удалить эту тему",
+      "themeSaved": "Тема сохранена",
+      "viewModesTitle": "Режимы отображения",
+      "layoutTitle": "Компоновка",
+      "cardDensity": "Плотность карточек",
+      "fontSize": "Размер шрифта",
+      "instanceColumns": "Колонки экземпляров",
+      "columnsAuto": "Авто",
+      "density": {
+        "compact": "Компактный",
+        "normal": "Обычный",
+        "comfortable": "Свободный"
+      },
+      "font": {
+        "small": "Мелкий",
+        "default": "Стандартный",
+        "large": "Крупный"
+      },
+      "visibilityTitle": "Видимость элементов",
+      "vis": {
+        "instanceBadges": "Бейджи экземпляров (Client/Server)",
+        "instancePlaytime": "Время игры",
+        "instanceQuickPlay": "Быстрый запуск",
+        "modDescriptions": "Описания модов",
+        "modThumbnails": "Иконки модов",
+        "modpackChangelogs": "Ченжлоги модпаков",
+        "toolsMenu": "Меню инструментов",
+        "connectButton": "Кнопка Connect",
+        "downloadNotifications": "Уведомления о загрузках",
+        "searchBar": "Поиск (Ctrl+F)"
+      },
+      "profilesTitle": "Профили настроек",
+      "createProfile": "Сохранить как профиль",
+      "loadProfile": "Загрузить",
+      "profileName": "Название профиля...",
+      "profileSaved": "Профиль сохранён",
+      "noProfiles": "Нет сохранённых профилей",
+      "dataTitle": "Данные настроек",
+      "exportBtn": "Экспорт",
+      "importBtn": "Импорт",
+      "resetBtn": "Сбросить всё",
+      "exportedToClipboard": "Скопировано в буфер",
+      "importSuccess": "Настройки импортированы",
+      "importError": "Ошибка формата данных",
+      "clipboardError": "Нет доступа к буферу обмена",
+      "resetDone": "Настройки интерфейса сброшены"
+    },
+    "translations": {
+      "title": "Редактор переводов",
+      "searchPlaceholder": "Поиск по ключам или значениям...",
+      "onlyModified": "Только изменённые",
+      "modified": "изменено",
+      "save": "Сохранить",
+      "saving": "Сохранение...",
+      "saved": "Переводы сохранены",
+      "saveError": "Ошибка сохранения переводов",
+      "expandAll": "Развернуть всё",
+      "collapseAll": "Свернуть всё",
+      "import": "Импорт",
+      "export": "Экспорт",
+      "imported": "Переводы импортированы",
+      "keysImported": "ключей импортировано",
+      "importError": "Ошибка импорта",
+      "exported": "Переводы экспортированы",
+      "exportError": "Ошибка экспорта",
+      "resetAll": "Сбросить всё",
+      "reset": "Переводы сброшены",
+      "resetError": "Ошибка сброса",
+      "resetKey": "Сбросить к значению по умолчанию",
+      "baseValue": "Оригинал",
+      "unsavedChanges": "Есть несохранённые изменения",
+      "noResults": "Совпадений не найдено",
+      "keysShown": "ключей показано",
+      "hint": "Нажмите на значение для редактирования. Изменения применяются после сохранения.",
+      "scrollForMore": "Прокрутите вниз для просмотра..."
+    },
     "appearance": {
       "title": "Внешний вид",
       "background": "Фон приложения",
@@ -789,7 +1006,7 @@
         "dotGrid": "Точечная сетка",
         "rippleGrid": "Волновая сетка",
         "edgePixels": "Пиксели",
-        "static": "Тёмный",
+        "static": "Однотонный",
         "image": "Картинка"
       },
       "selectImage": "Выбрать",
@@ -802,12 +1019,36 @@
     "language": {
       "title": "Язык / Language",
       "select": "Выберите язык / Select language",
-      "changesApply": "Изменения применяются сразу / Changes apply immediately"
+      "changesApply": "Изменения применяются сразу / Changes apply immediately",
+      "importLanguage": "Импортировать язык",
+      "custom": "Пользовательский",
+      "invalidCode": "Не удалось определить код языка",
+      "invalidCodeHint": "добавьте \"_meta\": {\"lang\": \"es\"} в JSON или назовите файл es.json",
+      "imported": "Язык импортирован",
+      "importError": "Ошибка импорта",
+      "deleted": "Язык удалён",
+      "deleteError": "Ошибка удаления языка"
     },
     "developer": {
       "title": "Режим разработчика",
       "enable": "Включить режим разработчика",
       "description": "Показывает кнопки Console и Source Code в TitleBar. Горячие клавиши (Ctrl+Shift+D/U/T) работают в обоих режимах."
+    },
+    "tour": {
+      "title": "Обучение",
+      "description": "Интерактивный гид, который подсвечивает ключевые элементы интерфейса.",
+      "restart": "Пройти обучение заново",
+      "resetAll": "Сбросить прогресс",
+      "reset": "Прогресс обучения сброшен",
+      "selectTour": "Выберите тур",
+      "completed": "Пройден",
+      "notCompleted": "Не пройден",
+      "hasUpdates": "Есть новое",
+      "steps": "шагов",
+      "startTour": "Начать",
+      "whatsNew": "Что нового",
+      "subTours": "Дополнительные туры",
+      "noTours": "Нет доступных туров"
     },
     "user": {
       "title": "Пользователь",
@@ -865,7 +1106,9 @@
     },
     "mods": {
       "title": "Моды",
-      "autoUpdate": "Автоматически обновлять моды"
+      "autoUpdate": "Автоматически обновлять моды",
+      "preferModrinth": "Предпочитать Modrinth",
+      "preferModrinthHint": "При установке модпаков сначала искать моды на Modrinth, затем на CurseForge"
     },
     "downloads": {
       "title": "Загрузки",
@@ -1729,6 +1972,9 @@
     "online": "В сети",
     "inGame": "Играет",
     "lastSeen": "Был в сети",
+    "lastSeenSeconds": "с",
+    "lastSeenMinutes": "м",
+    "ago": "назад",
     "requestModpack": "Запросить модпак",
     "viewModpacks": "Посмотреть модпаки",
     "addFriend": "Запрос в друзья",
@@ -1750,6 +1996,7 @@
     "connect": "Подключиться",
     "invalidCode": "Неверный формат кода",
     "connecting": "Подключение...",
+    "codeHint": "Введите код друга или приглашение",
     "vpnHint": "Для игры с друзьями через интернет рекомендуем:",
     "network": {
       "title": "Диагностика сети",
@@ -1771,7 +2018,15 @@
       "useVpnDesc": "Для игры через интернет (не в одной локальной сети) используйте VPN: Radmin VPN, ZeroTier или Hamachi.",
       "copyFirewallCommand": "Скопировать команду",
       "firewallHint": "Выполните эту команду в командной строке от имени администратора:",
-      "copied": "Скопировано!"
+      "copied": "Скопировано!",
+      "firewallSettings": "Настройки Firewall",
+      "portAvailable": "Доступен",
+      "portAvailableFallback": "Доступен (резервный: {port})",
+      "portStuzhikUsing": "Используется Stuzhik",
+      "portStuzhikFallback": "Используется Stuzhik (резервный: {port})",
+      "portAllBusy": "Все порты заняты",
+      "portsClosedWarning": "Порты закрыты — возможны проблемы с подключением",
+      "portsClosedHint": "Убедитесь что оба устройства в одной сети. Для игры через интернет используйте VPN (Radmin VPN, ZeroTier, Tailscale)."
     },
     "settings": {
       "title": "Настройки Connect",
@@ -1842,7 +2097,10 @@
       "decline": "Отклонить",
       "wantsToSync": "хочет синхронизировать",
       "filesCount": "файлов",
-      "totalSize": "{{size}}"
+      "totalSize": "{{size}}",
+      "calculating": "Расчёт...",
+      "secondsShort": "сек",
+      "remaining": "осталось"
     },
     "queue": {
       "title": "Очередь передач",
@@ -2016,6 +2274,8 @@
     }
   },
   "editor": {
+    "title": "Редактор",
+    "profiles": "Профили",
     "projects": "Проекты",
     "refresh": "Обновить",
     "searchFiles": "Поиск файлов...",
@@ -2929,6 +3189,7 @@
       "hasQuickPresets": "Есть быстрые шаблоны"
     },
     "bulkOperations": {
+      "toolbar": "Массовые операции",
       "selected": "Выбрано:",
       "enable": "Включить",
       "enableAll": "Включить все",
@@ -2938,6 +3199,10 @@
       "deleteAll": "Удалить все",
       "deselect": "Снять выделение",
       "cancel": "Отменить"
+    },
+    "dialogs": {
+      "selectModpackFile": "Выберите файл модпака",
+      "modpackFilter": "Модпаки"
     },
     "units": {
       "bytes": "Б",
@@ -2991,5 +3256,31 @@
     "modsShort": "м.",
     "configsShort": "к.",
     "filesShort": "ф."
+  },
+  "tour": {
+    "welcome": "Добро пожаловать в Stuzhik!",
+    "welcomeDesc": "Давайте быстро познакомимся с интерфейсом. Тур займёт пару минут — можно пропустить в любой момент.",
+    "instanceList": "Ваши экземпляры",
+    "instanceListDesc": "Здесь отображаются все ваши экземпляры Minecraft — клиенты и серверы. Нажмите на карточку, чтобы открыть подробности.",
+    "createInstance": "Создание экземпляра",
+    "createInstanceDesc": "Создайте новый экземпляр Minecraft — выберите версию, загрузчик модов (Forge, Fabric, NeoForge, Quilt) и имя.",
+    "modpacks": "Браузер модпаков",
+    "modpacksDesc": "Установите готовый модпак в один клик. Поддерживаются Modrinth, CurseForge и импорт из файлов (.mrpack, .stzhk).",
+    "tools": "Инструменты",
+    "toolsDesc": "Анализатор логов поможет понять краши, а синхронизация настроек — перенести конфиг на другой ПК.",
+    "quickPlay": "Быстрый запуск",
+    "quickPlayDesc": "Запускайте последний экземпляр одной кнопкой или создайте новый прямо отсюда — без лишних шагов.",
+    "connect": "Stuzhik Connect",
+    "connectDesc": "Играйте с друзьями по P2P — без выделенного сервера. Отправляйте моды и модпаки напрямую.",
+    "docs": "Документация",
+    "docsDesc": "Встроенная база знаний: гайды, FAQ и changelog — всё под рукой.",
+    "settings": "Настройки",
+    "settingsDesc": "Java, память, тема оформления, язык, горячие клавиши — настройте лаунчер под себя.",
+    "detailHeader": "Информация об экземпляре",
+    "detailHeaderDesc": "Версия Minecraft, загрузчик, время в игре и текущий статус. Кнопка «Играть» запускает экземпляр.",
+    "detailTabs": "Вкладки",
+    "detailTabsDesc": "Моды, ресурсы, редактор кода, инструменты и бэкапы — всё управление экземпляром здесь.",
+    "detailActions": "Действия",
+    "detailActionsDesc": "Открыть папку, экспортировать модпак, настройки игры, история запусков, ремонт и удаление."
   }
 }

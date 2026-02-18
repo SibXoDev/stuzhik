@@ -28,7 +28,10 @@
     "documentation": "Documentation",
     "browse": "Browse",
     "loader": "Loader",
-    "mods": "Mods"
+    "mods": "Mods",
+    "skip": "Skip",
+    "next": "Next",
+    "done": "Done"
   },
   "titleBar": {
     "devConsole": "Developer Console",
@@ -99,6 +102,40 @@
       "snapshots": "Snapshots",
       "oldBeta": "Old beta",
       "oldAlpha": "Old alpha"
+    }
+  },
+  "games": {
+    "title": "Select Game",
+    "minecraft": "Minecraft",
+    "hytale": "Hytale",
+    "installed": "Installed",
+    "notInstalled": "Not installed",
+    "switchTo": "Switch to {game}",
+    "currentGame": "Current game",
+    "detectingInstallation": "Detecting installation...",
+    "hytaleDescription": "Next-gen sandbox RPG",
+    "minecraftDescription": "The original sandbox game",
+    "modTypes": {
+      "pack": "Pack",
+      "plugin": "Plugin",
+      "earlyPlugin": "Early Plugin"
+    },
+    "hytale": {
+      "modTypes": {
+        "pack": "Content Pack",
+        "plugin": "Plugin",
+        "earlyPlugin": "Early Plugin",
+        "packDesc": "Blocks, mobs, items and content",
+        "pluginDesc": "Game API plugins",
+        "earlyPluginDesc": "Bootstrap plugins"
+      },
+      "browser": {
+        "title": "Hytale Mods",
+        "allTypes": "All Types",
+        "contentPacks": "Content Packs",
+        "plugins": "Plugins",
+        "earlyPlugins": "Early Plugins"
+      }
     }
   },
   "dragDrop": {
@@ -213,6 +250,20 @@
     "downloads": "Downloads",
     "noLoaderVersions": "No available loader versions",
     "loaderNotSupported": "Loader doesn't support this Minecraft version",
+    "play": "Play",
+    "launching": "Starting",
+    "stopShort": "Stop",
+    "dropToInstall": "Drop to install",
+    "needModLoader": "Mod loader required",
+    "hoursShort": "h",
+    "minutesShort": "m",
+    "cannotInstallMod": "Cannot install mod",
+    "noModLoaderMessage": "{name} doesn't support mods (needs Fabric, Forge or another loader)",
+    "modsInstalled": "Installed {count} mods",
+    "modsVerified": "{count} verified",
+    "modAlreadyInstalled": "Mod already installed",
+    "batchInstallError": "Batch installation error",
+    "unknownErrorShort": "Unknown error",
     "edit": {
       "title": "Edit Instance",
       "versions": "Versions",
@@ -258,6 +309,37 @@
       "javaCompatible": "Compatible",
       "javaWarning": "Warning",
       "javaIncompatible": "Incompatible"
+    },
+    "conversion": {
+      "title": "Convert to Server",
+      "subtitle": "Transform client into server",
+      "warning": "Warning",
+      "warningText": "Client-only mods (maps, shaders, UI) will be automatically disabled. You will need to accept EULA before first launch.",
+      "port": "Server Port",
+      "portHint": "Default port: 25565",
+      "convert": "Convert",
+      "converting": "Converting...",
+      "success": "Instance successfully converted to server",
+      "successMods": "Client-only mods disabled",
+      "alreadyServer": "Instance is already a server",
+      "progress": {
+        "preparing": "Preparing conversion...",
+        "directories": "Creating server directories...",
+        "eula": "Creating EULA...",
+        "properties": "Creating server.properties...",
+        "mods": "Scanning mods...",
+        "database": "Updating database...",
+        "complete": "Conversion complete!"
+      }
+    },
+    "reimport": {
+      "title": "Re-import Manifest",
+      "started": "Importing manifest...",
+      "complete": "Re-import complete",
+      "downloaded": "downloaded",
+      "alreadyPresent": "already present",
+      "failed": "failed",
+      "error": "Re-import failed"
     }
   },
   "mods": {
@@ -442,6 +524,7 @@
         "graph": "Graph",
         "graphTooltip": "Visual dependency graph between mods",
         "changelogTooltip": "View changes in recently updated mods",
+        "changelog": "Changelog",
         "verifyingMods": "Verifying mod authenticity...",
         "loadingDeps": "Loading dependency information..."
       },
@@ -650,9 +733,19 @@
         "modrinthWarning": "The following mods were found on Modrinth automatically.",
         "modrinthWarningNote": "Versions may be incorrect! Check compatibility.",
         "failedMods": "The following mods could NOT be downloaded:",
+        "failedModsHint": "You can search and install them manually.",
         "totalMods": "Total mods",
         "notDownloaded": "Not downloaded",
-        "understood": "Got it"
+        "understood": "Got it",
+        "searchingMod": "Searching...",
+        "installMod": "Install",
+        "installingMod": "Installing...",
+        "installed": "Installed",
+        "notFound": "Not found",
+        "searchFailed": "Search failed",
+        "retrySearch": "Retry",
+        "skipAll": "Skip all",
+        "installAll": "Install found"
       },
       "confirm": {
         "title": "Install Modpack",
@@ -772,6 +865,42 @@
         "cancel": "Cancel",
         "export": "Export",
         "exporting": "Exporting..."
+      },
+      "format": {
+        "title": "Export Format",
+        "stzhk": {
+          "name": "STZHK",
+          "hint": "For Stuzhik. CDN links + optional embedding"
+        },
+        "mrpack": {
+          "name": "Modrinth",
+          "hint": "For Prism, MultiMC, Modrinth App. Standard format"
+        },
+        "universalZip": {
+          "name": "Universal ZIP",
+          "hint": "For friends without a launcher. All files + README"
+        }
+      },
+      "universalZip": {
+        "title": "Export for Friends",
+        "subtitle": "Creating archive from",
+        "readmeLanguage": "README Language",
+        "readmeLanguages": {
+          "ru": "Russian",
+          "en": "English",
+          "both": "Both languages"
+        },
+        "warning": {
+          "title": "Warning: large file size",
+          "hint": "Archive contains ALL mods and files. Size may be significant."
+        },
+        "readme": {
+          "include": "Include README with instructions",
+          "hint": "File with step-by-step installation guide"
+        }
+      },
+      "mrpack": {
+        "info": "Modrinth format uses CDN links for mods. Compatible with Prism Launcher, MultiMC, and Modrinth App."
       }
     }
   },
@@ -780,6 +909,94 @@
     "subtitle": "Default settings for new instances",
     "loading": "Loading...",
     "saved": "Settings saved!",
+    "tabs": {
+      "general": "General",
+      "interface": "Interface",
+      "connect": "Connect",
+      "game": "Game",
+      "mods": "Mods",
+      "data": "Data",
+      "translations": "Translations"
+    },
+    "interface": {
+      "themeTitle": "Accent Color",
+      "customThemeName": "Theme name...",
+      "deleteTheme": "Delete this theme",
+      "themeSaved": "Theme saved",
+      "viewModesTitle": "View Modes",
+      "layoutTitle": "Layout",
+      "cardDensity": "Card Density",
+      "fontSize": "Font Size",
+      "instanceColumns": "Instance Columns",
+      "columnsAuto": "Auto",
+      "density": {
+        "compact": "Compact",
+        "normal": "Normal",
+        "comfortable": "Comfortable"
+      },
+      "font": {
+        "small": "Small",
+        "default": "Default",
+        "large": "Large"
+      },
+      "visibilityTitle": "Element Visibility",
+      "vis": {
+        "instanceBadges": "Instance Badges (Client/Server)",
+        "instancePlaytime": "Play Time",
+        "instanceQuickPlay": "Quick Play",
+        "modDescriptions": "Mod Descriptions",
+        "modThumbnails": "Mod Thumbnails",
+        "modpackChangelogs": "Modpack Changelogs",
+        "toolsMenu": "Tools Menu",
+        "connectButton": "Connect Button",
+        "downloadNotifications": "Download Notifications",
+        "searchBar": "Search (Ctrl+F)"
+      },
+      "profilesTitle": "Setting Profiles",
+      "createProfile": "Save as profile",
+      "loadProfile": "Load",
+      "profileName": "Profile name...",
+      "profileSaved": "Profile saved",
+      "noProfiles": "No saved profiles",
+      "dataTitle": "Settings Data",
+      "exportBtn": "Export",
+      "importBtn": "Import",
+      "resetBtn": "Reset All",
+      "exportedToClipboard": "Copied to clipboard",
+      "importSuccess": "Settings imported",
+      "importError": "Invalid data format",
+      "clipboardError": "Cannot access clipboard",
+      "resetDone": "Interface settings reset"
+    },
+    "translations": {
+      "title": "Translation Editor",
+      "searchPlaceholder": "Search keys or values...",
+      "onlyModified": "Modified only",
+      "modified": "modified",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Translations saved",
+      "saveError": "Failed to save translations",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "import": "Import",
+      "export": "Export",
+      "imported": "Translations imported",
+      "keysImported": "keys imported",
+      "importError": "Import failed",
+      "exported": "Translations exported",
+      "exportError": "Export failed",
+      "resetAll": "Reset all",
+      "reset": "Translations reset to default",
+      "resetError": "Failed to reset",
+      "resetKey": "Reset to default",
+      "baseValue": "Base",
+      "unsavedChanges": "You have unsaved changes",
+      "noResults": "No matching translation keys",
+      "keysShown": "keys shown",
+      "hint": "Click any value to edit. Changes are applied after saving.",
+      "scrollForMore": "Scroll down to see more..."
+    },
     "appearance": {
       "title": "Appearance",
       "background": "Application Background",
@@ -789,7 +1006,7 @@
         "dotGrid": "Dot Grid",
         "rippleGrid": "Ripple Grid",
         "edgePixels": "Pixels",
-        "static": "Dark",
+        "static": "Solid",
         "image": "Image"
       },
       "selectImage": "Select",
@@ -802,12 +1019,36 @@
     "language": {
       "title": "Language",
       "select": "Select language",
-      "changesApply": "Changes apply immediately"
+      "changesApply": "Changes apply immediately",
+      "importLanguage": "Import language",
+      "custom": "Custom",
+      "invalidCode": "Cannot determine language code",
+      "invalidCodeHint": "add \"_meta\": {\"lang\": \"es\"} to the JSON or name the file es.json",
+      "imported": "Language imported",
+      "importError": "Import failed",
+      "deleted": "Language deleted",
+      "deleteError": "Failed to delete language"
     },
     "developer": {
       "title": "Developer Mode",
       "enable": "Enable Developer Mode",
       "description": "Shows Console and Source Code buttons in TitleBar. Keyboard shortcuts (Ctrl+Shift+D/U/T) work in both modes."
+    },
+    "tour": {
+      "title": "Onboarding",
+      "description": "Interactive guide that highlights key features of the interface.",
+      "restart": "Restart tour",
+      "resetAll": "Reset progress",
+      "reset": "Tour progress reset",
+      "selectTour": "Select a tour",
+      "completed": "Completed",
+      "notCompleted": "Not completed",
+      "hasUpdates": "What's new",
+      "steps": "steps",
+      "startTour": "Start",
+      "whatsNew": "What's new",
+      "subTours": "Additional tours",
+      "noTours": "No tours available"
     },
     "user": {
       "title": "User",
@@ -865,7 +1106,9 @@
     },
     "mods": {
       "title": "Mods",
-      "autoUpdate": "Automatically update mods"
+      "autoUpdate": "Automatically update mods",
+      "preferModrinth": "Prefer Modrinth",
+      "preferModrinthHint": "When installing modpacks, try Modrinth first, then CurseForge"
     },
     "downloads": {
       "title": "Downloads",
@@ -1729,6 +1972,9 @@
     "online": "Online",
     "inGame": "In game",
     "lastSeen": "Last seen",
+    "lastSeenSeconds": "s",
+    "lastSeenMinutes": "m",
+    "ago": "ago",
     "requestModpack": "Request modpack",
     "viewModpacks": "View modpacks",
     "addFriend": "Send friend request",
@@ -1750,6 +1996,7 @@
     "connect": "Connect",
     "invalidCode": "Invalid code format",
     "connecting": "Connecting...",
+    "codeHint": "Enter friend code or invite",
     "vpnHint": "To play with friends over the internet, we recommend:",
     "network": {
       "title": "Network Diagnostics",
@@ -1771,7 +2018,15 @@
       "useVpnDesc": "To play over the internet (not on the same LAN), use a VPN: Radmin VPN, ZeroTier, or Hamachi.",
       "copyFirewallCommand": "Copy command",
       "firewallHint": "Run this command in an administrator command prompt:",
-      "copied": "Copied!"
+      "copied": "Copied!",
+      "firewallSettings": "Firewall Settings",
+      "portAvailable": "Available",
+      "portAvailableFallback": "Available (fallback: {port})",
+      "portStuzhikUsing": "Used by Stuzhik",
+      "portStuzhikFallback": "Used by Stuzhik (fallback: {port})",
+      "portAllBusy": "All ports busy",
+      "portsClosedWarning": "Ports closed — connection issues possible",
+      "portsClosedHint": "Make sure both devices are on the same network. For internet play, use VPN (Radmin VPN, ZeroTier, Tailscale)."
     },
     "settings": {
       "title": "Connect Settings",
@@ -1842,7 +2097,10 @@
       "decline": "Decline",
       "wantsToSync": "wants to sync",
       "filesCount": "files",
-      "totalSize": "{{size}}"
+      "totalSize": "{{size}}",
+      "calculating": "Calculating...",
+      "secondsShort": "s",
+      "remaining": "remaining"
     },
     "queue": {
       "title": "Transfer Queue",
@@ -2016,6 +2274,8 @@
     }
   },
   "editor": {
+    "title": "Editor",
+    "profiles": "Profiles",
     "projects": "Projects",
     "refresh": "Refresh",
     "searchFiles": "Search files...",
@@ -2320,6 +2580,20 @@
           "javaAuto": "Auto-install",
           "javaTitle": "Java Versions",
           "javaText": "Stuzhik automatically downloads and installs the required Java version. Here are the versions needed for different Minecraft versions:"
+        },
+        "folders": {
+          "title": "Application Folders",
+          "intro": "All Stuzhik data is stored locally. Click on a folder to open it in your file explorer:",
+          "base": "Stuzhik root folder — all application data",
+          "instances": "Instances — your Minecraft builds",
+          "java": "Installed Java versions (auto-download)",
+          "logs": "Application logs — for diagnostics",
+          "cache": "Cache — safe to clear",
+          "globalTitle": "Global Resources",
+          "resourcepacks": "Resource packs — shared across all instances",
+          "shaderpacks": "Shaders — shared across all instances",
+          "libraries": "Minecraft libraries — shared files",
+          "assets": "Minecraft assets — textures, sounds, languages"
         }
       },
       "instances": {
@@ -2369,6 +2643,10 @@
         "structure": {
           "title": "Folder Structure",
           "intro": "Each instance has a standard folder structure:",
+          "openInstances": "Open instances folder",
+          "foldersTitle": "Instance folder structure",
+          "tipTitle": "Tip",
+          "tipText": "The resourcepacks/ and shaderpacks/ folders inside an instance override global ones. This allows you to have different settings for different modpacks.",
           "codeRef": {
             "module": "Instance management module"
           }
@@ -2772,7 +3050,8 @@
           "javaTitle": "Wrong Java version",
           "javaText": "Make sure you're using the correct Java version. MC 1.17+ requires Java 17+, MC 1.20.5+ requires Java 21.",
           "conflictsTitle": "Mod conflicts",
-          "conflictsText": "OptiFine is incompatible with Sodium/Iris. Use Sodium + Iris for shaders."
+          "conflictsText": "OptiFine is incompatible with Sodium/Iris. Use Sodium + Iris for shaders.",
+          "openJava": "Open Java folder"
         },
         "logAnalyzer": {
           "title": "Log Analyzer",
@@ -2781,6 +3060,9 @@
           "feature2": "Fix suggestions",
           "feature3": "Problematic mod identification",
           "feature4": "Knowledge base integration",
+          "openLogs": "Open logs folder",
+          "tipTitle": "Tip",
+          "tipText": "If Stuzhik cannot identify the problem automatically, copy the contents of latest.log and send it to the mod's support or forum.",
           "codeRef": "Log analyzer"
         },
         "faq": {
@@ -2907,6 +3189,7 @@
       "hasQuickPresets": "Has quick presets"
     },
     "bulkOperations": {
+      "toolbar": "Bulk operations",
       "selected": "Selected:",
       "enable": "Enable",
       "enableAll": "Enable all",
@@ -2916,6 +3199,10 @@
       "deleteAll": "Delete all",
       "deselect": "Deselect",
       "cancel": "Cancel"
+    },
+    "dialogs": {
+      "selectModpackFile": "Select modpack file",
+      "modpackFilter": "Modpacks"
     },
     "units": {
       "bytes": "B",
@@ -2969,5 +3256,31 @@
     "modsShort": "m",
     "configsShort": "c",
     "filesShort": "f"
+  },
+  "tour": {
+    "welcome": "Welcome to Stuzhik!",
+    "welcomeDesc": "Let's take a quick tour of the interface. This will only take a couple of minutes — you can skip at any time.",
+    "instanceList": "Your instances",
+    "instanceListDesc": "All your Minecraft instances are shown here — clients and servers. Click a card to open its details.",
+    "createInstance": "Create an instance",
+    "createInstanceDesc": "Create a new Minecraft instance — pick a version, mod loader (Forge, Fabric, NeoForge, Quilt), and a name.",
+    "modpacks": "Modpack browser",
+    "modpacksDesc": "Install a ready-made modpack in one click. Supports Modrinth, CurseForge, and file imports (.mrpack, .stzhk).",
+    "tools": "Tools",
+    "toolsDesc": "Log analyzer helps diagnose crashes, and settings sync lets you transfer configs to another PC.",
+    "quickPlay": "Quick Play",
+    "quickPlayDesc": "Launch your last instance with one button or create a new one right here — no extra steps needed.",
+    "connect": "Stuzhik Connect",
+    "connectDesc": "Play with friends via P2P — no dedicated server needed. Send mods and modpacks directly.",
+    "docs": "Documentation",
+    "docsDesc": "Built-in knowledge base: guides, FAQ, and changelog — all at your fingertips.",
+    "settings": "Settings",
+    "settingsDesc": "Java, memory, theme, language, hotkeys — customize the launcher to your liking.",
+    "detailHeader": "Instance info",
+    "detailHeaderDesc": "Minecraft version, loader, playtime, and current status. The Play button launches the instance.",
+    "detailTabs": "Tabs",
+    "detailTabsDesc": "Mods, resources, code editor, tools, and backups — all instance management is here.",
+    "detailActions": "Actions",
+    "detailActionsDesc": "Open folder, export modpack, game settings, launch history, repair, and delete."
   }
 }

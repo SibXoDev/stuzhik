@@ -115,7 +115,7 @@ function LoaderSelector(props: Props) {
             <button
               type="button"
               class={`w-full px-3 py-2.5 flex items-center gap-3 hover:bg-gray-700/50 transition-colors rounded-2xl ${
-                props.value === loader.id ? "bg-blue-600/20" : ""
+                props.value === loader.id ? "bg-[var(--color-primary-bg)]" : ""
               }`}
               onClick={() => handleSelect(loader.id)}
             >
@@ -125,7 +125,7 @@ function LoaderSelector(props: Props) {
                 <div class="text-xs text-gray-500 truncate">{getLoaderDescription(loader.id)}</div>
               </div>
               <Show when={props.value === loader.id}>
-                <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-blue-400 flex-shrink-0" />
+                <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-[var(--color-primary)] flex-shrink-0" />
               </Show>
             </button>
           )}

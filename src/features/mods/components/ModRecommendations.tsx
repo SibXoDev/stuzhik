@@ -168,7 +168,7 @@ const ModRecommendations: Component<Props> = (props) => {
         setPreviewVersions(versionsResult.value);
       }
     } catch (e) {
-      console.error("Failed to load mod preview data:", e);
+      if (import.meta.env.DEV) console.error("Failed to load mod preview data:", e);
     } finally {
       setPreviewLoading(false);
     }
@@ -199,7 +199,7 @@ const ModRecommendations: Component<Props> = (props) => {
       recommendations.loadRecommendations(8);
       closeModPreview();
     } catch (e) {
-      console.error("Failed to install mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to install mod:", e);
     } finally {
       setPreviewInstalling(false);
     }
@@ -336,7 +336,7 @@ const ModRecommendations: Component<Props> = (props) => {
           <Show when={previewLoading()}>
             <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
               <div class="bg-gray-850 border border-gray-750 rounded-2xl p-8 flex items-center gap-3">
-                <i class="i-svg-spinners-6-dots-scale w-6 h-6 text-blue-400" />
+                <i class="i-svg-spinners-6-dots-scale w-6 h-6 text-[var(--color-primary)]" />
                 <span class="text-gray-300">{t().common?.loading ?? "Loading..."}</span>
               </div>
             </div>

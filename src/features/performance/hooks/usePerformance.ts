@@ -166,7 +166,7 @@ export function usePerformance(
       setSnapshots([]);
       setRealtimeBottlenecks([]);
     } catch (e) {
-      console.error("[PERF] Failed to start monitoring:", e);
+      if (import.meta.env.DEV) console.error("[PERF] Failed to start monitoring:", e);
       setError(getErrorMessage(e));
     } finally {
       setLoading(false);
@@ -224,7 +224,7 @@ export function usePerformance(
       setReport(rep);
       return rep;
     } catch (e) {
-      console.error("[PERF] Failed to get report:", e);
+      if (import.meta.env.DEV) console.error("[PERF] Failed to get report:", e);
       setError(getErrorMessage(e));
       return null;
     } finally {
@@ -258,7 +258,7 @@ export function usePerformance(
       setSparkInfo(info);
       return info;
     } catch (e) {
-      console.error("Failed to detect Spark:", e);
+      if (import.meta.env.DEV) console.error("Failed to detect Spark:", e);
       return null;
     }
   }

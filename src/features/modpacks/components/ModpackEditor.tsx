@@ -10,7 +10,7 @@ import type {
 } from "../../../shared/types";
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import { addToast } from "../../../shared/components/Toast";
-import { Tabs } from "../../../shared/ui";
+import { Tabs, Tooltip } from "../../../shared/ui";
 import { useI18n } from "../../../shared/i18n";
 import { formatSize } from "../../../shared/utils/format-size";
 
@@ -181,7 +181,7 @@ export default function ModpackEditor(props: Props) {
         );
       }
     } catch (e) {
-      console.error("Search error:", e);
+      if (import.meta.env.DEV) console.error("Search error:", e);
       setError(`Ошибка поиска: ${e}`);
     } finally {
       setSearching(false);
@@ -384,17 +384,17 @@ export default function ModpackEditor(props: Props) {
       {/* Header */}
       <div class="flex items-center gap-4 p-4 border-b border-gray-750 flex-shrink-0">
         <button
-          class="p-2 rounded-2xl hover:bg-gray-800 text-gray-400 hover:text-white transition-colors duration-100"
+          class="p-2 rounded-2xl hover:bg-gray-800 text-gray-400 hover:text-gray-200 transition-colors duration-100"
           onClick={props.onBack}
         >
           <div class="i-hugeicons-arrow-left-01 w-5 h-5" />
         </button>
 
-        <div class="flex-1">
+        <div class="flex-1 flex flex-col gap-1">
           <h2 class="text-xl font-bold text-white">
             {projectFull()?.project.name || props.project.name}
           </h2>
-          <div class="flex items-center gap-3 text-sm text-gray-400 mt-1">
+          <div class="flex items-center gap-3 text-sm text-gray-400">
             <span>v{projectFull()?.project.version || props.project.version}</span>
             <span>•</span>
             <span>{props.project.minecraft_version}</span>
@@ -409,11 +409,11 @@ export default function ModpackEditor(props: Props) {
       </div>
 
       {/* Content */}
-      <div class="flex-1 overflow-y-auto p-4">
+      <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
 
       {/* Error */}
       <Show when={error()}>
-        <div class="card mb-4 p-3 bg-red-500/10 border-red-500/30">
+        <div class="card p-3 bg-red-500/10 border-red-500/30">
           <div class="flex items-center gap-2 text-red-400">
             <div class="i-hugeicons-alert-02 w-5 h-5" />
             <span class="flex-1">{error()}</span>
@@ -427,13 +427,13 @@ export default function ModpackEditor(props: Props) {
       {/* Loading */}
       <Show when={loading()}>
         <div class="flex-1 flex items-center justify-center">
-          <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-blue-500" />
+          <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-[var(--color-primary)]" />
         </div>
       </Show>
 
       <Show when={!loading() && projectFull()}>
         {/* Tabs */}
-        <div class="mb-4">
+        <div>
           <Tabs
             tabs={[
               { id: "mods", label: "Моды", icon: "i-hugeicons-package" },
@@ -448,11 +448,11 @@ export default function ModpackEditor(props: Props) {
 
         {/* Mods Tab */}
         <Show when={activeTab() === "mods"}>
-          <div class="flex-1 flex flex-col overflow-hidden">
+          <div class="flex-1 flex flex-col gap-4 overflow-hidden">
             {/* Search */}
-            <div class="mb-4">
+            <div class="flex flex-col gap-3">
               {/* Source Selector */}
-              <div class="mb-3">
+              <div>
                 <Tabs
                   tabs={[
                     { id: "modrinth", label: "Modrinth", icon: "i-hugeicons-github" },
@@ -472,7 +472,7 @@ export default function ModpackEditor(props: Props) {
                   <div class="i-hugeicons-search-01 absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                   <input
                     type="text"
-                    class="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                    class="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 placeholder-gray-500 focus:border-[var(--color-primary)] focus:outline-none"
                     placeholder={t().ui.placeholders.searchModsOn.replace("{source}", searchSource() === "modrinth" ? "Modrinth" : "CurseForge")}
                     value={searchQuery()}
                     onInput={(e) => setSearchQuery(e.currentTarget.value)}
@@ -494,7 +494,7 @@ export default function ModpackEditor(props: Props) {
 
               {/* Search Results */}
               <Show when={searchResults().length > 0}>
-                <div class="mt-2 max-h-64 overflow-y-auto rounded-2xl border border-gray-700 bg-gray-alpha-50">
+                <div class="max-h-64 overflow-y-auto rounded-2xl border border-gray-700 bg-gray-alpha-50">
                   <For each={searchResults()}>
                     {(mod) => (
                       <div class="flex items-center gap-3 p-3 border-b border-gray-700 last:border-0 hover:bg-gray-700/50">
@@ -513,7 +513,7 @@ export default function ModpackEditor(props: Props) {
                           />
                         </Show>
 
-                        <div class="flex-1 min-w-0">
+                        <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                           <div class="flex items-center gap-2">
                             <span class="font-medium text-white truncate">
                               {mod._title}
@@ -531,7 +531,7 @@ export default function ModpackEditor(props: Props) {
                           <div class="text-xs text-gray-400 truncate">
                             {mod._description}
                           </div>
-                          <div class="text-xs text-gray-500 mt-0.5">
+                          <div class="text-xs text-gray-500">
                             {mod._downloads?.toLocaleString()} загрузок
                           </div>
                         </div>
@@ -572,10 +572,12 @@ export default function ModpackEditor(props: Props) {
               <Show
                 when={projectFull()!.mods.length > 0}
                 fallback={
-                  <div class="flex flex-col items-center justify-center h-full text-gray-400">
-                    <div class="i-hugeicons-package w-12 h-12 mb-3 opacity-50" />
-                    <p>Модов пока нет</p>
-                    <p class="text-sm">Добавьте моды через поиск выше</p>
+                  <div class="flex flex-col items-center justify-center gap-3 h-full text-gray-400">
+                    <div class="i-hugeicons-package w-12 h-12 opacity-50" />
+                    <div class="flex flex-col items-center">
+                      <p>Модов пока нет</p>
+                      <p class="text-sm">Добавьте моды через поиск выше</p>
+                    </div>
                   </div>
                 }
               >
@@ -635,11 +637,11 @@ export default function ModpackEditor(props: Props) {
                           </div>
                         </div>
 
+                        <Tooltip text="Удалить мод" position="bottom">
                         <button
                           class="p-2 rounded opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors duration-100"
                           onClick={() => handleRemoveMod(mod.mod_id)}
                           disabled={removingMod() === mod.mod_id}
-                          title="Удалить мод"
                         >
                           {removingMod() === mod.mod_id ? (
                             <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
@@ -647,6 +649,7 @@ export default function ModpackEditor(props: Props) {
                             <div class="i-hugeicons-delete-02 w-4 h-4" />
                           )}
                         </button>
+                        </Tooltip>
                       </div>
                     )}
                   </For>
@@ -660,44 +663,44 @@ export default function ModpackEditor(props: Props) {
         <Show when={activeTab() === "settings"}>
           <div class="flex-1 overflow-y-auto">
             <div class="max-w-xl space-y-4">
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="text-sm text-gray-400">
                   Название модпака
                 </label>
                 <input
                   type="text"
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 focus:border-[var(--color-primary)] focus:outline-none"
                   value={editName()}
                   onInput={(e) => setEditName(e.currentTarget.value)}
                 />
               </div>
 
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Версия</label>
+              <div class="flex flex-col gap-1">
+                <label class="text-sm text-gray-400">Версия</label>
                 <input
                   type="text"
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 focus:border-[var(--color-primary)] focus:outline-none"
                   placeholder={t().ui.placeholders.versionNumber}
                   value={editVersion()}
                   onInput={(e) => setEditVersion(e.currentTarget.value)}
                 />
               </div>
 
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Автор</label>
+              <div class="flex flex-col gap-1">
+                <label class="text-sm text-gray-400">Автор</label>
                 <input
                   type="text"
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 focus:border-[var(--color-primary)] focus:outline-none"
                   placeholder={t().ui.placeholders.yourName}
                   value={editAuthor()}
                   onInput={(e) => setEditAuthor(e.currentTarget.value)}
                 />
               </div>
 
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Описание</label>
+              <div class="flex flex-col gap-1">
+                <label class="text-sm text-gray-400">Описание</label>
                 <textarea
-                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none resize-none"
+                  class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 focus:border-[var(--color-primary)] focus:outline-none resize-none"
                   rows={4}
                   placeholder={t().ui.placeholders.modpackDescriptionLong}
                   value={editDescription()}
@@ -743,7 +746,7 @@ export default function ModpackEditor(props: Props) {
                   <label class="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      class="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                      class="w-4 h-4 rounded border-gray-600 bg-gray-700 focus:ring-[var(--color-primary)]"
                       checked={embedMods()}
                       onChange={(e) => setEmbedMods(e.currentTarget.checked)}
                     />
@@ -772,7 +775,7 @@ export default function ModpackEditor(props: Props) {
                       </div>
                       <div class="h-1.5 bg-gray-700 rounded-full overflow-hidden">
                         <div
-                          class="h-full bg-blue-500 transition-colors duration-100"
+                          class="h-full bg-[var(--color-primary)] transition-colors duration-100"
                           style={{
                             width: `${(exportProgress()!.current / Math.max(exportProgress()!.total, 1)) * 100}%`,
                           }}
@@ -815,7 +818,7 @@ export default function ModpackEditor(props: Props) {
                     </label>
                     <input
                       type="text"
-                      class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
+                      class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 focus:border-[var(--color-primary)] focus:outline-none"
                       value={instanceName()}
                       onInput={(e) => setInstanceName(e.currentTarget.value)}
                     />

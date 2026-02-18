@@ -21,7 +21,7 @@ export function useMinecraftData(instanceId: Accessor<string>) {
         instanceId: id,
       });
     } catch (e) {
-      console.error("Failed to load Minecraft data stats:", e);
+      if (import.meta.env.DEV) console.error("Failed to load Minecraft data stats:", e);
       return null;
     }
   });
@@ -57,7 +57,7 @@ export function useMinecraftData(instanceId: Accessor<string>) {
 
       return result;
     } catch (e) {
-      console.error("Failed to rebuild Minecraft data cache:", e);
+      if (import.meta.env.DEV) console.error("Failed to rebuild Minecraft data cache:", e);
       return null;
     }
   };
@@ -77,7 +77,7 @@ export function useMinecraftData(instanceId: Accessor<string>) {
         limit: limit ?? 50,
       });
     } catch (e) {
-      console.error("Failed to search items:", e);
+      if (import.meta.env.DEV) console.error("Failed to search items:", e);
       return [];
     }
   };
@@ -97,7 +97,7 @@ export function useMinecraftData(instanceId: Accessor<string>) {
         limit: limit ?? 50,
       });
     } catch (e) {
-      console.error("Failed to search blocks:", e);
+      if (import.meta.env.DEV) console.error("Failed to search blocks:", e);
       return [];
     }
   };
@@ -119,7 +119,7 @@ export function useMinecraftData(instanceId: Accessor<string>) {
         limit: limit ?? 50,
       });
     } catch (e) {
-      console.error("Failed to search tags:", e);
+      if (import.meta.env.DEV) console.error("Failed to search tags:", e);
       return [];
     }
   };

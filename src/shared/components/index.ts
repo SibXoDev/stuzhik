@@ -1,6 +1,7 @@
 // Layout components
 export { default as TitleBar } from './TitleBar';
 export { default as AppBackground } from './AppBackground';
+export { default as GameSwitcher } from './GameSwitcher';
 
 // Background effects
 export { default as Aurora } from './Aurora';

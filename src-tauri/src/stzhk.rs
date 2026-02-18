@@ -700,7 +700,7 @@ impl StzhkManager {
 
         // Modrinth batch API: POST /v2/version_files
         // Body: { "hashes": ["sha512_1", "sha512_2", ...], "algorithm": "sha512" }
-        let client = reqwest::Client::new();
+        let client = &*crate::utils::SHARED_HTTP_CLIENT;
 
         #[derive(Serialize)]
         struct BatchRequest<'a> {
@@ -1035,6 +1035,7 @@ impl StzhkManager {
         let instance = crate::instances::create_instance(
             crate::types::CreateInstanceRequest {
                 name: instance_name.clone(),
+                game_type: Some("minecraft".to_string()),
                 version: manifest.requirements.minecraft_version.clone(),
                 loader: manifest.requirements.loader.clone(),
                 loader_version: manifest.requirements.loader_version.clone(),
@@ -1681,15 +1682,17 @@ impl StzhkManager {
                     "Override check: {} at {:?} - exists: {}",
                     name,
                     path,
-                    path.exists()
+                    tokio::fs::try_exists(path).await.unwrap_or(false)
                 );
             }
 
             // Filter to only existing paths AND not excluded
-            let filtered: Vec<_> = dirs
-                .into_iter()
-                .filter(|(name, path)| path.exists() && !excluded_overrides.contains(*name))
-                .collect();
+            let mut filtered: Vec<(&str, std::path::PathBuf)> = Vec::new();
+            for (name, path) in dirs {
+                if tokio::fs::try_exists(&path).await.unwrap_or(false) && !excluded_overrides.contains(name) {
+                    filtered.push((name, path));
+                }
+            }
             log::info!(
                 "Found {} override directories/files to include (after exclusions)",
                 filtered.len()
@@ -2662,10 +2665,8 @@ async fn resolve_yandex_disk_url(url: &str) -> Result<String> {
         urlencoding::encode(url)
     );
 
-    let client = reqwest::Client::new();
-    let response = client
+    let response = crate::utils::SHARED_HTTP_CLIENT
         .get(&api_url)
-        .timeout(std::time::Duration::from_secs(30))
         .send()
         .await?;
 
@@ -2834,7 +2835,7 @@ pub async fn export_mrpack(
         }
 
         let mod_path = mods_dir.join(file_name);
-        if !mod_path.exists() {
+        if !tokio::fs::try_exists(&mod_path).await.unwrap_or(false) {
             log::warn!("Mod file not found: {:?}", mod_path);
             continue;
         }
@@ -2937,7 +2938,7 @@ pub async fn export_mrpack(
             }
 
             let dir_path = instance_path.join(dir_name);
-            if dir_path.exists() && dir_path.is_dir() {
+            if tokio::fs::try_exists(&dir_path).await.unwrap_or(false) && dir_path.is_dir() {
                 collect_override_files(&dir_path, dir_name, &mut override_files).await?;
             }
         }
@@ -2998,6 +2999,454 @@ pub async fn export_mrpack(
 
     log::info!("Successfully exported to {}", output_path);
     Ok(output_path)
+}
+
+// ============================================================================
+// Universal ZIP Export (for friends without launcher)
+// ============================================================================
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct UniversalZipOptions {
+    pub name: String,
+    pub version: String,
+    pub author: String,
+    pub description: Option<String>,
+    pub include_readme: bool,
+    pub readme_language: String, // "ru", "en", or "both"
+    pub excluded_mods: Vec<String>,
+    pub excluded_overrides: Vec<String>,
+}
+
+/// Export instance to universal .zip for friends without any launcher.
+/// Contains all mods embedded, configs, and README with installation instructions.
+#[tauri::command]
+pub async fn export_universal_zip(
+    instance_id: String,
+    output_path: String,
+    options: UniversalZipOptions,
+    app_handle: tauri::AppHandle,
+) -> Result<String> {
+    use crate::db::get_db_conn;
+    use crate::instances;
+    use crate::paths::{instance_mods_dir, instances_dir};
+    use std::io::Write as IoWriteTrait;
+    use tauri::Emitter;
+    use zip::write::SimpleFileOptions as ZipOptions;
+
+    log::info!(
+        "Exporting instance {} to universal ZIP: {:?}",
+        instance_id,
+        output_path
+    );
+
+    // Get instance details
+    let instance = instances::lifecycle::get_instance(instance_id.clone()).await?;
+
+    // Emit progress
+    let _ = app_handle.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "preparing",
+            "progress": 0,
+            "message": "Preparing export..."
+        }),
+    );
+
+    // Get installed mods from database
+    let mods_dir = instance_mods_dir(&instance_id);
+    let mods_rows: Vec<(String, String, bool)> = {
+        let conn = get_db_conn()?;
+        let mut rows = Vec::new();
+        {
+            let mut stmt = conn.prepare(
+                "SELECT name, file_name, enabled FROM mods WHERE instance_id = ?1",
+            )?;
+            let mut query_rows = stmt.query([&instance_id])?;
+            while let Some(row) = query_rows.next()? {
+                rows.push((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, bool>(2)?,
+                ));
+            }
+        }
+        rows
+    };
+
+    // Collect all mod files (embed all)
+    let mut mod_files: Vec<(String, Vec<u8>)> = Vec::new();
+    let total_mods = mods_rows.len();
+    let mut processed = 0;
+    let mut mod_names: Vec<String> = Vec::new();
+
+    for (name, file_name, enabled) in &mods_rows {
+        // Skip excluded mods
+        if options.excluded_mods.contains(file_name) {
+            continue;
+        }
+
+        // Skip disabled mods
+        if !enabled {
+            continue;
+        }
+
+        processed += 1;
+        let _ = app_handle.emit(
+            "export-progress",
+            serde_json::json!({
+                "stage": "processing_mods",
+                "progress": (processed * 40) / total_mods.max(1),
+                "message": format!("Processing mod: {}", name)
+            }),
+        );
+
+        // Read mod file
+        let mod_path = mods_dir.join(file_name);
+        if tokio::fs::try_exists(&mod_path).await.unwrap_or(false) {
+            match tokio::fs::read(&mod_path).await {
+                Ok(content) => {
+                    mod_files.push((file_name.clone(), content));
+                    mod_names.push(name.clone());
+                }
+                Err(e) => {
+                    log::warn!("Failed to read mod file {}: {}", file_name, e);
+                }
+            }
+        }
+    }
+
+    // Collect override files (configs, etc.)
+    let mut override_files: Vec<(String, Vec<u8>)> = Vec::new();
+    let instance_path = instances_dir().join(&instance_id);
+
+    // Directories to include
+    let override_dirs = [
+        "config",
+        "kubejs",
+        "scripts",
+        "defaultconfigs",
+        "resourcepacks",
+        "shaderpacks",
+    ];
+
+    let _ = app_handle.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "collecting_overrides",
+            "progress": 50,
+            "message": "Collecting configs and resources..."
+        }),
+    );
+
+    for dir_name in override_dirs {
+        if options.excluded_overrides.contains(&dir_name.to_string()) {
+            continue;
+        }
+
+        let dir_path = instance_path.join(dir_name);
+        if tokio::fs::try_exists(&dir_path).await.unwrap_or(false) && dir_path.is_dir() {
+            collect_override_files(&dir_path, dir_name, &mut override_files).await?;
+        }
+    }
+
+    // Also include options.txt and servers.dat if they exist
+    for file_name in ["options.txt", "servers.dat"] {
+        let file_path = instance_path.join(file_name);
+        if tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
+            if let Ok(content) = tokio::fs::read(&file_path).await {
+                override_files.push((file_name.to_string(), content));
+            }
+        }
+    }
+
+    // Generate README content
+    let readme_content = if options.include_readme {
+        generate_readme(
+            &options.name,
+            &options.version,
+            &options.author,
+            options.description.as_deref(),
+            &instance.version,
+            instance.loader.as_str(),
+            instance.loader_version.as_deref(),
+            &mod_names,
+            &options.readme_language,
+        )
+    } else {
+        String::new()
+    };
+
+    let _ = app_handle.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "writing_archive",
+            "progress": 70,
+            "message": "Creating ZIP archive..."
+        }),
+    );
+
+    // Write ZIP file
+    let output = output_path.clone();
+    tokio::task::spawn_blocking(move || -> Result<()> {
+        let file = std::fs::File::create(&output)?;
+        let mut zip = zip::ZipWriter::new(file);
+        let zip_options = ZipOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated)
+            .compression_level(Some(6));
+
+        // Write README
+        if !readme_content.is_empty() {
+            zip.start_file("README.md", zip_options)?;
+            zip.write_all(readme_content.as_bytes())?;
+        }
+
+        // Write mods
+        for (filename, content) in &mod_files {
+            let archive_path = format!("mods/{}", filename);
+            zip.start_file(&archive_path, zip_options)?;
+            zip.write_all(content)?;
+        }
+
+        // Write override files
+        for (path, content) in &override_files {
+            zip.start_file(path, zip_options)?;
+            zip.write_all(content)?;
+        }
+
+        zip.finish()?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| LauncherError::Join(e.to_string()))??;
+
+    let _ = app_handle.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "complete",
+            "progress": 100,
+            "message": "Export complete!"
+        }),
+    );
+
+    log::info!("Successfully exported universal ZIP to {}", output_path);
+    Ok(output_path)
+}
+
+/// Generate README.md content with installation instructions
+fn generate_readme(
+    name: &str,
+    version: &str,
+    author: &str,
+    description: Option<&str>,
+    mc_version: &str,
+    loader: &str,
+    loader_version: Option<&str>,
+    mod_names: &[String],
+    language: &str,
+) -> String {
+    let loader_name = match loader {
+        "fabric" => "Fabric",
+        "forge" => "Forge",
+        "neoforge" => "NeoForge",
+        "quilt" => "Quilt",
+        _ => loader,
+    };
+
+    let loader_ver = loader_version.unwrap_or("latest");
+    let desc = description.unwrap_or("");
+
+    match language {
+        "ru" => generate_readme_ru(name, version, author, desc, mc_version, loader_name, loader_ver, mod_names),
+        "en" => generate_readme_en(name, version, author, desc, mc_version, loader_name, loader_ver, mod_names),
+        _ => {
+            // Both languages
+            let ru = generate_readme_ru(name, version, author, desc, mc_version, loader_name, loader_ver, mod_names);
+            let en = generate_readme_en(name, version, author, desc, mc_version, loader_name, loader_ver, mod_names);
+            format!("{}\n\n---\n\n{}", ru, en)
+        }
+    }
+}
+
+fn generate_readme_ru(
+    name: &str,
+    version: &str,
+    author: &str,
+    description: &str,
+    mc_version: &str,
+    loader_name: &str,
+    loader_version: &str,
+    mod_names: &[String],
+) -> String {
+    let mods_list = if mod_names.len() <= 20 {
+        mod_names.iter().map(|m| format!("- {}", m)).collect::<Vec<_>>().join("\n")
+    } else {
+        format!("{} модов (см. папку mods/)", mod_names.len())
+    };
+
+    format!(r#"# {name}
+
+**Версия:** {version}
+**Автор:** {author}
+{desc_line}
+
+## Требования
+
+- **Minecraft:** {mc_version}
+- **Загрузчик модов:** {loader_name} {loader_version}
+- **Java:** 17+ (для 1.18+) или 8 (для 1.12.2)
+
+## Инструкция по установке
+
+### Способ 1: Через официальный лаунчер Minecraft
+
+1. Скачай и установи {loader_name}:
+   - Fabric: https://fabricmc.net/use/installer/
+   - Forge: https://files.minecraftforge.net/
+   - NeoForge: https://neoforged.net/
+   - Quilt: https://quiltmc.org/install/
+
+2. Запусти Minecraft хотя бы один раз с {loader_name}, чтобы создалась папка mods
+
+3. Открой папку .minecraft:
+   - Windows: нажми Win+R, введи `%appdata%\.minecraft`
+   - macOS: ~/Library/Application Support/minecraft
+   - Linux: ~/.minecraft
+
+4. Скопируй содержимое этого архива в папку .minecraft:
+   - папку `mods/` → в `.minecraft/mods/`
+   - папку `config/` → в `.minecraft/config/`
+   - остальные папки аналогично
+
+5. Запусти Minecraft с профилем {loader_name} {mc_version}
+
+### Способ 2: Через Prism Launcher / MultiMC (рекомендуется)
+
+1. Скачай Prism Launcher: https://prismlauncher.org/
+
+2. Создай новый экземпляр:
+   - Нажми "Добавить экземпляр"
+   - Выбери Minecraft {mc_version}
+   - Выбери {loader_name} в качестве загрузчика
+
+3. Открой папку экземпляра (ПКМ → "Папка")
+
+4. Скопируй содержимое архива в папку `.minecraft` экземпляра
+
+5. Запусти экземпляр
+
+## Содержимое модпака
+
+{mods_list}
+
+## Проблемы?
+
+- Убедись что версия Java соответствует версии Minecraft
+- Проверь что установлена правильная версия {loader_name}
+- Удали папку mods и config, затем скопируй заново
+
+---
+*Экспортировано с помощью Stuzhik Launcher*
+"#,
+        name = name,
+        version = version,
+        author = author,
+        desc_line = if description.is_empty() { String::new() } else { format!("\n{}\n", description) },
+        mc_version = mc_version,
+        loader_name = loader_name,
+        loader_version = loader_version,
+        mods_list = mods_list,
+    )
+}
+
+fn generate_readme_en(
+    name: &str,
+    version: &str,
+    author: &str,
+    description: &str,
+    mc_version: &str,
+    loader_name: &str,
+    loader_version: &str,
+    mod_names: &[String],
+) -> String {
+    let mods_list = if mod_names.len() <= 20 {
+        mod_names.iter().map(|m| format!("- {}", m)).collect::<Vec<_>>().join("\n")
+    } else {
+        format!("{} mods (see mods/ folder)", mod_names.len())
+    };
+
+    format!(r#"# {name}
+
+**Version:** {version}
+**Author:** {author}
+{desc_line}
+
+## Requirements
+
+- **Minecraft:** {mc_version}
+- **Mod Loader:** {loader_name} {loader_version}
+- **Java:** 17+ (for 1.18+) or 8 (for 1.12.2)
+
+## Installation Guide
+
+### Method 1: Official Minecraft Launcher
+
+1. Download and install {loader_name}:
+   - Fabric: https://fabricmc.net/use/installer/
+   - Forge: https://files.minecraftforge.net/
+   - NeoForge: https://neoforged.net/
+   - Quilt: https://quiltmc.org/install/
+
+2. Launch Minecraft at least once with {loader_name} to create the mods folder
+
+3. Open .minecraft folder:
+   - Windows: Press Win+R, type `%appdata%\.minecraft`
+   - macOS: ~/Library/Application Support/minecraft
+   - Linux: ~/.minecraft
+
+4. Copy the contents of this archive to .minecraft:
+   - `mods/` folder → `.minecraft/mods/`
+   - `config/` folder → `.minecraft/config/`
+   - other folders similarly
+
+5. Launch Minecraft with {loader_name} {mc_version} profile
+
+### Method 2: Prism Launcher / MultiMC (recommended)
+
+1. Download Prism Launcher: https://prismlauncher.org/
+
+2. Create a new instance:
+   - Click "Add Instance"
+   - Select Minecraft {mc_version}
+   - Select {loader_name} as mod loader
+
+3. Open instance folder (Right-click → "Folder")
+
+4. Copy archive contents to the instance's `.minecraft` folder
+
+5. Launch the instance
+
+## Modpack Contents
+
+{mods_list}
+
+## Troubleshooting
+
+- Make sure Java version matches Minecraft version requirements
+- Verify correct {loader_name} version is installed
+- Delete mods and config folders, then copy again
+
+---
+*Exported with Stuzhik Launcher*
+"#,
+        name = name,
+        version = version,
+        author = author,
+        desc_line = if description.is_empty() { String::new() } else { format!("\n{}\n", description) },
+        mc_version = mc_version,
+        loader_name = loader_name,
+        loader_version = loader_version,
+        mods_list = mods_list,
+    )
 }
 
 /// Recursively collect files from a directory for overrides

@@ -120,24 +120,29 @@ impl ConnectService {
     }
 
     /// Включить P2P сервис
+    ///
+    /// ВАЖНО: Порядок запуска критичен!
+    /// 1. Создаём discovery (чтобы получить peer_id)
+    /// 2. Запускаем TCP сервер (определяем фактический порт)
+    /// 3. Устанавливаем TCP порт в discovery
+    /// 4. ТОЛЬКО ПОТОМ запускаем UDP discovery (начинаем broadcast)
+    ///
+    /// Это предотвращает race condition когда discovery broadcast
+    /// отправляет неправильный TCP порт.
     pub async fn enable(&self) -> Result<(), String> {
         let settings = self.settings.read().await;
         if !settings.enabled {
             return Err("P2P отключён в настройках".to_string());
         }
 
-        // Запускаем discovery
+        // Шаг 1: Создаём discovery (для peer_id), но НЕ запускаем
         let mut discovery_guard = self.discovery.write().await;
         if discovery_guard.is_none() {
             let discovery = Discovery::new(settings.clone());
             *discovery_guard = Some(discovery);
         }
 
-        if let Some(ref mut discovery) = *discovery_guard {
-            discovery.start().await?;
-        }
-
-        // Запускаем transfer server
+        // Шаг 2: Запускаем TCP сервер ПЕРВЫМ (определяем фактический порт)
         if let Some(ref event_tx) = self.event_tx {
             let tcp_port = settings.discovery_port + server::TCP_PORT_OFFSET;
             let peer_id = discovery_guard
@@ -157,14 +162,18 @@ impl ConnectService {
             // Получаем фактический порт (может отличаться если основной был занят)
             let actual_port = server.get_actual_port().await;
 
-            // Обновляем порт в discovery для корректного broadcast
+            // Шаг 3: Устанавливаем ПРАВИЛЬНЫЙ TCP порт в discovery ДО начала broadcast
             if let Some(ref discovery) = *discovery_guard {
                 discovery.set_tcp_port(actual_port).await;
             }
 
             *self.transfer_server.write().await = Some(server);
-
             log::info!("Transfer server started on port {}", actual_port);
+        }
+
+        // Шаг 4: Запускаем UDP discovery ПОСЛЕДНИМ (теперь TCP порт уже правильный)
+        if let Some(ref mut discovery) = *discovery_guard {
+            discovery.start().await?;
         }
 
         Ok(())
@@ -199,8 +208,15 @@ impl ConnectService {
     }
 
     /// Получить список найденных пиров
+    /// Использует peers из discovery (которые автоматически очищаются от устаревших)
     pub async fn get_peers(&self) -> Vec<PeerInfo> {
-        self.peers.read().await.clone()
+        let discovery_guard = self.discovery.read().await;
+        if let Some(ref discovery) = *discovery_guard {
+            discovery.get_peers().await
+        } else {
+            // Fallback to local cache if discovery not running
+            self.peers.read().await.clone()
+        }
     }
 
     /// Обновить настройки

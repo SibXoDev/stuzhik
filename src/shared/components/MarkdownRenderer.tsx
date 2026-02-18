@@ -2,6 +2,7 @@ import { createMemo, createSignal, createEffect, Show, onCleanup } from "solid-j
 import { marked } from "marked";
 import DOMPurify, { Config as DOMPurifyConfig } from "dompurify";
 import { highlightCode, detectLanguage } from "../utils/highlighter";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 interface MarkdownRendererProps {
   content: string;
@@ -30,8 +31,14 @@ const DOMPURIFY_CONFIG: DOMPurifyConfig = {
 // Hook to add security attributes to links
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
-    node.setAttribute("target", "_blank");
-    node.setAttribute("rel", "noopener noreferrer");
+    const href = node.getAttribute("href") || "";
+    // Только для внешних ссылок (http/https) принудительно открываем в новой вкладке.
+    // Относительные ссылки (./docs/file.md) оставляем без target — они
+    // перехватываются onClick handler'ом в MarkdownRenderer.
+    if (href.startsWith("http://") || href.startsWith("https://")) {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
   }
   // Validate image src URLs
   if (node.tagName === "IMG") {
@@ -146,7 +153,7 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
       // Sanitize HTML to prevent XSS
       return DOMPurify.sanitize(rawHtml, DOMPURIFY_CONFIG) as string;
     } catch (error) {
-      console.error("[MarkdownRenderer] Failed to parse markdown:", error);
+      if (import.meta.env.DEV) console.error("[MarkdownRenderer] Failed to parse markdown:", error);
       // Escape content for safety in fallback
       return DOMPurify.sanitize(`<pre>${props.content}</pre>`, DOMPURIFY_CONFIG) as string;
     }
@@ -187,11 +194,38 @@ export function MarkdownRenderer(props: MarkdownRendererProps) {
 
   const displayHtml = () => highlightedHtml() ?? initialHtml();
 
+  /** Перехват кликов по ссылкам внутри отрендеренного HTML.
+   *  - Внешние ссылки (http/https) → открываем в системном браузере через openUrl
+   *  - Относительные ссылки (./file.md) → предотвращаем навигацию внутри Tauri webview
+   *  - Якоря (#section) → стандартное поведение
+   */
+  const handleLinkClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest("a");
+    if (!anchor) return;
+
+    const href = anchor.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (href.startsWith("http://") || href.startsWith("https://")) {
+      openUrl(href).catch(() => {
+        // Fallback: window.open если openUrl не сработал
+        window.open(href, "_blank", "noopener,noreferrer");
+      });
+    }
+    // Относительные ссылки (./docs/file.md и т.п.) просто блокируем —
+    // навигация внутри tauri.localhost не имеет смысла.
+  };
+
   return (
     <Show when={props.content} fallback={<div class="text-gray-500 italic">No content</div>}>
       <div
         class={`markdown-content ${props.class || ""}`}
         innerHTML={displayHtml()}
+        onClick={handleLinkClick}
       />
     </Show>
   );
@@ -209,11 +243,30 @@ export function HtmlRenderer(props: { content: string; class?: string }) {
     return DOMPurify.sanitize(props.content, DOMPURIFY_CONFIG) as string;
   });
 
+  const handleLinkClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest("a");
+    if (!anchor) return;
+
+    const href = anchor.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (href.startsWith("http://") || href.startsWith("https://")) {
+      openUrl(href).catch(() => {
+        window.open(href, "_blank", "noopener,noreferrer");
+      });
+    }
+  };
+
   return (
     <Show when={props.content} fallback={<div class="text-gray-500 italic">No content</div>}>
       <div
         class={`markdown-content ${props.class || ""}`}
         innerHTML={sanitizedHtml()}
+        onClick={handleLinkClick}
       />
     </Show>
   );

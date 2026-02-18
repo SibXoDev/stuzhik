@@ -929,6 +929,7 @@ pub async fn create_instance_from_project(
     let instance = crate::instances::create_instance(
         crate::types::CreateInstanceRequest {
             name: instance_name.clone(),
+            game_type: Some("minecraft".to_string()),
             version: project.minecraft_version.clone(),
             loader: project.loader.clone(),
             loader_version: project.loader_version.clone(),

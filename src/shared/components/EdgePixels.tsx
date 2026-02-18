@@ -150,7 +150,7 @@ const EdgePixels = (props: EdgePixelsProps) => {
     gl.compileShader(fs);
 
     if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-      console.error("Fragment shader error:", gl.getShaderInfoLog(fs));
+      if (import.meta.env.DEV) console.error("Fragment shader error:", gl.getShaderInfoLog(fs));
       return;
     }
 

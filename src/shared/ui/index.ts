@@ -17,3 +17,4 @@ export type { TooltipProps } from './Tooltip';
 export type { RangeSliderProps } from './RangeSlider';
 export type { Tab, TabsProps } from './Tabs';
 export type { SkeletonProps } from './Skeleton';
+export { ViewModeSwitch } from './ViewModeSwitch';

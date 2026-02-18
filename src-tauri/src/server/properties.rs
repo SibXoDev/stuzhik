@@ -32,7 +32,7 @@ impl ServerProperties {
     pub async fn load(path: impl AsRef<Path>) -> ServerResult<Self> {
         let path = path.as_ref();
 
-        if !path.exists() {
+        if !fs::try_exists(path).await.unwrap_or(false) {
             return Ok(Self::default_properties());
         }
 

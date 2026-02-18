@@ -175,7 +175,7 @@ export function DevConsole(props: DevConsoleProps) {
       const path = await invoke<string>("get_current_log_path");
       setLogPath(path);
     } catch (e) {
-      console.error("Failed to load logs:", e);
+      if (import.meta.env.DEV) console.error("Failed to load logs:", e);
     } finally {
       setIsLoading(false);
     }
@@ -290,7 +290,7 @@ export function DevConsole(props: DevConsoleProps) {
         await writeTextFile(path, systemInfo + logText);
       }
     } catch (e) {
-      console.error("Failed to export logs:", e);
+      if (import.meta.env.DEV) console.error("Failed to export logs:", e);
     }
   }
 
@@ -301,7 +301,7 @@ export function DevConsole(props: DevConsoleProps) {
         // Use revealItemInDir to open folder with file selected
         await revealItemInDir(path);
       } catch (e) {
-        console.error("Failed to open log folder:", e);
+        if (import.meta.env.DEV) console.error("Failed to open log folder:", e);
       }
     }
   }
@@ -341,7 +341,7 @@ ${errorLogs || "No recent errors"}
 
       await openUrl(`${GITHUB_ISSUES_URL}?labels=bug&body=${body}`);
     } catch (e) {
-      console.error("Failed to open bug report:", e);
+      if (import.meta.env.DEV) console.error("Failed to open bug report:", e);
     }
   }
 
@@ -414,10 +414,10 @@ ${errorLogs || "No recent errors"}
       });
 
       consoleWindow.once("tauri://error", (e) => {
-        console.error("Failed to create console window:", e);
+        if (import.meta.env.DEV) console.error("Failed to create console window:", e);
       });
     } catch (e) {
-      console.error("Failed to detach console:", e);
+      if (import.meta.env.DEV) console.error("Failed to detach console:", e);
     }
   }
 
@@ -430,7 +430,7 @@ ${errorLogs || "No recent errors"}
       class={`bg-gray-950 flex flex-col shadow-2xl ${
         props.detached
           ? "h-full w-full"
-          : `border-gray-800/60 shrink-0 ${
+          : `border-gray-800/60 shrink-0 z-[55] ${
               position() === "right"
                 ? "border-l h-full"
                 : "border-t w-full"
@@ -585,7 +585,7 @@ ${errorLogs || "No recent errors"}
             <i class="i-hugeicons-delete-02 w-3 h-3" />
           </button>
           <button
-            class={`p-1 rounded transition-colors ${autoScroll() ? "text-blue-400 bg-blue-500/10" : "text-gray-600 hover:text-gray-300"}`}
+            class={`p-1 rounded transition-colors ${autoScroll() ? "text-[var(--color-primary)] bg-[var(--color-primary-bg)]" : "text-gray-600 hover:text-gray-300"}`}
             onClick={() => setAutoScroll(!autoScroll())}
             title="Auto-scroll"
           >

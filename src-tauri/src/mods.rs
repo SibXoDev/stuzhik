@@ -342,9 +342,9 @@ fn string_similarity(s1: &str, s2: &str) -> f64 {
 /// Используется в: check_dependencies, get_dependency_graph, UI поиске
 pub struct ModMatcher;
 
-impl ModMatcher {
-    /// Алиасы зависимостей - мод A может удовлетворять зависимость B
-    fn get_aliases() -> HashMap<&'static str, Vec<&'static str>> {
+/// Static alias map for dependency matching - created once, reused forever
+static MOD_ALIASES: std::sync::LazyLock<HashMap<&'static str, Vec<&'static str>>> =
+    std::sync::LazyLock::new(|| {
         [
             // Fabric API variants
             ("fabric-api", vec!["forgified-fabric-api", "sinytra-connector", "fabric", "quilted-fabric-api"]),
@@ -384,6 +384,12 @@ impl ModMatcher {
             ("yet-another-config-lib", vec!["yacl", "yacl3"]),
             ("yacl", vec!["yet-another-config-lib", "yacl3"]),
         ].into_iter().collect()
+    });
+
+impl ModMatcher {
+    /// Алиасы зависимостей - мод A может удовлетворять зависимость B
+    fn get_aliases() -> &'static HashMap<&'static str, Vec<&'static str>> {
+        &MOD_ALIASES
     }
 
     /// Проверяет, есть ли у нас Fabric-on-Forge совместимость (Sinytra Connector)
@@ -1228,6 +1234,9 @@ impl ModManager {
         let now = Utc::now().to_rfc3339();
         let mods_dir = instance_mods_dir(instance_id);
 
+        conn.execute_batch("BEGIN TRANSACTION")?;
+
+        let result = (|| -> Result<()> {
         for (file_name, hash) in mod_files {
             // Check if mod is disabled (has .disabled suffix)
             let is_disabled = file_name.ends_with(".disabled");
@@ -1276,12 +1285,23 @@ impl ModManager {
                 None => (None, slug.replace('-', " "), version.clone(), None, None),
             };
 
+            // Use mod_id from JAR as slug when available (authoritative identifier)
+            // This prevents UNIQUE(instance_id, slug) collisions from filename parsing
+            // e.g. "mod-forge-1.20.jar" and "mod-fabric-1.20.jar" both parse to slug "mod"
+            let effective_slug = if let Some(ref mid) = mod_id {
+                if !mid.is_empty() { mid.clone() } else { slug.clone() }
+            } else {
+                slug.clone()
+            };
+
+            // INSERT OR IGNORE: if a slug collision still occurs, skip this mod
+            // rather than rolling back ALL 460+ mods in the transaction
             conn.execute(
-                "INSERT INTO mods (instance_id, slug, mod_id, name, version, minecraft_version, source, source_id, file_name, file_hash, enabled, auto_update, description, author, installed_at, updated_at)
+                "INSERT OR IGNORE INTO mods (instance_id, slug, mod_id, name, version, minecraft_version, source, source_id, file_name, file_hash, enabled, auto_update, description, author, installed_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, ?12, ?13, ?14, ?14)",
                 params![
                     instance_id,
-                    slug,
+                    effective_slug,
                     mod_id, // mod_id из JAR файла
                     display_name,
                     mod_version,
@@ -1299,6 +1319,34 @@ impl ModManager {
         }
 
         Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                conn.execute_batch("COMMIT")?;
+
+                // Update mods_folder_mtime so sync_mods_with_folder can skip the full scan
+                // on first open (mods are already registered, no need to re-hash 460+ files)
+                let current_mtime = std::fs::metadata(&mods_dir)
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs() as i64);
+
+                if let Some(mtime) = current_mtime {
+                    let _ = conn.execute(
+                        "UPDATE instances SET mods_folder_mtime = ?1 WHERE id = ?2",
+                        params![mtime, instance_id],
+                    );
+                }
+
+                Ok(())
+            }
+            Err(e) => {
+                let _ = conn.execute_batch("ROLLBACK");
+                Err(e)
+            }
+        }
     }
 
     /// Smart sync: check folder mtime first, skip if unchanged
@@ -1777,10 +1825,13 @@ impl ModManager {
         mod_id: i64,
         download_manager: &DownloadManager,
     ) -> Result<()> {
-        let (slug, source, source_id, current_version, mc_version) = {
+        // Get mod info AND instance loader from DB
+        let (slug, source, source_id, current_version, mc_version, loader) = {
             let conn = get_db_conn()?;
             let mut stmt = conn.prepare(
-                "SELECT slug, source, source_id, version, minecraft_version FROM mods WHERE id = ?1"
+                "SELECT m.slug, m.source, m.source_id, m.version, m.minecraft_version, i.loader
+                 FROM mods m JOIN instances i ON m.instance_id = i.id
+                 WHERE m.id = ?1"
             )?;
             stmt.query_row(params![mod_id], |row| {
                 Ok((
@@ -1789,6 +1840,7 @@ impl ModManager {
                     row.get::<_, Option<String>>(2)?,
                     row.get::<_, String>(3)?,
                     row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
                 ))
             })?
         };
@@ -1797,7 +1849,7 @@ impl ModManager {
             "modrinth" => {
                 // Проверяем обновления
                 if let Some(new_version) =
-                    ModrinthClient::check_updates(&slug, &current_version, &mc_version, "neoforge")
+                    ModrinthClient::check_updates(&slug, &current_version, &mc_version, &loader)
                         .await?
                 {
                     // Удаляем старый файл
@@ -1808,7 +1860,7 @@ impl ModManager {
                         instance_id,
                         &slug,
                         &mc_version,
-                        "neoforge",
+                        &loader,
                         None,
                         download_manager,
                     )
@@ -1848,7 +1900,7 @@ impl ModManager {
 
                     // Проверяем обновления
                     if let Some(new_file) = client
-                        .check_updates(cf_mod_id, current_file_id, &mc_version, "neoforge")
+                        .check_updates(cf_mod_id, current_file_id, &mc_version, &loader)
                         .await?
                     {
                         // Удаляем старый файл
@@ -1859,7 +1911,7 @@ impl ModManager {
                             instance_id,
                             cf_mod_id,
                             &mc_version,
-                            "neoforge",
+                            &loader,
                             None,
                             download_manager,
                         )
@@ -1942,7 +1994,7 @@ impl ModManager {
             }
 
             let file_path = mods_dir.join(&mod_item.file_name);
-            if !file_path.exists() {
+            if !tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
                 skipped += 1;
                 continue;
             }
@@ -3243,7 +3295,7 @@ impl ModManager {
         };
 
         let mods_dir = instance_mods_dir(instance_id);
-        if !mods_dir.exists() {
+        if !tokio::fs::try_exists(&mods_dir).await.unwrap_or(false) {
             return Ok(Vec::new());
         }
 
@@ -3730,6 +3782,7 @@ impl ModManager {
         // Also save icon_url from verification for display in graph and lists
         emit_progress("saving", 0, results.len(), "Сохранение результатов...");
         let mut updated_count = 0;
+        conn.execute_batch("BEGIN TRANSACTION")?;
         for (idx, result) in results.iter().enumerate() {
             // Save verified_file_hash for ALL mods - including "local" (negative cache)
             // This prevents re-checking mods that were already verified/not found
@@ -3758,6 +3811,7 @@ impl ModManager {
                 updated_count += 1;
             }
         }
+        conn.execute_batch("COMMIT")?;
 
         emit_progress("saving", results.len(), results.len(), &format!("Сохранено: {} модов", updated_count));
 
@@ -3994,13 +4048,14 @@ impl ModManager {
 
         for mod_item in &mods {
             let file_path = mods_dir.join(&mod_item.file_name);
-            if !file_path.exists() {
+            if !tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
                 continue;
             }
 
-            let sha1 = match calculate_sha1(&file_path) {
-                Ok(h) => h,
-                Err(_) => continue,
+            let path_clone = file_path.clone();
+            let sha1 = match tokio::task::spawn_blocking(move || calculate_sha1(&path_clone)).await {
+                Ok(Ok(h)) => h,
+                _ => continue,
             };
 
             // Check if already enriched with same hash
@@ -4142,6 +4197,8 @@ impl ModManager {
             .collect();
             rows.into_iter().collect()
         };
+
+        conn.execute_batch("BEGIN TRANSACTION")?;
 
         for (sha1, version) in &modrinth_results {
             let mod_id = match sha1_to_mod_id.get(sha1) {
@@ -4373,7 +4430,7 @@ impl ModManager {
             }
 
             let jar_path = mods_dir.join(file_name);
-            if !jar_path.exists() {
+            if !tokio::fs::try_exists(&jar_path).await.unwrap_or(false) {
                 continue;
             }
 
@@ -4449,6 +4506,8 @@ impl ModManager {
             );
         }
 
+        conn.execute_batch("COMMIT")?;
+
         log::info!(
             "Incremental enrichment complete for {}: {} mods enriched, {} dependencies added ({} from Modrinth, {} from JAR parsing)",
             instance_id,
@@ -4506,7 +4565,7 @@ impl ModManager {
         }
 
         let mods_dir = instance_mods_dir(instance_id);
-        if !mods_dir.exists() {
+        if !tokio::fs::try_exists(&mods_dir).await.unwrap_or(false) {
             return Ok(Vec::new());
         }
 
@@ -4537,18 +4596,16 @@ impl ModManager {
             return Ok(Vec::new());
         }
 
-        // Build JAR paths
-        let jar_files: Vec<PathBuf> = mod_files
-            .iter()
-            .filter_map(|(_, filename)| {
-                let path = mods_dir.join(filename);
-                if path.exists() && path.extension().map(|e| e == "jar").unwrap_or(false) {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        // Собираем пути к JAR-файлам (async проверка существования)
+        let mut jar_files: Vec<PathBuf> = Vec::new();
+        for (_, filename) in &mod_files {
+            let path = mods_dir.join(filename);
+            if path.extension().map(|e| e == "jar").unwrap_or(false)
+                && tokio::fs::try_exists(&path).await.unwrap_or(false)
+            {
+                jar_files.push(path);
+            }
+        }
 
         if jar_files.is_empty() {
             return Ok(Vec::new());
@@ -4755,7 +4812,7 @@ impl ModManager {
         let mut file_hashes: Vec<(i64, String, String)> = Vec::new();
         for mod_item in &mods {
             let file_path = mods_dir.join(&mod_item.file_name);
-            if file_path.exists() {
+            if tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
                 if let Ok(sha1) = calculate_sha1(&file_path) {
                     file_hashes.push((mod_item.id, mod_item.file_name.clone(), sha1));
                 }
@@ -4984,13 +5041,11 @@ fn compute_cf_fingerprint(path: &PathBuf) -> Option<u32> {
     let mut data = Vec::new();
     file.read_to_end(&mut data).ok()?;
 
-    // Normalize: remove whitespace characters (9, 10, 13, 32)
-    let normalized: Vec<u8> = data
-        .into_iter()
-        .filter(|&b| b != 9 && b != 10 && b != 13 && b != 32)
-        .collect();
+    // Normalize in-place: remove whitespace (9=tab, 10=LF, 13=CR, 32=space)
+    // retain() avoids a second allocation unlike .filter().collect()
+    data.retain(|&b| b != 9 && b != 10 && b != 13 && b != 32);
 
-    Some(murmur2_hash(&normalized, 1))
+    Some(murmur2_hash(&data, 1))
 }
 
 /// MurmurHash2 implementation
@@ -5311,7 +5366,7 @@ impl ModManager {
     pub async fn start_watching(instance_id: &str, app_handle: tauri::AppHandle) -> Result<()> {
         let mods_dir = instance_mods_dir(instance_id);
 
-        if !mods_dir.exists() {
+        if !tokio::fs::try_exists(&mods_dir).await.unwrap_or(false) {
             return Err(LauncherError::NotFound(format!(
                 "Mods directory not found: {}",
                 mods_dir.display()

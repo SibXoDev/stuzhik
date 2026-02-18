@@ -20,6 +20,7 @@ import { Pagination, Select } from "../../../shared/ui";
 import { useInstallingMods } from "../../../shared/stores";
 import { useDebounce } from "../../../shared/hooks";
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
+import { isVisible } from "../../../shared/stores/uiPreferences";
 
 interface Props {
   instanceId: string;
@@ -198,7 +199,7 @@ const ModsBrowser: Component<Props> = (props) => {
         setPreviewVersions(versionsResult.value);
       }
     } catch (e) {
-      console.error("Failed to load mod preview data:", e);
+      if (import.meta.env.DEV) console.error("Failed to load mod preview data:", e);
     } finally {
       setPreviewLoading(false);
     }
@@ -225,11 +226,11 @@ const ModsBrowser: Component<Props> = (props) => {
 
     setPreviewInstalling(true);
     try {
-      const modId = mod.slug || mod.id?.toString() || "";
+      const modId = getModId(mod, source());
       await handleInstall(modId, source(), mod.title || mod.name || modId, versionId);
       closeModPreview();
     } catch (e) {
-      console.error("Failed to install mod:", e);
+      if (import.meta.env.DEV) console.error("Failed to install mod:", e);
     } finally {
       setPreviewInstalling(false);
     }
@@ -291,10 +292,10 @@ const ModsBrowser: Component<Props> = (props) => {
           });
         }
       } catch (e) {
-        console.error("Failed to check conflicts:", e);
+        if (import.meta.env.DEV) console.error("Failed to check conflicts:", e);
       }
     } catch (error) {
-      console.error("Failed to install mod:", error);
+      if (import.meta.env.DEV) console.error("Failed to install mod:", error);
     }
   };
 
@@ -362,10 +363,6 @@ const ModsBrowser: Component<Props> = (props) => {
     setSelectedCategory(categoryId);
     setPage(0);
   };
-
-  // Pagination controls (can be added to UI when needed)
-  // const handleNextPage = () => setPage(p => p + 1);
-  // const handlePrevPage = () => setPage(p => Math.max(0, p - 1));
 
   return (
     <div class="flex flex-col gap-4 flex-1 min-h-0">
@@ -493,7 +490,7 @@ const ModsBrowser: Component<Props> = (props) => {
                   <button
                     class={`px-3 py-1 rounded-2xl text-sm font-medium transition-colors duration-100 ${
                       searchMode() === "name"
-                        ? "bg-blue-600 text-white"
+                        ? "bg-[var(--color-primary)] text-white"
                         : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                     }`}
                     onClick={() => { setSearchMode("name"); setPage(0); }}
@@ -504,7 +501,7 @@ const ModsBrowser: Component<Props> = (props) => {
                   <button
                     class={`px-3 py-1 rounded-2xl text-sm font-medium transition-colors duration-100 ${
                       searchMode() === "id"
-                        ? "bg-blue-600 text-white"
+                        ? "bg-[var(--color-primary)] text-white"
                         : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                     }`}
                     onClick={() => { setSearchMode("id"); setPage(0); }}
@@ -515,7 +512,7 @@ const ModsBrowser: Component<Props> = (props) => {
                   <button
                     class={`px-3 py-1 rounded-2xl text-sm font-medium transition-colors duration-100 ${
                       searchMode() === "all"
-                        ? "bg-blue-600 text-white"
+                        ? "bg-[var(--color-primary)] text-white"
                         : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                     }`}
                     onClick={() => { setSearchMode("all"); setPage(0); }}
@@ -532,7 +529,7 @@ const ModsBrowser: Component<Props> = (props) => {
                   type="checkbox"
                   checked={showIncompatible()}
                   onChange={(e) => { setShowIncompatible(e.currentTarget.checked); setPage(0); }}
-                  class="w-4 h-4 rounded border-gray-600 bg-gray-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-900"
+                  class="w-4 h-4 rounded border-gray-600 bg-gray-800 focus:ring-[var(--color-primary)] focus:ring-offset-gray-900"
                 />
                 <span class="text-sm text-muted">{t().mods?.browser?.showIncompatible ?? "Show incompatible"}</span>
               </label>
@@ -555,7 +552,7 @@ const ModsBrowser: Component<Props> = (props) => {
               <button
                 class={`px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-100 flex items-center gap-2 ${
                   selectedCategory() === null
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[var(--color-primary)] text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                 }`}
                 onClick={() => handleCategorySelect(null)}
@@ -568,7 +565,7 @@ const ModsBrowser: Component<Props> = (props) => {
                   <button
                     class={`px-3 py-2 rounded-2xl text-sm font-medium transition-colors duration-100 flex items-center gap-2 ${
                       selectedCategory() === cat.id
-                        ? "bg-blue-600 text-white"
+                        ? "bg-[var(--color-primary)] text-white"
                         : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                     }`}
                     onClick={() => handleCategorySelect(cat.id)}
@@ -619,17 +616,17 @@ const ModsBrowser: Component<Props> = (props) => {
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <For each={modSearch.results()}>
             {(mod) => {
-              const modId = mod.slug || mod.id?.toString() || "";
+              const modId = getModId(mod, source());
               // Note: isModInstalling and isModInstalled are called directly in JSX for reactivity
               // SolidJS tracks signal dependencies only when accessed in reactive context (JSX)
 
               return (
                 <div
-                  class="card-hover flex flex-col cursor-pointer"
+                  class="card-hover flex flex-col gap-3 cursor-pointer"
                   onClick={() => openModPreview(mod)}
                 >
-                  <div class="flex items-start gap-3 mb-3">
-                    <Show when={sanitizeImageUrl(mod.icon_url || mod.logo?.url)}>
+                  <div class="flex items-start gap-3">
+                    <Show when={isVisible("modThumbnails") && sanitizeImageUrl(mod.icon_url || mod.logo?.url)}>
                       <img
                         src={sanitizeImageUrl(mod.icon_url || mod.logo?.url)!}
                         alt={mod.title || mod.name}
@@ -646,9 +643,11 @@ const ModsBrowser: Component<Props> = (props) => {
                     </div>
                   </div>
 
-                  <p class="text-sm text-muted line-clamp-3 mb-3 flex-1">
-                    {mod.description || mod.summary}
-                  </p>
+                  <Show when={isVisible("modDescriptions")}>
+                    <p class="text-sm text-muted line-clamp-3 mb-3 flex-1">
+                      {mod.description || mod.summary}
+                    </p>
+                  </Show>
 
                   <div class="flex items-center gap-2 flex-wrap mb-3">
                     <Show when={mod._exact_match}>
@@ -719,7 +718,7 @@ const ModsBrowser: Component<Props> = (props) => {
         <Show when={previewLoading()}>
           <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
             <div class="bg-gray-850 border border-gray-750 rounded-2xl p-8 flex items-center gap-3">
-              <i class="i-svg-spinners-6-dots-scale w-6 h-6 text-blue-400" />
+              <i class="i-svg-spinners-6-dots-scale w-6 h-6 text-[var(--color-primary)]" />
               <span class="text-gray-300">{t().common?.loading ?? "Loading..."}</span>
             </div>
           </div>

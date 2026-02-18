@@ -86,7 +86,7 @@ const ChangelogAggregatorModal: Component<Props> = (props) => {
             </span>
             <div class="flex items-center gap-2">
               <button
-                class="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                class="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-light)] transition-colors"
                 onClick={expandAll}
               >
                 {t().mods.changelog.expandAll}

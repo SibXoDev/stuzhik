@@ -6,6 +6,20 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
+/// General-purpose shared HTTP client for simple requests (API metadata, small files).
+/// Reused across all modules that don't need specialized headers (CurseForge has its own).
+/// Connection pooling, keep-alive, single DNS/TLS handshake per host.
+pub static SHARED_HTTP_CLIENT: std::sync::LazyLock<reqwest::Client> =
+    std::sync::LazyLock::new(|| {
+        reqwest::Client::builder()
+            .user_agent(crate::USER_AGENT)
+            .timeout(std::time::Duration::from_secs(60))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .pool_max_idle_per_host(4)
+            .build()
+            .expect("Failed to build shared HTTP client")
+    });
+
 /// Генерация короткого ID (base62) заданной длины
 ///
 /// # Safety

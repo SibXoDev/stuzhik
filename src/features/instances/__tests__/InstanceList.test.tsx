@@ -13,6 +13,7 @@ const TestWrapper = (props: { children: JSX.Element }) => (
 const mockInstance: Instance = {
   id: 'test-1',
   name: 'Test Instance',
+  game_type: 'minecraft',
   version: '1.20.1',
   loader: 'forge',
   loader_version: '47.2.0',

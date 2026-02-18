@@ -523,13 +523,15 @@ impl CollectionManager {
 
         // Add all mods
         for mod_info in exported.mods {
-            let _ = Self::add_mod_to_collection(AddModRequest {
+            if let Err(e) = Self::add_mod_to_collection(AddModRequest {
                 collection_id: collection.id.clone(),
-                mod_slug: mod_info.slug,
-                mod_name: mod_info.name,
+                mod_slug: mod_info.slug.clone(),
+                mod_name: mod_info.name.clone(),
                 mod_source: mod_info.source,
                 loader_type: mod_info.loader_type,
-            });
+            }) {
+                log::warn!("Failed to import mod '{}' into collection: {}", mod_info.slug, e);
+            }
         }
 
         Self::get_collection(&collection.id)
@@ -551,13 +553,15 @@ impl CollectionManager {
 
         // Copy all mods
         for mod_info in mods {
-            let _ = Self::add_mod_to_collection(AddModRequest {
+            if let Err(e) = Self::add_mod_to_collection(AddModRequest {
                 collection_id: new_collection.id.clone(),
-                mod_slug: mod_info.mod_slug,
-                mod_name: mod_info.mod_name,
+                mod_slug: mod_info.mod_slug.clone(),
+                mod_name: mod_info.mod_name.clone(),
                 mod_source: mod_info.mod_source,
                 loader_type: mod_info.loader_type,
-            });
+            }) {
+                log::warn!("Failed to copy mod '{}' during collection duplication: {}", mod_info.mod_slug, e);
+            }
         }
 
         Self::get_collection(&new_collection.id)

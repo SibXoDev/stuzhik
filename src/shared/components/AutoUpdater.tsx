@@ -71,7 +71,7 @@ export default function AutoUpdater(props: AutoUpdaterProps) {
       setStatus("restarting");
       await relaunch();
     } catch (e) {
-      console.error("Update check failed:", e);
+      if (import.meta.env.DEV) console.error("Update check failed:", e);
       setError(e instanceof Error ? e.message : String(e));
       setStatus("error");
       // Show error briefly, then proceed to app
@@ -95,36 +95,38 @@ export default function AutoUpdater(props: AutoUpdaterProps) {
   };
 
   return (
-    <div class="fixed inset-0 bg-gray-950 flex flex-col items-center justify-center z-50">
+    <div class="fixed inset-0 bg-gray-950 flex flex-col items-center justify-center gap-1 z-50">
       {/* Logo */}
-      <div class="mb-6">
+      <div class="mb-5">
         <img src="/logo.png" alt="Stuzhik" class="w-16 h-16 rounded-xl shadow-lg" />
       </div>
 
       {/* App name */}
-      <h1 class="text-xl font-semibold text-white mb-1">Stuzhik</h1>
-      <p class="text-gray-600 text-xs mb-6">Minecraft Launcher</p>
+      <h1 class="text-xl font-semibold text-white">Stuzhik</h1>
+      <p class="text-gray-600 text-xs mb-5">Minecraft Launcher</p>
 
       {/* Status */}
-      <div class="w-64 flex flex-col items-center">
-        <p class="text-gray-400 text-sm mb-3">{statusText()}</p>
+      <div class="w-64 flex flex-col items-center gap-3">
+        <p class="text-gray-400 text-sm">{statusText()}</p>
 
         {/* Progress bar */}
         <Show when={status() === "downloading"}>
-          <div class="w-full h-1 bg-gray-800 rounded-full overflow-hidden mb-2">
-            <div
-              class="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-100"
-              style={{ width: `${progress()}%` }}
-            />
+          <div class="flex flex-col gap-2 w-full items-center">
+            <div class="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                class="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-100"
+                style={{ width: `${progress()}%` }}
+              />
+            </div>
+            <p class="text-gray-600 text-xs">
+              {downloadedMB().toFixed(1)} / {totalMB().toFixed(1)} MB
+            </p>
           </div>
-          <p class="text-gray-600 text-xs">
-            {downloadedMB().toFixed(1)} / {totalMB().toFixed(1)} MB
-          </p>
         </Show>
 
         {/* Spinner */}
         <Show when={status() === "checking" || status() === "installing" || status() === "restarting"}>
-          <i class="i-svg-spinners-6-dots-scale w-5 h-5 text-blue-500" />
+          <i class="i-svg-spinners-6-dots-scale w-5 h-5 text-[var(--color-primary)]" />
         </Show>
 
         {/* Error */}

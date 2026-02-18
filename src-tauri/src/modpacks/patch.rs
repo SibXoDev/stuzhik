@@ -524,21 +524,25 @@ async fn install_mod_from_patch(
 
 /// Применить JSON merge patch (RFC 7396)
 fn json_merge(target: &mut serde_json::Value, patch: &serde_json::Value) {
-    if patch.is_object() {
+    // Безопасно извлекаем patch как объект
+    if let Some(patch_obj) = patch.as_object() {
+        // Убеждаемся что target - объект
         if !target.is_object() {
             *target = serde_json::Value::Object(serde_json::Map::new());
         }
-        let target_obj = target.as_object_mut().unwrap();
-        for (key, value) in patch.as_object().unwrap() {
-            if value.is_null() {
-                // null означает удаление ключа
-                target_obj.remove(key);
-            } else {
-                // Рекурсивно мержим вложенные объекты
-                let entry = target_obj
-                    .entry(key.clone())
-                    .or_insert(serde_json::Value::Null);
-                json_merge(entry, value);
+        // Безопасно получаем mutable reference на target объект
+        if let Some(target_obj) = target.as_object_mut() {
+            for (key, value) in patch_obj {
+                if value.is_null() {
+                    // null означает удаление ключа
+                    target_obj.remove(key);
+                } else {
+                    // Рекурсивно мержим вложенные объекты
+                    let entry = target_obj
+                        .entry(key.clone())
+                        .or_insert(serde_json::Value::Null);
+                    json_merge(entry, value);
+                }
             }
         }
     } else {
@@ -645,7 +649,7 @@ async fn apply_file(instance_dir: &Path, file_add: &PatchFileAdd) -> Result<()> 
         tokio::fs::write(&file_path, content).await?;
     } else if let Some(url) = &file_add.download_url {
         // Скачиваем файл
-        let response = reqwest::get(url).await.map_err(|e| {
+        let response = crate::utils::SHARED_HTTP_CLIENT.get(url).send().await.map_err(|e| {
             LauncherError::DownloadFailed(format!(
                 "Failed to download file {}: {}",
                 file_add.path, e

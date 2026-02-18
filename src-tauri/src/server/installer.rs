@@ -21,6 +21,8 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use super::{ServerError, ServerResult};
 
+use crate::utils::SHARED_HTTP_CLIENT as SERVER_HTTP_CLIENT;
+
 /// Loader type for server
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -153,8 +155,8 @@ async fn install_vanilla(server_dir: &Path, mc_version: &str) -> ServerResult<In
 
     // Get version manifest
     let manifest_url = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
-    let manifest: serde_json::Value = reqwest::get(manifest_url)
-        .await
+    let manifest: serde_json::Value = SERVER_HTTP_CLIENT.get(manifest_url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?
         .json()
         .await
@@ -175,8 +177,8 @@ async fn install_vanilla(server_dir: &Path, mc_version: &str) -> ServerResult<In
         .ok_or_else(|| ServerError::Config("No version URL".into()))?;
 
     // Get version details
-    let version_data: serde_json::Value = reqwest::get(version_url)
-        .await
+    let version_data: serde_json::Value = SERVER_HTTP_CLIENT.get(version_url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?
         .json()
         .await
@@ -211,8 +213,8 @@ async fn get_latest_fabric_loader(mc_version: &str) -> ServerResult<Option<Strin
         mc_version
     );
 
-    let response = reqwest::get(&url)
-        .await
+    let response = SERVER_HTTP_CLIENT.get(&url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?;
 
     if !response.status().is_success() {
@@ -247,8 +249,8 @@ async fn install_fabric(
 
     // Get latest installer version
     let installer_url = "https://meta.fabricmc.net/v2/versions/installer";
-    let installers: Vec<serde_json::Value> = reqwest::get(installer_url)
-        .await
+    let installers: Vec<serde_json::Value> = SERVER_HTTP_CLIENT.get(installer_url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?
         .json()
         .await
@@ -301,7 +303,7 @@ async fn install_fabric(
     let _ = fs::remove_file(&installer_jar).await;
 
     // Find the server JAR (fabric-server-launch.jar or fabric-server-mc.X.X.X-loader.X.X.X-launcher.jar)
-    let server_jar = if server_dir.join("fabric-server-launch.jar").exists() {
+    let server_jar = if fs::try_exists(server_dir.join("fabric-server-launch.jar")).await.unwrap_or(false) {
         server_dir.join("fabric-server-launch.jar")
     } else {
         // Try to find the launcher JAR
@@ -328,7 +330,7 @@ async fn install_fabric(
             "-jar".into(),
             server_jar
                 .file_name()
-                .unwrap()
+                .unwrap_or_default()
                 .to_string_lossy()
                 .to_string(),
             "nogui".into(),
@@ -343,8 +345,8 @@ async fn install_fabric(
 async fn get_latest_forge_version(mc_version: &str) -> ServerResult<Option<String>> {
     let url = "https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json";
 
-    let response = reqwest::get(url)
-        .await
+    let response = SERVER_HTTP_CLIENT.get(url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?;
 
     let data: serde_json::Value = response
@@ -420,7 +422,7 @@ async fn install_forge(
     let run_sh = server_dir.join("run.sh");
     let run_bat = server_dir.join("run.bat");
 
-    let (server_jar, java_args) = if run_sh.exists() || run_bat.exists() {
+    let (server_jar, java_args) = if fs::try_exists(&run_sh).await.unwrap_or(false) || fs::try_exists(&run_bat).await.unwrap_or(false) {
         // Modern Forge - use the args from run script
         let args_file = format!(
             "@libraries/net/minecraftforge/forge/{}/unix_args.txt",
@@ -431,13 +433,13 @@ async fn install_forge(
             .join(&full_version)
             .join("unix_args.txt");
 
-        if !args_path.exists() {
+        if !fs::try_exists(&args_path).await.unwrap_or(false) {
             // Try win_args.txt as fallback
             let win_args = server_dir
                 .join("libraries/net/minecraftforge/forge")
                 .join(&full_version)
                 .join("win_args.txt");
-            if !win_args.exists() {
+            if !fs::try_exists(&win_args).await.unwrap_or(false) {
                 return Err(ServerError::Config(format!(
                     "Forge installed but args file not found at {:?}",
                     args_path
@@ -463,7 +465,7 @@ async fn install_forge(
 
         for pattern in &patterns {
             let jar_path = server_dir.join(pattern);
-            if jar_path.exists() {
+            if fs::try_exists(&jar_path).await.unwrap_or(false) {
                 found_jar = Some(jar_path);
                 break;
             }
@@ -523,8 +525,8 @@ async fn get_latest_neoforge_version(mc_version: &str) -> ServerResult<Option<St
     // For 1.20.2+, it's 20.2.X (matching MC minor.patch)
     let url = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
 
-    let response = reqwest::get(url)
-        .await
+    let response = SERVER_HTTP_CLIENT.get(url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?;
 
     let data: serde_json::Value = response
@@ -631,8 +633,8 @@ async fn install_neoforge(
 async fn get_latest_quilt_loader(mc_version: &str) -> ServerResult<Option<String>> {
     let url = format!("https://meta.quiltmc.org/v3/versions/loader/{}", mc_version);
 
-    let response = reqwest::get(&url)
-        .await
+    let response = SERVER_HTTP_CLIENT.get(&url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?;
 
     if !response.status().is_success() {
@@ -664,8 +666,8 @@ async fn install_quilt(
 
     // Get latest installer version
     let installer_url = "https://meta.quiltmc.org/v3/versions/installer";
-    let installers: Vec<serde_json::Value> = reqwest::get(installer_url)
-        .await
+    let installers: Vec<serde_json::Value> = SERVER_HTTP_CLIENT.get(installer_url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?
         .json()
         .await
@@ -728,7 +730,7 @@ async fn install_quilt(
             "-jar".into(),
             server_jar
                 .file_name()
-                .unwrap()
+                .unwrap_or_default()
                 .to_string_lossy()
                 .to_string(),
             "nogui".into(),
@@ -744,8 +746,8 @@ async fn install_quilt(
 async fn download_file(url: &str, path: &Path) -> ServerResult<()> {
     log::debug!("Downloading {} to {:?}", url, path);
 
-    let response = reqwest::get(url)
-        .await
+    let response = SERVER_HTTP_CLIENT.get(url)
+        .send().await
         .map_err(|e| ServerError::Network(e.to_string()))?;
 
     if !response.status().is_success() {
@@ -778,8 +780,8 @@ pub async fn get_available_loader_versions(
                 "https://meta.fabricmc.net/v2/versions/loader/{}",
                 mc_version
             );
-            let versions: Vec<serde_json::Value> = reqwest::get(&url)
-                .await
+            let versions: Vec<serde_json::Value> = SERVER_HTTP_CLIENT.get(&url)
+                .send().await
                 .map_err(|e| ServerError::Network(e.to_string()))?
                 .json()
                 .await
@@ -793,8 +795,8 @@ pub async fn get_available_loader_versions(
         }
         ServerLoader::Quilt => {
             let url = format!("https://meta.quiltmc.org/v3/versions/loader/{}", mc_version);
-            let versions: Vec<serde_json::Value> = reqwest::get(&url)
-                .await
+            let versions: Vec<serde_json::Value> = SERVER_HTTP_CLIENT.get(&url)
+                .send().await
                 .map_err(|e| ServerError::Network(e.to_string()))?
                 .json()
                 .await

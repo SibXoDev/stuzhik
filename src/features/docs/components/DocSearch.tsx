@@ -211,7 +211,7 @@ const DocSearch: Component<Props> = (props) => {
   });
 
   return (
-    <div class="relative">
+    <div>
       {/* Search Input */}
       <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-800">
         <i class="i-hugeicons-search-01 w-5 h-5 text-gray-500" />
@@ -239,8 +239,8 @@ const DocSearch: Component<Props> = (props) => {
       <div class="max-h-80 overflow-y-auto">
         <Show when={query().length >= 2}>
           <Show when={searchResults().length > 0} fallback={
-            <div class="flex-col-center py-8 text-gray-500">
-              <i class="i-hugeicons-search-01 w-8 h-8 opacity-30 mb-2" />
+            <div class="flex-col-center gap-2 py-8 text-gray-500">
+              <i class="i-hugeicons-search-01 w-8 h-8 opacity-30" />
               <p class="text-sm">{getLocalizedText(t, "docs.search.noResults")}</p>
             </div>
           }>
@@ -252,7 +252,7 @@ const DocSearch: Component<Props> = (props) => {
                   <button
                     class={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
                       index() === selectedIndex()
-                        ? "bg-blue-600/20 text-blue-400"
+                        ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]"
                         : "hover:bg-gray-800/50"
                     }`}
                     onClick={() => {
@@ -262,9 +262,9 @@ const DocSearch: Component<Props> = (props) => {
                     onMouseEnter={() => setSelectedIndex(index())}
                   >
                     <i class={`${result.icon} w-5 h-5 flex-shrink-0 ${
-                      index() === selectedIndex() ? "text-blue-400" : "text-gray-500"
+                      index() === selectedIndex() ? "text-[var(--color-primary)]" : "text-gray-500"
                     }`} />
-                    <div class="flex-1 min-w-0">
+                    <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                       <div class="flex items-center gap-2">
                         <span class="font-medium text-sm">{result.sectionTitle}</span>
                         <Show when={result.subsectionTitle}>
@@ -273,9 +273,9 @@ const DocSearch: Component<Props> = (props) => {
                         </Show>
                       </div>
                       <Show when={highlight}>
-                        <p class="text-xs text-gray-500 truncate mt-0.5">
+                        <p class="text-xs text-gray-500 truncate">
                           {highlight!.before}
-                          <span class="text-blue-400 font-medium">{highlight!.match}</span>
+                          <span class="text-[var(--color-primary)] font-medium">{highlight!.match}</span>
                           {highlight!.after}
                         </p>
                       </Show>

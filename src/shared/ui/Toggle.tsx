@@ -19,8 +19,9 @@ export function Toggle(props: ToggleProps) {
       aria-checked={props.checked}
       disabled={props.disabled || props.loading}
       class={`relative group w-11 h-6 rounded-full transition-all duration-100 ${
-        props.checked ? "bg-blue-600" : "bg-gray-600"
+        props.checked ? "" : "bg-gray-600"
       } ${props.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      style={props.checked ? { "background-color": "var(--color-primary)" } : undefined}
       onClick={() => !props.disabled && !props.loading && props.onChange(!props.checked)}
     >
       {/* Thumb with hover preview */}

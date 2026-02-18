@@ -431,7 +431,7 @@ pub async fn create_launch_snapshot(
 }
 
 async fn collect_mods_info(mods_dir: &Path) -> Result<Vec<ModInfo>> {
-    if !mods_dir.exists() {
+    if !tokio::fs::try_exists(mods_dir).await.unwrap_or(false) {
         return Ok(Vec::new());
     }
 
@@ -476,7 +476,7 @@ async fn hash_mod_file(path: PathBuf) -> Result<ModInfo> {
 }
 
 async fn collect_configs_info(config_dir: &Path) -> Result<Vec<FileInfo>> {
-    if !config_dir.exists() {
+    if !tokio::fs::try_exists(config_dir).await.unwrap_or(false) {
         return Ok(Vec::new());
     }
 
@@ -501,7 +501,7 @@ async fn collect_tracked_files(instance_dir: &Path) -> Result<Vec<FileInfo>> {
 
     for filename in TRACKED_FILES {
         let path = instance_dir.join(filename);
-        if path.exists() {
+        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
             if let Ok(info) = hash_file_info_sync(&path, instance_dir, "") {
                 files.push(info);
             }
@@ -510,7 +510,7 @@ async fn collect_tracked_files(instance_dir: &Path) -> Result<Vec<FileInfo>> {
 
     for dirname in TRACKED_DIRS {
         let dir = instance_dir.join(dirname);
-        if dir.exists() {
+        if tokio::fs::try_exists(&dir).await.unwrap_or(false) {
             if let Ok(entries) = std::fs::read_dir(&dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();

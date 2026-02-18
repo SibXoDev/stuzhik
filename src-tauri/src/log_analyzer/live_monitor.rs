@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use lazy_static::lazy_static;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -21,15 +20,18 @@ use tokio::sync::mpsc;
 use super::LogAnalyzer;
 
 // Кешированные regex паттерны для extract_mod_from_line (компилируются один раз)
-lazy_static! {
-    /// Pattern: [ModName] - извлекает имя мода из квадратных скобок
-    static ref RE_BRACKET: Regex = Regex::new(r"\[([a-zA-Z][a-zA-Z0-9_-]{2,30})\]")
-        .expect("RE_BRACKET regex should compile");
 
-    /// Pattern: at com.modname. - извлекает mod ID из stacktrace
-    static ref RE_AT_PACKAGE: Regex = Regex::new(r"at\s+(?:com|net|org)\.([a-z][a-z0-9_]{2,20})\.")
-        .expect("RE_AT_PACKAGE regex should compile");
-}
+/// Pattern: [ModName] - извлекает имя мода из квадратных скобок
+static RE_BRACKET: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"\[([a-zA-Z][a-zA-Z0-9_-]{2,30})\]")
+        .expect("RE_BRACKET regex should compile")
+});
+
+/// Pattern: at com.modname. - извлекает mod ID из stacktrace
+static RE_AT_PACKAGE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(r"at\s+(?:com|net|org)\.([a-z][a-z0-9_]{2,20})\.")
+        .expect("RE_AT_PACKAGE regex should compile")
+});
 
 /// Live crash event sent to frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]

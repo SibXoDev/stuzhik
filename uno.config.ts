@@ -27,58 +27,105 @@ export default defineConfig({
     },
   },
 
-  // Custom rules for gray-alpha colors and missing utilities
+  // Custom rules for theme-aware CSS variables, gray-alpha, and missing utilities
   rules: [
+    // ===== Theme-aware gray colors via CSS variables =====
+    // bg-gray-{shade} / text-gray-{shade} / border-gray-{shade}
+    // These override presetWind4 defaults so all gray utilities respond to theme changes.
+    // Opacity variants use color-mix() for browser-native alpha blending.
+    [/^bg-gray-(\d+)$/, ([, s]: string[]) => ({ 'background-color': `var(--color-gray-${s})` })],
+    [/^bg-gray-(\d+)\/(\d+)$/, ([, s, a]: string[]) => ({ 'background-color': `color-mix(in srgb, var(--color-gray-${s}) ${a}%, transparent)` })],
+    [/^text-gray-(\d+)$/, ([, s]: string[]) => ({ 'color': `var(--color-gray-${s})` })],
+    [/^text-gray-(\d+)\/(\d+)$/, ([, s, a]: string[]) => ({ 'color': `color-mix(in srgb, var(--color-gray-${s}) ${a}%, transparent)` })],
+    [/^border-gray-(\d+)$/, ([, s]: string[]) => ({ 'border-color': `var(--color-gray-${s})` })],
+    [/^border-gray-(\d+)\/(\d+)$/, ([, s, a]: string[]) => ({ 'border-color': `color-mix(in srgb, var(--color-gray-${s}) ${a}%, transparent)` })],
+    [/^ring-offset-gray-(\d+)$/, ([, s]: string[]) => ({ '--un-ring-offset-color': `var(--color-gray-${s})` })],
+    [/^divide-gray-(\d+)$/, ([, s]: string[]) => ({ '--un-divide-color': `var(--color-gray-${s})` })],
+
+    // ===== Theme-aware shadows via CSS variables =====
+    ['shadow-sm', { 'box-shadow': 'var(--shadow-sm)' }],
+    ['shadow', { 'box-shadow': 'var(--shadow-md)' }],
+    ['shadow-md', { 'box-shadow': 'var(--shadow-md)' }],
+    ['shadow-lg', { 'box-shadow': 'var(--shadow-lg)' }],
+    ['shadow-xl', { 'box-shadow': 'var(--shadow-xl)' }],
+    ['shadow-2xl', { 'box-shadow': 'var(--shadow-xl)' }],
+    ['shadow-none', { 'box-shadow': 'none' }],
+
+    // ===== Theme-aware blur via CSS variables =====
+    ['backdrop-blur-sm', { '-webkit-backdrop-filter': 'blur(var(--blur-sm))', 'backdrop-filter': 'blur(var(--blur-sm))' }],
+    ['backdrop-blur', { '-webkit-backdrop-filter': 'blur(var(--blur-md))', 'backdrop-filter': 'blur(var(--blur-md))' }],
+    ['backdrop-blur-md', { '-webkit-backdrop-filter': 'blur(var(--blur-md))', 'backdrop-filter': 'blur(var(--blur-md))' }],
+    ['backdrop-blur-lg', { '-webkit-backdrop-filter': 'blur(var(--blur-lg))', 'backdrop-filter': 'blur(var(--blur-lg))' }],
+    ['backdrop-blur-none', { '-webkit-backdrop-filter': 'none', 'backdrop-filter': 'none' }],
+    ['blur-sm', { 'filter': 'blur(var(--blur-sm))' }],
+    ['blur', { 'filter': 'blur(var(--blur-md))' }],
+    ['blur-md', { 'filter': 'blur(var(--blur-md))' }],
+    ['blur-lg', { 'filter': 'blur(var(--blur-lg))' }],
+    ['blur-none', { 'filter': 'none' }],
+
+    // ===== Gray alpha & misc =====
     ['bg-gray-alpha-30', { 'background-color': 'rgba(26, 27, 31, 0.3)' }],
     ['bg-gray-alpha-50', { 'background-color': 'rgba(26, 27, 31, 0.5)' }],
     ['bg-gray-alpha-70', { 'background-color': 'rgba(26, 27, 31, 0.7)' }],
     // Fix missing container size in presetWind4 v66
     ['max-w-5xl', { 'max-width': '64rem' }],
+    // Theme-aware surface utilities (respond to data-color-mode)
+    ['bg-surface', { 'background-color': 'var(--color-bg)' }],
+    ['bg-surface-elevated', { 'background-color': 'var(--color-bg-elevated)' }],
+    ['bg-surface-hover', { 'background-color': 'var(--color-bg-hover)' }],
+    ['bg-surface-card', { 'background-color': 'var(--color-bg-card)' }],
+    ['bg-surface-modal', { 'background-color': 'var(--color-bg-modal)' }],
+    ['bg-surface-input', { 'background-color': 'var(--color-bg-input)' }],
+    ['border-surface', { 'border-color': 'var(--color-border)' }],
+    ['border-surface-light', { 'border-color': 'var(--color-border-light)' }],
+    ['text-surface', { 'color': 'var(--color-text)' }],
+    ['text-surface-secondary', { 'color': 'var(--color-text-secondary)' }],
+    ['text-surface-muted', { 'color': 'var(--color-text-muted)' }],
   ],
 
   shortcuts: [
     // Buttons - minimum 15px border-radius
     // Используем transition-colors вместо transition-all чтобы не анимировать размеры
     ['btn', 'px-4 py-2.5 font-medium rounded-2xl inline-flex items-center justify-center gap-2 cursor-pointer transition-colors duration-100 disabled:opacity-40 disabled:cursor-not-allowed select-none'],
-    ['btn-primary', 'btn bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-700'],
-    ['btn-secondary', 'btn bg-gray-750 text-gray-100 hover:bg-[#35363a] active:bg-[#252629]'],
-    ['btn-ghost', 'btn bg-transparent text-gray-300 hover:bg-[#2a2b2f] active:bg-[#252629]'],
+    ['btn-primary', 'btn bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)]'],
+    ['btn-secondary', 'btn bg-[var(--color-bg-hover)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-active)] active:bg-[var(--color-bg-elevated)]'],
+    ['btn-ghost', 'btn bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] active:bg-[var(--color-bg-active)]'],
     ['btn-danger', 'btn bg-red-600/90 text-white hover:bg-red-600 active:bg-red-700'],
     ['btn-success', 'btn bg-green-600/90 text-white hover:bg-green-600 active:bg-green-700'],
     ['btn-sm', 'px-3 py-1.5 text-sm'],
     ['btn-lg', 'px-6 py-3 text-base'],
 
-    // Cards
-    ['card', 'bg-gray-850 border border-gray-750 rounded-2xl p-4'],
-    ['card-hover', 'card hover:border-[#35363a] transition-colors duration-100 cursor-pointer'],
-    ['card-glass', 'bg-gray-alpha-50 backdrop-blur-sm border border-gray-750 rounded-2xl p-4'],
+    // Cards — theme-aware
+    ['card', 'bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-2xl p-4'],
+    ['card-hover', 'card hover:border-[var(--color-border-light)] transition-colors duration-100 cursor-pointer'],
+    ['card-glass', 'bg-[var(--color-bg-glass)] backdrop-blur-sm border border-[var(--color-border)] rounded-2xl p-4'],
 
     // Badge
     ['badge', 'inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium'],
-    ['badge-primary', 'badge bg-blue-600/20 text-blue-400 border border-blue-600/30'],
-    ['badge-success', 'badge bg-green-600/20 text-green-400 border border-green-600/30'],
-    ['badge-warning', 'badge bg-yellow-600/20 text-yellow-400 border border-yellow-600/30'],
-    ['badge-danger', 'badge bg-red-600/20 text-red-400 border border-red-600/30'],
-    ['badge-gray', 'badge bg-gray-700/40 text-gray-300 border border-gray-700'],
+    ['badge-primary', 'badge bg-[var(--color-primary-bg)] text-[var(--color-primary)] border border-[var(--color-primary-border)]'],
+    ['badge-success', 'badge bg-[var(--color-success-bg)] text-[var(--color-success)] border border-[var(--color-success-border)]'],
+    ['badge-warning', 'badge bg-[var(--color-warning-bg)] text-[var(--color-warning)] border border-[var(--color-warning-border)]'],
+    ['badge-danger', 'badge bg-[var(--color-danger-bg)] text-[var(--color-danger)] border border-[var(--color-danger-border)]'],
+    ['badge-gray', 'badge bg-[var(--color-bg-hover)] text-[var(--color-text-muted)] border border-[var(--color-border)]'],
 
-    // Text styles
-    ['text-muted', 'text-gray-400'],
-    ['text-dim', 'text-gray-500'],
-    ['text-dimmer', 'text-gray-600'],
+    // Text styles — theme-aware via CSS vars
+    ['text-muted', 'text-[var(--color-text-muted)]'],
+    ['text-dim', 'text-[var(--color-text-dim)]'],
+    ['text-dimmer', 'text-[var(--color-text-dimmer)]'],
 
     // Layout helpers
     ['flex-center', 'flex items-center justify-center'],
     ['flex-between', 'flex items-center justify-between'],
     ['flex-col-center', 'flex flex-col items-center justify-center'],
 
-    // NEW: Modal & Dialog shortcuts
+    // Modal & Dialog shortcuts — theme-aware
     ['modal-overlay', 'fixed inset-0 z-50 pt-12 pb-4 px-4 flex items-start justify-center overflow-y-auto'],
-    ['modal-content', 'bg-gray-850 border border-gray-750 rounded-2xl p-6 w-full max-h-[calc(100vh-4rem)] overflow-y-auto shadow-2xl my-auto'],
+    ['modal-content', 'bg-[var(--color-bg-modal)] border border-[var(--color-border)] rounded-2xl p-6 w-full max-h-[calc(100vh-4rem)] overflow-y-auto shadow-2xl my-auto'],
 
     // Radio/Option buttons - используем transition-colors (не transition-all!)
     ['radio-option', 'relative rounded-2xl border-2 transition-colors duration-75 p-4'],
-    ['radio-option-active', 'radio-option border-blue-500 bg-blue-500/10'],
-    ['radio-option-inactive', 'radio-option border-gray-700 hover:border-gray-500 hover:bg-gray-alpha-50'],
+    ['radio-option-active', 'radio-option border-[var(--color-primary)] bg-[var(--color-primary-bg)]'],
+    ['radio-option-inactive', 'radio-option border-[var(--color-border)] hover:border-[var(--color-border-lighter)] hover:bg-[var(--color-bg-hover)]'],
 
     // Animation shortcuts - только colors и opacity, НЕ размеры/transform
     ['transition-fast', 'transition-colors duration-100'],
@@ -121,11 +168,18 @@ export default defineConfig({
         sans: ['Rubik', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['Cascadia Code', 'Monaco', 'Consolas', 'monospace'],
       },
-      boxShadow: {
-        'sm': '0 1px 2px 0 rgb(0 0 0 / 0.3)',
-        'DEFAULT': '0 2px 4px 0 rgb(0 0 0 / 0.4)',
-        'md': '0 4px 8px 0 rgb(0 0 0 / 0.5)',
-        'lg': '0 8px 16px 0 rgb(0 0 0 / 0.6)',
+      // boxShadow — handled by custom rules above (var(--shadow-*))
+      // Border radius — через CSS-переменные, чтобы тема могла менять скругления
+      borderRadius: {
+        'none': 'var(--radius-none, 0px)',
+        'sm': 'var(--radius-sm, 0.375rem)',
+        'DEFAULT': 'var(--radius-md, 0.5rem)',
+        'md': 'var(--radius-md, 0.5rem)',
+        'lg': 'var(--radius-lg, 0.75rem)',
+        'xl': 'var(--radius-xl, 1rem)',
+        '2xl': 'var(--radius-2xl, 1.5rem)',
+        '3xl': 'var(--radius-3xl, 2rem)',
+        'full': 'var(--radius-full, 9999px)',
       },
     },
   },
@@ -170,14 +224,25 @@ export default defineConfig({
   ],
 
   safelist: [
-    // Dropdown component utilities
-    'z-[60]',
+    // z-index layer hierarchy
+    'z-[55]',     // DevConsole (above modals, below TitleBar)
+    'z-[60]',     // TitleBar
     'z-[61]',
     'z-[62]',
+    'z-[70]',     // Tour overlay
+    'z-[90]',     // ErrorReporter button
+    'z-[100]',    // ConfirmDialog, Toast, Tooltip
+    'z-[200]',    // DragDropOverlay
     'pointer-events-auto',
 
     // Container sizes (missing in presetWind4 v66)
     'max-w-5xl',
+
+    // Theme-aware surface utilities
+    'bg-surface', 'bg-surface-elevated', 'bg-surface-hover',
+    'bg-surface-card', 'bg-surface-modal', 'bg-surface-input',
+    'border-surface', 'border-surface-light',
+    'text-surface', 'text-surface-secondary', 'text-surface-muted',
 
     // Border colors for Toast, LogAnalyzer, etc. (with opacity variants)
     'border-green-700', 'border-green-600', 'border-green-500',
@@ -305,6 +370,7 @@ export default defineConfig({
     'i-hugeicons-menu-01',
     'i-hugeicons-minimize-01',
     'i-hugeicons-minus-sign',
+    'i-hugeicons-moon-02',
     'i-hugeicons-more-horizontal',
     'i-hugeicons-more-vertical',
     'i-hugeicons-mouse-left-click-02',
@@ -336,7 +402,10 @@ export default defineConfig({
     'i-hugeicons-stop',
     'i-hugeicons-store-01',
     'i-hugeicons-structure-03',
+    'i-hugeicons-sun-03',
     'i-hugeicons-test-tube',
+    'i-hugeicons-text-align-justify-center',
+    'i-hugeicons-text-align-justify-left',
     'i-hugeicons-text-font',
     'i-hugeicons-thumbs-down',
     'i-hugeicons-thumbs-up',

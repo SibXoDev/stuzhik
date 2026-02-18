@@ -1,5 +1,6 @@
-import { Show, createSignal, createEffect } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
+import { createFocusTrap } from "../hooks";
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -28,15 +29,18 @@ export interface ConfirmDialogProps {
  * />
  */
 export default function ConfirmDialog(props: ConfirmDialogProps) {
+  return (
+    <Show when={props.open}>
+      <ConfirmDialogInner {...props} />
+    </Show>
+  );
+}
+
+/** Inner component — mounts/unmounts with Show so focus trap lifecycle is correct */
+function ConfirmDialogInner(props: ConfirmDialogProps) {
   const { t } = useI18n();
   let dialogRef: HTMLDivElement | undefined;
-
-  // Focus trap и ESC для закрытия
-  createEffect(() => {
-    if (props.open && dialogRef) {
-      dialogRef.focus();
-    }
-  });
+  createFocusTrap(() => dialogRef);
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -65,18 +69,18 @@ export default function ConfirmDialog(props: ConfirmDialogProps) {
       default:
         return {
           icon: "i-hugeicons-information-circle",
-          iconColor: "text-blue-400",
-          iconBg: "bg-blue-500/10",
+          iconColor: "text-[var(--color-primary)]",
+          iconBg: "bg-[var(--color-primary-bg)]",
           btnClass: "btn-primary",
         };
     }
   };
 
   return (
-    <Show when={props.open}>
+    <>
       {/* Backdrop - blocks all interactions below */}
       <div
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in pointer-events-auto"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-lg animate-fade-in pointer-events-auto"
         style="animation-duration: 0.1s"
         onClick={(e) => {
           // Only close if clicking directly on backdrop, not bubbled events
@@ -94,7 +98,7 @@ export default function ConfirmDialog(props: ConfirmDialogProps) {
         <div
           ref={dialogRef}
           tabIndex={-1}
-          class="bg-gray-850 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 animate-scale-in border border-gray-800 outline-none"
+          class="bg-[var(--color-bg-modal)] rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 animate-scale-in border border-[var(--color-border)] outline-none"
           style="animation-duration: 0.1s"
           onClick={(e) => e.stopPropagation()}
         >
@@ -104,7 +108,7 @@ export default function ConfirmDialog(props: ConfirmDialogProps) {
               <i class={`${variantStyles().icon} w-6 h-6 ${variantStyles().iconColor}`} />
             </div>
             <div class="flex-1 min-w-0">
-              <h3 class="text-lg font-semibold text-white">{props.title}</h3>
+              <h3 class="text-lg font-semibold text-gray-200">{props.title}</h3>
               <p class="text-sm text-gray-400 mt-1 whitespace-pre-line">{props.message}</p>
             </div>
           </div>
@@ -128,7 +132,7 @@ export default function ConfirmDialog(props: ConfirmDialogProps) {
           </div>
         </div>
       </div>
-    </Show>
+    </>
   );
 }
 

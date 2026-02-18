@@ -3,7 +3,6 @@ use crate::error::Result;
 use chrono::Utc;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use stuzhik_core::i18n::Language;
 
 /// Поведение лаунчера при запуске игры
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -38,8 +37,8 @@ impl LaunchBehavior {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
-    // Интерфейс
-    pub language: Language,
+    // Интерфейс — код языка (например "ru", "en", "de", "es" и т.д.)
+    pub language: String,
     /// Режим разработчика (показывает Console, Source Code в TitleBar)
     pub developer_mode: bool,
 
@@ -59,6 +58,8 @@ pub struct Settings {
 
     // Моды
     pub auto_update_mods: bool,
+    /// Предпочитать Modrinth как источник загрузки (fallback: CurseForge → Modrinth)
+    pub prefer_modrinth: bool,
 
     // Загрузки
     pub download_threads: i32,
@@ -90,7 +91,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            language: Language::Russian,
+            language: "ru".to_string(),
             developer_mode: false, // По умолчанию выключен
             default_username: None,
             default_memory_min: 2048,
@@ -100,6 +101,7 @@ impl Default for Settings {
             java_auto_install: true,
             launch_behavior: LaunchBehavior::MinimizeToTray,
             auto_update_mods: false,
+            prefer_modrinth: false,
             download_threads: 4,
             max_concurrent_downloads: 8,
             bandwidth_limit: 0, // Без лимита
@@ -146,7 +148,7 @@ impl SettingsManager {
 
         Ok(Settings {
             language: Self::get_setting("language")?
-                .and_then(|s| Language::parse(&s))
+                .filter(|s| Self::validate_language(s).is_ok())
                 .unwrap_or(default.language),
 
             developer_mode: Self::get_setting("developer_mode")?
@@ -180,6 +182,10 @@ impl SettingsManager {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(default.auto_update_mods),
 
+            prefer_modrinth: Self::get_setting("prefer_modrinth")?
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(default.prefer_modrinth),
+
             download_threads: Self::get_setting("download_threads")?
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(default.download_threads),
@@ -211,9 +217,24 @@ impl SettingsManager {
         })
     }
 
+    /// Validate a language code (2-5 ascii alphanumeric or '-')
+    fn validate_language(lang: &str) -> Result<()> {
+        if lang.len() < 2
+            || lang.len() > 5
+            || !lang.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
+            return Err(crate::error::LauncherError::InvalidConfig(format!(
+                "Invalid language code: {}",
+                lang
+            )));
+        }
+        Ok(())
+    }
+
     /// Сохранить все настройки
     pub fn save_all(settings: Settings) -> Result<()> {
-        Self::set_setting("language", settings.language.code())?;
+        Self::validate_language(&settings.language)?;
+        Self::set_setting("language", &settings.language)?;
         Self::set_setting("developer_mode", &settings.developer_mode.to_string())?;
 
         if let Some(username) = settings.default_username {
@@ -239,6 +260,7 @@ impl SettingsManager {
 
         Self::set_setting("java_auto_install", &settings.java_auto_install.to_string())?;
         Self::set_setting("auto_update_mods", &settings.auto_update_mods.to_string())?;
+        Self::set_setting("prefer_modrinth", &settings.prefer_modrinth.to_string())?;
         Self::set_setting("download_threads", &settings.download_threads.to_string())?;
         Self::set_setting(
             "max_concurrent_downloads",
@@ -312,6 +334,13 @@ impl SettingsManager {
     /// Получить выбранный GPU (None = автоматический выбор)
     pub fn get_selected_gpu() -> Result<Option<String>> {
         Self::get_setting("selected_gpu")
+    }
+
+    /// Предпочитать Modrinth как источник загрузки модов
+    pub fn get_prefer_modrinth() -> Result<bool> {
+        Ok(Self::get_setting("prefer_modrinth")?
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(false))
     }
 }
 

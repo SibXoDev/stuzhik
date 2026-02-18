@@ -2,6 +2,7 @@ import { createSignal, createEffect, createMemo, Show, onMount } from "solid-js"
 import { invoke } from "@tauri-apps/api/core";
 import type { Instance, CreateInstanceRequest, LoaderType, InstanceType } from "../../../shared/types";
 import { useI18n } from "../../../shared/i18n";
+import { currentGame } from "../../../shared/stores/gameContext";
 import VersionSelector from "../../../shared/components/VersionSelector";
 import LoaderVersionSelector from "../../../shared/components/LoaderVersionSelector";
 import LoaderSelector from "../../../shared/components/LoaderSelector";
@@ -75,7 +76,7 @@ export interface CreateInstanceFormProps {
 function CreateInstanceForm(props: CreateInstanceFormProps) {
   const { t } = useI18n();
   const [totalMemory, setTotalMemory] = createSignal(8192);
-  const [name, setName] = createSignal(t().instances.newInstance);
+  const [name, setName] = createSignal("");
   const [version, setVersion] = createSignal("");
   const [loader, setLoader] = createSignal("neoforge" as LoaderType);
   const [loaderVersion, setLoaderVersion] = createSignal("");
@@ -99,7 +100,7 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
       const memory = await invoke<number>("get_total_memory");
       setTotalMemory(memory);
     } catch (e) {
-      console.error("Failed to get total memory:", e);
+      if (import.meta.env.DEV) console.error("Failed to get total memory:", e);
     }
   });
 
@@ -126,8 +127,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
       invoke<string[]>("get_loader_versions", {
         minecraftVersion: mcVersion,
         loader: currentLoader,
-      }).catch(e => {
-        console.debug("Pre-loading loader versions failed (non-critical):", e);
+      }).catch((e) => {
+        if (import.meta.env.DEV) console.debug("Pre-loading loader versions failed (non-critical):", e);
       });
     }
   });
@@ -138,8 +139,9 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
     setError(null);
 
     try {
-      const request = {
-        name: name(),
+      const request: CreateInstanceRequest = {
+        name: name().trim() || t().instances.newInstance,
+        game_type: currentGame(),
         version: version(),
         loader: loader(),
         loader_version: loaderVersion() || undefined,
@@ -160,7 +162,7 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to create instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to create instance:", e);
     } finally {
       setLoading(false);
     }
@@ -168,7 +170,7 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
 
   const canProceed = () => {
     if (step() === 1) {
-      return name().trim().length > 0 && version().trim().length > 0;
+      return version().trim().length > 0; // name uses default if empty
     }
     return true;
   };
@@ -177,22 +179,22 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
     <form onSubmit={handleSubmit} class="flex flex-col gap-6">
       {/* Progress Steps */}
       <div class="flex items-center justify-center gap-2">
-        <div class={`flex items-center gap-2 ${step() >= 1 ? "text-blue-400" : "text-gray-500"}`}>
-          <div class={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${step() >= 1 ? "bg-blue-600" : "bg-gray-700"}`}>
+        <div class={`flex items-center gap-2 ${step() >= 1 ? "text-[var(--color-primary)]" : "text-gray-500"}`}>
+          <div class={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${step() >= 1 ? "bg-[var(--color-primary)]" : "bg-gray-700"}`}>
             1
           </div>
           <span class="text-sm font-medium">{t().instances.stepBasic}</span>
         </div>
         <div class="w-12 h-0.5 bg-gray-700" />
-        <div class={`flex items-center gap-2 ${step() >= 2 ? "text-blue-400" : "text-gray-500"}`}>
-          <div class={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${step() >= 2 ? "bg-blue-600" : "bg-gray-700"}`}>
+        <div class={`flex items-center gap-2 ${step() >= 2 ? "text-[var(--color-primary)]" : "text-gray-500"}`}>
+          <div class={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${step() >= 2 ? "bg-[var(--color-primary)]" : "bg-gray-700"}`}>
             2
           </div>
           <span class="text-sm font-medium">{t().instances.stepSettings}</span>
         </div>
         <div class="w-12 h-0.5 bg-gray-700" />
-        <div class={`flex items-center gap-2 ${step() >= 3 ? "text-blue-400" : "text-gray-500"}`}>
-          <div class={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${step() >= 3 ? "bg-blue-600" : "bg-gray-700"}`}>
+        <div class={`flex items-center gap-2 ${step() >= 3 ? "text-[var(--color-primary)]" : "text-gray-500"}`}>
+          <div class={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${step() >= 3 ? "bg-[var(--color-primary)]" : "bg-gray-700"}`}>
             3
           </div>
           <span class="text-sm font-medium">{t().instances.stepConfirm}</span>
@@ -221,8 +223,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
       {/* Step 1: Basic Info */}
       <Show when={step() === 1}>
         <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-2">
+          <div class="flex flex-col gap-2">
+            <label class="block text-sm font-medium">
               {t().instances.name} <span class="text-red-500">*</span>
             </label>
             <input
@@ -236,8 +238,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
           </div>
 
           <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium mb-2">
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium">
                 {t().instances.minecraftVersion} <span class="text-red-500">*</span>
               </label>
               <VersionSelector
@@ -248,14 +250,14 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
               />
             </div>
 
-            <div>
-              <label class="block text-sm font-medium mb-2">{t().instances.type}</label>
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium">{t().instances.type}</label>
               <div class="flex rounded-2xl overflow-hidden border border-gray-700">
                 <button
                   type="button"
                   class={`flex-1 px-4 py-2.5 flex items-center justify-center gap-2 transition-colors ${
                     instanceType() === "client"
-                      ? "bg-blue-600 text-white"
+                      ? "bg-[var(--color-primary)] text-white"
                       : "bg-gray-850 text-gray-400 hover:bg-gray-700/50"
                   }`}
                   onClick={() => setInstanceType("client")}
@@ -267,7 +269,7 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
                   type="button"
                   class={`flex-1 px-4 py-2.5 flex items-center justify-center gap-2 transition-colors ${
                     instanceType() === "server"
-                      ? "bg-blue-600 text-white"
+                      ? "bg-[var(--color-primary)] text-white"
                       : "bg-gray-850 text-gray-400 hover:bg-gray-700/50"
                   }`}
                   onClick={() => setInstanceType("server")}
@@ -280,8 +282,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
           </div>
 
           <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium mb-2">{t().instances.loader}</label>
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium">{t().instances.loader}</label>
               <LoaderSelector
                 value={loader()}
                 onChange={setLoader}
@@ -289,8 +291,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
               />
             </div>
 
-            <div>
-              <label class="block text-sm font-medium mb-2 inline-flex items-center gap-1">
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium inline-flex items-center gap-1">
                 {t().instances.edit.loaderVersion}
                 <span class="text-xs text-gray-400">{t().instances.edit.optional}</span>
               </label>
@@ -305,8 +307,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
           </div>
 
           <Show when={instanceType() === "server"}>
-            <div>
-              <label class="block text-sm font-medium mb-2">{t().instances.edit.serverPort}</label>
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium">{t().instances.edit.serverPort}</label>
               <input
                 type="number"
                 value={port()}
@@ -318,8 +320,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
           </Show>
 
           <Show when={instanceType() === "client"}>
-            <div>
-              <label class="block text-sm font-medium mb-2">
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium">
                 {t().instances.edit.username}
                 <span class="text-xs text-gray-400">{t().instances.optionalFromSettings}</span>
               </label>
@@ -337,8 +339,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
       {/* Step 2: Advanced Settings */}
       <Show when={step() === 2}>
         <div class="space-y-4">
-          <fieldset>
-            <legend class="text-base font-medium mb-4 inline-flex items-center gap-2">
+          <fieldset class="flex flex-col gap-4">
+            <legend class="text-base font-medium inline-flex items-center gap-2">
               {t().instances.edit.memory}
               <span class="text-xs text-gray-400">
                 {t().instances.edit.available}: {totalMemory()} MB
@@ -348,8 +350,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
             <div class="space-y-4">
               {/* Для КЛИЕНТА - один слайдер */}
               <Show when={instanceType() === "client"}>
-                <div>
-                  <div class="flex items-center justify-between mb-2">
+                <div class="flex flex-col gap-2">
+                  <div class="flex items-center justify-between">
                     <label class="text-sm font-medium">{t().instances.edit.allocateMemory}</label>
                     <span class="text-sm text-gray-400">{memoryMax()} MB ({(memoryMax() / 1024).toFixed(1)} GB)</span>
                   </div>
@@ -365,7 +367,7 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
                     labelTicks={generateLabelTicks(generateMemoryMarkers(totalMemory()))}
                     formatLabel={formatMemoryLabel}
                   />
-                  <p class="text-xs text-gray-400 mt-1">
+                  <p class="text-xs text-gray-400">
                     {t().instances.edit.memoryHint}
                   </p>
                 </div>
@@ -374,8 +376,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
               {/* Для СЕРВЕРА - два слайдера min/max */}
               <Show when={instanceType() === "server"}>
                 <>
-                  <div>
-                    <div class="flex items-center justify-between mb-2">
+                  <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
                       <label class="text-sm font-medium">{t().instances.edit.minMemory}</label>
                       <span class="text-sm text-gray-400">{memoryMin()} MB ({(memoryMin() / 1024).toFixed(1)} GB)</span>
                     </div>
@@ -398,8 +400,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
                     />
                   </div>
 
-                  <div>
-                    <div class="flex items-center justify-between mb-2">
+                  <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
                       <label class="text-sm font-medium">{t().instances.edit.maxMemory}</label>
                       <span class="text-sm text-gray-400">{memoryMax()} MB ({(memoryMax() / 1024).toFixed(1)} GB)</span>
                     </div>
@@ -435,8 +437,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
             </div>
           </fieldset>
 
-          <div>
-            <label class="block text-sm font-medium mb-2 inline-flex items-center gap-1">
+          <div class="flex flex-col gap-2">
+            <label class="block text-sm font-medium inline-flex items-center gap-1">
               {t().instances.edit.javaArgs}
               <span class="text-xs text-gray-400">{t().instances.optionalFromSettings}</span>
             </label>
@@ -446,14 +448,14 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
               onInput={(e) => setJavaArgs(e.currentTarget.value)}
               placeholder={t().instances.edit.fromGlobalSettings}
             />
-            <p class="text-xs text-gray-400 mt-1">
+            <p class="text-xs text-gray-400">
               {t().instances.edit.javaArgsHint}
             </p>
           </div>
 
           <Show when={instanceType() === "client"}>
-            <div>
-              <label class="block text-sm font-medium mb-2">
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium">
                 {t().instances.edit.gameArgs}
                 <span class="text-xs text-gray-400">{t().instances.edit.optional}</span>
               </label>
@@ -466,8 +468,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
             </div>
           </Show>
 
-          <div>
-            <label class="block text-sm font-medium mb-2 inline-flex items-center gap-1">
+          <div class="flex flex-col gap-2">
+            <label class="block text-sm font-medium inline-flex items-center gap-1">
               {t().instances.edit.notes}
               <span class="text-xs text-gray-400">{t().instances.edit.optional}</span>
             </label>
@@ -483,8 +485,8 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
 
       {/* Step 3: Confirmation */}
       <Show when={step() === 3}>
-        <div class="bg-gray-700/50 rounded-2xl p-4">
-          <h3 class="text-lg font-semibold mb-4">{t().instances.confirmTitle}</h3>
+        <div class="flex flex-col gap-4 bg-gray-700/50 rounded-2xl p-4">
+          <h3 class="text-lg font-semibold">{t().instances.confirmTitle}</h3>
 
           <div class="space-y-3 text-sm">
             <div class="flex justify-between">
@@ -525,7 +527,7 @@ function CreateInstanceForm(props: CreateInstanceFormProps) {
             </Show>
           </div>
 
-          <div class="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-2xl">
+          <div class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-2xl">
             <p class="text-sm text-blue-400 inline-flex items-start gap-1">
               <span class="i-hugeicons-information-circle w-4 h-4 flex-shrink-0" />
               {t().instances.installInfoMessage}

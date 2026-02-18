@@ -36,14 +36,37 @@ use crate::error::{LauncherError, Result};
 use crate::utils::verify_file_hash;
 use futures::StreamExt;
 use reqwest::Client;
-use std::fs::{File, OpenOptions};
-use std::io::{Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::Emitter;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
+
+/// Infer download source from URL for UI badges
+fn infer_download_source(url: &str) -> Option<String> {
+    if url.contains("modrinth.com") || url.contains("cdn-raw.modrinth.com") {
+        Some("modrinth".to_string())
+    } else if url.contains("curseforge.com")
+        || url.contains("forgecdn.net")
+        || url.contains("edge.forgecdn.net")
+    {
+        Some("curseforge".to_string())
+    } else if url.contains("maven.minecraftforge.net") || url.contains("minecraftforge.net") {
+        Some("forge".to_string())
+    } else if url.contains("fabricmc.net") || url.contains("maven.fabricmc.net") {
+        Some("fabric".to_string())
+    } else if url.contains("quiltmc.org") {
+        Some("quilt".to_string())
+    } else if url.contains("neoforged.net") {
+        Some("neoforge".to_string())
+    } else if url.contains("mojang.com") || url.contains("minecraft.net") {
+        Some("minecraft".to_string())
+    } else {
+        None
+    }
+}
 
 /// Прогресс загрузки
 #[derive(Debug, Clone, serde::Serialize)]
@@ -56,6 +79,9 @@ pub struct DownloadProgress {
     pub percentage: f32,
     pub status: String,
     pub operation_id: Option<String>,
+    /// Source of the download: "modrinth", "curseforge", "forge", "fabric", etc.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// API-aware семафоры для контроля параллельных загрузок
@@ -63,7 +89,16 @@ pub struct DownloadSemaphores {
     modrinth: Arc<Semaphore>,
     curseforge: Arc<Semaphore>,
     files: Arc<Semaphore>,
+    /// Timestamp последнего старта CurseForge CDN загрузки.
+    /// Используется для rate limiting — предотвращает burst новых TCP connections,
+    /// который вызывает отказы CDN (edge.forgecdn.net / AmazonS3).
+    cf_last_start: Arc<tokio::sync::Mutex<tokio::time::Instant>>,
 }
+
+/// Минимальный интервал между стартами CurseForge CDN загрузок (мс).
+/// Предотвращает burst новых TCP connections, из-за которого CDN отклоняет соединения.
+/// 150ms = максимум ~6.6 новых connections/sec — комфортно для CDN.
+const CF_MIN_START_GAP_MS: u64 = 150;
 
 impl Default for DownloadSemaphores {
     fn default() -> Self {
@@ -77,6 +112,9 @@ impl DownloadSemaphores {
             modrinth: Arc::new(Semaphore::new(5)),
             curseforge: Arc::new(Semaphore::new(2)),
             files: Arc::new(Semaphore::new(50)),
+            cf_last_start: Arc::new(tokio::sync::Mutex::new(
+                tokio::time::Instant::now() - std::time::Duration::from_secs(10),
+            )),
         }
     }
 
@@ -87,6 +125,18 @@ impl DownloadSemaphores {
             ResourceType::CurseForge => &self.curseforge,
             _ => &self.files,
         }
+    }
+
+    /// Enforce minimum gap between CurseForge CDN download starts.
+    /// Prevents burst of new TCP connections that causes CDN to drop connections.
+    pub async fn throttle_cf_start(&self) {
+        let mut last = self.cf_last_start.lock().await;
+        let elapsed = last.elapsed();
+        let min_gap = std::time::Duration::from_millis(CF_MIN_START_GAP_MS);
+        if elapsed < min_gap {
+            tokio::time::sleep(min_gap - elapsed).await;
+        }
+        *last = tokio::time::Instant::now();
     }
 }
 
@@ -209,56 +259,53 @@ impl StallDetector {
     }
 }
 
-/// Rate limiter для bandwidth limiting (token bucket)
+/// Sleep-based rate limiter для bandwidth limiting.
+/// В отличие от token bucket с truncation, этот подход ВСЕГДА записывает
+/// весь chunk целиком, но замедляет скачивание через sleep.
+/// Это предотвращает corrupted файлы из-за обрезанных данных.
 struct RateLimiter {
     /// Лимит bytes/sec (0 = без лимита)
     limit: u64,
-    /// Время последней проверки
-    last_check: Instant,
-    /// Накопленные "токены" (байты которые можно скачать)
-    tokens: f64,
+    /// Время начала текущего окна измерения
+    window_start: Instant,
+    /// Байт скачано в текущем окне
+    window_bytes: u64,
 }
 
 impl RateLimiter {
     fn new(limit: u64) -> Self {
         Self {
             limit,
-            last_check: Instant::now(),
-            tokens: limit as f64, // Начинаем с полного bucket
+            window_start: Instant::now(),
+            window_bytes: 0,
         }
     }
 
-    /// Ждать если нужно для соблюдения лимита, вернуть сколько можно скачать
-    async fn acquire(&mut self, requested: usize) -> usize {
+    /// Ждать если нужно для соблюдения лимита скорости.
+    /// Весь chunk записывается целиком — throttling через sleep, не через truncation.
+    async fn throttle(&mut self, chunk_size: usize) {
         if self.limit == 0 {
-            return requested; // Без лимита
+            return; // Без лимита
         }
 
-        let now = Instant::now();
-        let elapsed = now.duration_since(self.last_check).as_secs_f64();
-        self.last_check = now;
+        self.window_bytes += chunk_size as u64;
 
-        // Добавляем токены за прошедшее время
-        self.tokens += elapsed * self.limit as f64;
+        let elapsed = self.window_start.elapsed().as_secs_f64();
 
-        // Cap на 1 секунду burst
-        self.tokens = self.tokens.min(self.limit as f64);
+        // Сколько времени ДОЛЖНО было пройти при заданном лимите
+        let expected_time = self.window_bytes as f64 / self.limit as f64;
 
-        if self.tokens >= requested as f64 {
-            // Достаточно токенов - разрешаем сразу
-            self.tokens -= requested as f64;
-            requested
-        } else if self.tokens > 0.0 {
-            // Частичное разрешение
-            let allowed = self.tokens as usize;
-            self.tokens = 0.0;
-            allowed.max(1) // Минимум 1 байт
-        } else {
-            // Нет токенов - ждём
-            let wait_time = (requested as f64 - self.tokens) / self.limit as f64;
-            tokio::time::sleep(std::time::Duration::from_secs_f64(wait_time.min(0.1))).await;
-            self.tokens = 0.0;
-            (self.limit as f64 * 0.1) as usize // 100ms worth of data
+        if expected_time > elapsed {
+            // Мы скачиваем быстрее лимита — нужно подождать
+            let sleep_duration = expected_time - elapsed;
+            // Cap sleep at 500ms to keep responsive to cancellation
+            tokio::time::sleep(std::time::Duration::from_secs_f64(sleep_duration.min(0.5))).await;
+        }
+
+        // Сбрасываем окно каждую секунду для предотвращения drift
+        if elapsed > 1.0 {
+            self.window_start = Instant::now();
+            self.window_bytes = 0;
         }
     }
 }
@@ -422,39 +469,136 @@ impl SmartDownloader {
         let resource_type = ResourceType::from_url(url);
         let download_id = uuid::Uuid::new_v4().to_string();
 
+        // Создаём child token для индивидуальной отмены этой загрузки
+        // Child отменяется когда parent отменяется, но отмена child НЕ отменяет parent
+        let child_token = cancel_token.map(|parent| parent.child_token());
+        let effective_token = child_token.as_ref().or(cancel_token);
+
+        // Регистрируем child token для индивидуальной отмены по download_id
+        if let Some(ref ct) = child_token {
+            crate::cancellation::register_token(&download_id, ct.clone());
+        }
+
+        // Scope guard: ensure child token is removed from registry even on early returns/errors
+        struct TokenGuard(String);
+        impl Drop for TokenGuard {
+            fn drop(&mut self) {
+                crate::cancellation::remove_token(&self.0);
+            }
+        }
+        let _token_guard = TokenGuard(download_id.clone());
+
         // Получаем семафор для этого типа ресурса
         let semaphore = self.semaphores.for_resource_type(resource_type).clone();
         let _permit = semaphore.acquire().await.map_err(|e| {
             LauncherError::InvalidConfig(format!("Failed to acquire semaphore: {}", e))
         })?;
 
+        // Rate limit CurseForge CDN — prevent burst of new TCP connections
+        if resource_type == ResourceType::CurseForge {
+            self.semaphores.throttle_cf_start().await;
+        }
+
         // Если тип ресурса имеет зеркала - используем их
-        if resource_type.has_mirrors() {
+        let result = if resource_type.has_mirrors() {
             let urls = self.registry.get_mirror_urls(url);
-            return self
-                .download_from_mirrors(
+            self.download_from_mirrors(
                     &urls,
                     destination,
                     name,
                     expected_hash,
-                    cancel_token,
+                    effective_token,
                     operation_id,
                     &download_id,
                 )
-                .await;
-        }
+                .await
+        } else {
+            // Простая загрузка без зеркал — с retry для connection-level ошибок
+            let source = infer_download_source(url);
+            let max_retries = self.config.retries_per_mirror;
+            let mut last_err = None;
 
-        // Простая загрузка без зеркал
-        self.download_single(
-            url,
-            destination,
-            name,
-            expected_hash,
-            cancel_token,
-            operation_id,
-            &download_id,
-        )
-        .await
+            for attempt in 0..=max_retries {
+                // Проверка отмены перед каждой попыткой
+                if let Some(token) = effective_token {
+                    if token.is_cancelled() {
+                        return Err(LauncherError::OperationCancelled);
+                    }
+                }
+
+                if attempt > 0 {
+                    let delay = self.config.retry_delay_ms * (1 << (attempt - 1));
+                    log::info!(
+                        "Retrying download {} (attempt {}/{}) after {}ms",
+                        name,
+                        attempt + 1,
+                        max_retries + 1,
+                        delay
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+                }
+
+                match self
+                    .download_single(
+                        url,
+                        destination,
+                        name,
+                        expected_hash,
+                        effective_token,
+                        operation_id,
+                        &download_id,
+                    )
+                    .await
+                {
+                    Ok(()) => return Ok(()),
+                    Err(LauncherError::OperationCancelled) => {
+                        return Err(LauncherError::OperationCancelled);
+                    }
+                    Err(e) => {
+                        let is_connection_error = e.to_string().contains("Connection failed")
+                            || e.to_string().contains("error sending request");
+
+                        if is_connection_error && attempt < max_retries {
+                            log::warn!(
+                                "[CDN-DIAG] Connection error for {} (attempt {}/{}): {}",
+                                name,
+                                attempt + 1,
+                                max_retries + 1,
+                                e
+                            );
+                            last_err = Some(e);
+                            continue;
+                        }
+
+                        // Non-retryable error or last attempt
+                        last_err = Some(e);
+                        break;
+                    }
+                }
+            }
+
+            let dl_result = Err(last_err.unwrap_or_else(|| {
+                LauncherError::DownloadFailed("Download failed after retries".to_string())
+            }));
+
+            // Ensure Failed status is emitted so frontend doesn't stay on "Connecting"
+            self.emit_progress_with_source(
+                &download_id,
+                name,
+                0,
+                0,
+                0,
+                DownloadStatus::Failed,
+                operation_id,
+                source.as_deref(),
+            )
+            .await;
+
+            dl_result
+        };
+
+        // _token_guard drops here → remove_token(&download_id) автоматически
+        result
     }
 
     /// Загрузка с перебором зеркал
@@ -540,8 +684,9 @@ impl SmartDownloader {
             }
         }
 
-        // Все зеркала failed
-        self.emit_progress(
+        // Все зеркала failed — infer source from first URL for UI badge
+        let source = urls.first().and_then(|u| infer_download_source(u));
+        self.emit_progress_with_source(
             download_id,
             name,
             0,
@@ -549,6 +694,7 @@ impl SmartDownloader {
             0,
             DownloadStatus::Failed,
             operation_id,
+            source.as_deref(),
         )
         .await;
 
@@ -587,19 +733,18 @@ impl SmartDownloader {
                 .unwrap_or_else(|| "part".to_string()),
         );
 
-        // Проверяем существующий partial файл для resume
-        let existing_size = if part_path.exists() {
-            match std::fs::metadata(&part_path) {
-                Ok(meta) => meta.len(),
-                Err(_) => 0,
-            }
-        } else {
-            0
+        // Проверяем существующий partial файл для resume (async I/O)
+        let existing_size = match tokio::fs::metadata(&part_path).await {
+            Ok(meta) => meta.len(),
+            Err(_) => 0,
         };
 
         let is_resuming = existing_size > 0;
 
-        self.emit_progress(
+        // Infer download source from URL for UI badges
+        let source = infer_download_source(url);
+
+        self.emit_progress_with_source(
             download_id,
             name,
             existing_size,
@@ -611,6 +756,7 @@ impl SmartDownloader {
                 DownloadStatus::Connecting
             },
             operation_id,
+            source.as_deref(),
         )
         .await;
 
@@ -635,24 +781,89 @@ impl SmartDownloader {
         };
 
         // Выполняем запрос
-        let response = if let Some(token) = cancel_token {
+        let map_reqwest_error = |e: reqwest::Error| -> LauncherError {
+            let kind = if e.is_timeout() {
+                "timeout"
+            } else if e.is_connect() {
+                "connect"
+            } else if e.is_request() {
+                "request"
+            } else {
+                "unknown"
+            };
+            log::warn!(
+                "[CDN-DIAG] {} connection error (kind={}): {}",
+                name,
+                kind,
+                e
+            );
+            LauncherError::DownloadFailed(format!("Connection failed ({}): {}", kind, e))
+        };
+
+        let mut response = if let Some(token) = cancel_token {
             tokio::select! {
                 biased;
                 _ = token.cancelled() => {
                     return Err(LauncherError::OperationCancelled);
                 }
                 result = request.send() => {
-                    result.map_err(|e| LauncherError::DownloadFailed(format!("Connection failed: {}", e)))?
+                    result.map_err(map_reqwest_error)?
                 }
             }
         } else {
             request
                 .send()
                 .await
-                .map_err(|e| LauncherError::DownloadFailed(format!("Connection failed: {}", e)))?
+                .map_err(map_reqwest_error)?
         };
 
         let status = response.status();
+
+        // Диагностика: логируем response details для отладки CDN проблем
+        {
+            let final_url = response.url().to_string();
+            let content_length = response.content_length();
+            let headers = response.headers();
+
+            // Логируем redirect (debug — информационно, не проблема)
+            if final_url != url {
+                log::debug!(
+                    "[CDN-DIAG] {} redirect: {} -> {}",
+                    name,
+                    url,
+                    final_url
+                );
+            }
+
+            log::debug!(
+                "[CDN-DIAG] {} status={}, content-length={:?}, content-type={:?}, server={:?}, final_url={}",
+                name,
+                status,
+                content_length,
+                headers.get("content-type").map(|v| v.to_str().unwrap_or("?")),
+                headers.get("server").map(|v| v.to_str().unwrap_or("?")),
+                final_url,
+            );
+
+            // Предупреждение если content-length = 0 или отсутствует — возможный soft block
+            if status.is_success() && content_length.unwrap_or(0) == 0 {
+                log::warn!(
+                    "[CDN-DIAG] {} response has no content-length or content-length=0! Possible soft block. Headers: {:?}",
+                    name,
+                    headers.keys().map(|k| k.as_str()).collect::<Vec<_>>()
+                );
+            }
+
+            // Логируем нестандартные статусы
+            if !status.is_success() && status != reqwest::StatusCode::PARTIAL_CONTENT && status != reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+                log::warn!(
+                    "[CDN-DIAG] {} unexpected status {}. Response headers: {:?}",
+                    name,
+                    status,
+                    headers.iter().map(|(k, v)| format!("{}: {}", k.as_str(), v.to_str().unwrap_or("?"))).collect::<Vec<_>>()
+                );
+            }
+        }
 
         // Определяем режим работы по статусу ответа
         let (resume_offset, total_size, _supports_resume) =
@@ -667,6 +878,23 @@ impl SmartDownloader {
                     total
                 );
                 (existing_size, total, true)
+            } else if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+                // 416 - Range Not Satisfiable (файл изменился или .part больше файла)
+                log::warn!(
+                    "HTTP 416 for {} - range not satisfiable, deleting partial and restarting",
+                    name
+                );
+                let _ = tokio::fs::remove_file(&part_path).await;
+                // Повторяем запрос без Range header
+                let retry_response = self
+                    .client
+                    .get(url)
+                    .send()
+                    .await
+                    .map_err(|e| LauncherError::DownloadFailed(format!("Retry after 416 failed: {}", e)))?;
+                let total = retry_response.content_length().unwrap_or(0);
+                response = retry_response;
+                (0, total, false)
             } else if status.is_success() {
                 // 200 - сервер не поддерживает resume или отправил полный файл
                 if is_resuming {
@@ -710,12 +938,13 @@ impl SmartDownloader {
         )
         .await;
 
-        // Открываем файл: append если resume, create если с нуля
+        // Открываем файл: append если resume, create если с нуля (async I/O)
         let mut file = if resume_offset > 0 {
-            let mut f = OpenOptions::new()
+            let mut f = tokio::fs::OpenOptions::new()
                 .write(true)
                 .append(true)
                 .open(&part_path)
+                .await
                 .map_err(|e| {
                     log::error!(
                         "Failed to open file for resume {}: {}",
@@ -725,13 +954,13 @@ impl SmartDownloader {
                     LauncherError::Io(e)
                 })?;
             // Перемещаемся в конец для надёжности
-            f.seek(SeekFrom::End(0)).map_err(|e| {
+            f.seek(std::io::SeekFrom::End(0)).await.map_err(|e| {
                 log::error!("Failed to seek to end: {}", e);
                 LauncherError::Io(e)
             })?;
             f
         } else {
-            File::create(&part_path).map_err(|e| {
+            tokio::fs::File::create(&part_path).await.map_err(|e| {
                 log::error!("Failed to create file {}: {}", part_path.display(), e);
                 LauncherError::Io(e)
             })?
@@ -743,16 +972,21 @@ impl SmartDownloader {
         let mut stall_detector = StallDetector::new(self.config.clone());
         let mut rate_limiter = RateLimiter::new(self.config.bandwidth_limit);
         let mut last_progress_emit = Instant::now();
+        let first_chunk_time = Instant::now();
+        let mut got_first_chunk = false;
 
         loop {
             // Проверка stall
             if stall_detector.is_stalled() {
                 let timeout = stall_detector.timeout_secs();
                 log::warn!(
-                    "Download stalled for {} - no progress for {} seconds (downloaded {} bytes)",
+                    "[CDN-DIAG] Download stalled for {} - no progress for {} seconds (session={} bytes, total={} bytes, got_first_chunk={}, url={})",
                     name,
                     timeout,
-                    downloaded
+                    session_downloaded,
+                    downloaded,
+                    got_first_chunk,
+                    url,
                 );
                 drop(file);
                 // НЕ удаляем partial файл - можно resume позже
@@ -772,7 +1006,8 @@ impl SmartDownloader {
                 )));
             }
 
-            // Читаем chunk
+            // Читаем chunk с таймаутом для защиты от зависания соединений
+            let chunk_timeout = stall_detector.adaptive_timeout();
             let chunk_result = if let Some(token) = cancel_token {
                 tokio::select! {
                     biased;
@@ -783,10 +1018,37 @@ impl SmartDownloader {
                         log::info!("Download cancelled for {} ({} bytes saved for resume)", name, downloaded);
                         return Err(LauncherError::OperationCancelled);
                     }
+                    _ = tokio::time::sleep(chunk_timeout) => {
+                        log::warn!(
+                            "[CDN-DIAG] Chunk read timeout for {} after {:?} (session={} bytes, total={} bytes, got_first_chunk={}, url={})",
+                            name, chunk_timeout, session_downloaded, downloaded, got_first_chunk, url
+                        );
+                        if session_downloaded > 0 {
+                            // Some data was downloaded — save progress for resume
+                            break;
+                        }
+                        return Err(LauncherError::DownloadFailed(format!(
+                            "Download stalled: no data received for {:?}", chunk_timeout
+                        )));
+                    }
                     chunk = stream.next() => chunk
                 }
             } else {
-                stream.next().await
+                match tokio::time::timeout(chunk_timeout, stream.next()).await {
+                    Ok(chunk) => chunk,
+                    Err(_) => {
+                        log::warn!(
+                            "[CDN-DIAG] Chunk read timeout (no cancel token) for {} after {:?} (session={} bytes, total={} bytes, got_first_chunk={}, url={})",
+                            name, chunk_timeout, session_downloaded, downloaded, got_first_chunk, url
+                        );
+                        if session_downloaded > 0 {
+                            break;
+                        }
+                        return Err(LauncherError::DownloadFailed(format!(
+                            "Download stalled: no data received for {:?}", chunk_timeout
+                        )));
+                    }
+                }
             };
 
             let chunk = match chunk_result {
@@ -821,21 +1083,38 @@ impl SmartDownloader {
                 None => break,
             };
 
-            // Rate limiting - ждём если превышен лимит скорости
-            let allowed = rate_limiter.acquire(chunk.len()).await;
-            let chunk_to_write = if allowed < chunk.len() {
-                &chunk[..allowed]
-            } else {
-                &chunk[..]
-            };
+            // Диагностика: время до первого chunk (TTFB)
+            if !got_first_chunk {
+                got_first_chunk = true;
+                let ttfb = first_chunk_time.elapsed();
+                if ttfb.as_millis() > 2000 {
+                    log::warn!(
+                        "[CDN-DIAG] {} TTFB={:?} (slow!), first chunk={} bytes",
+                        name,
+                        ttfb,
+                        chunk.len()
+                    );
+                } else {
+                    log::debug!(
+                        "[CDN-DIAG] {} TTFB={:?}, first chunk={} bytes",
+                        name,
+                        ttfb,
+                        chunk.len()
+                    );
+                }
+            }
 
-            file.write_all(chunk_to_write).map_err(|e| {
+            // Записываем ВЕСЬ chunk целиком (async) — rate limiting через sleep, не truncation
+            file.write_all(&chunk).await.map_err(|e| {
                 log::error!("Failed to write: {}", e);
                 LauncherError::Io(e)
             })?;
 
-            downloaded += chunk_to_write.len() as u64;
-            session_downloaded += chunk_to_write.len() as u64;
+            downloaded += chunk.len() as u64;
+            session_downloaded += chunk.len() as u64;
+
+            // Rate limiting — замедляем если скачиваем быстрее лимита
+            rate_limiter.throttle(chunk.len()).await;
 
             // Обновляем stall detector с session_downloaded для корректного расчёта скорости
             let speed = stall_detector.update_progress(session_downloaded);
@@ -876,7 +1155,8 @@ impl SmartDownloader {
             }
         }
 
-        file.sync_all().map_err(|e| LauncherError::Io(e))?;
+        file.flush().await.map_err(LauncherError::Io)?;
+        file.sync_all().await.map_err(LauncherError::Io)?;
         drop(file);
 
         let final_total = if total_size > 0 {
@@ -991,6 +1271,20 @@ impl SmartDownloader {
         status: DownloadStatus,
         operation_id: Option<&str>,
     ) {
+        self.emit_progress_with_source(id, name, downloaded, total, speed, status, operation_id, None).await;
+    }
+
+    async fn emit_progress_with_source(
+        &self,
+        id: &str,
+        name: &str,
+        downloaded: u64,
+        total: u64,
+        speed: u64,
+        status: DownloadStatus,
+        operation_id: Option<&str>,
+        source: Option<&str>,
+    ) {
         if name.is_empty() {
             return;
         }
@@ -1010,6 +1304,7 @@ impl SmartDownloader {
             percentage,
             status: status.to_string(),
             operation_id: operation_id.map(String::from),
+            source: source.map(String::from),
         };
 
         let _ = self.app_handle.emit("download-progress", progress);
@@ -1150,21 +1445,24 @@ impl DownloadTask {
     }
 }
 
-/// Fetch JSON from URL with retry logic
-/// Standalone function (doesn't require SmartDownloader instance)
-pub async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T> {
-    const MAX_RETRIES: u32 = 4;
-    const BASE_DELAY_MS: u64 = 2000;
-
-    let client = Client::builder()
+/// Shared HTTP client for fetch_json — created once, reused for all calls.
+/// Avoids repeated DNS resolution, TLS handshake, and connection pool overhead.
+static FETCH_JSON_CLIENT: std::sync::LazyLock<Client> = std::sync::LazyLock::new(|| {
+    Client::builder()
         .user_agent(crate::USER_AGENT)
         .timeout(std::time::Duration::from_secs(30))
         .connect_timeout(std::time::Duration::from_secs(10))
         .build()
-        .map_err(|e| {
-            log::error!("Failed to build HTTP client: {}", e);
-            LauncherError::ApiError(format!("Failed to build client: {}", e))
-        })?;
+        .expect("Failed to build HTTP client for fetch_json")
+});
+
+/// Fetch JSON from URL with retry logic
+/// Standalone function (doesn't require SmartDownloader instance)
+pub async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T> {
+    const MAX_RETRIES: u32 = 4;
+    const BASE_DELAY_MS: u64 = 500;
+
+    let client = &*FETCH_JSON_CLIENT;
 
     let mut last_error = None;
 
@@ -1206,12 +1504,19 @@ pub async fn fetch_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T> 
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            log::error!("HTTP {} for {}: {}", status, url, body);
 
+            // 404 Not Found — expected for API lookups (mod not on platform, etc.)
+            // 5xx — server errors, worth retrying
+            // Other client errors — log as warning
             if status.is_server_error() {
+                log::error!("HTTP {} for {}: {}", status, url, body);
                 last_error = Some(LauncherError::ApiError(format!("HTTP {}: {}", status, url)));
                 continue;
+            } else if status.as_u16() == 404 {
+                log::debug!("HTTP 404 for {}", url);
+                return Err(LauncherError::ApiError(format!("HTTP {}: {}", status, url)));
             } else {
+                log::warn!("HTTP {} for {}: {}", status, url, body);
                 return Err(LauncherError::ApiError(format!("HTTP {}: {}", status, url)));
             }
         }

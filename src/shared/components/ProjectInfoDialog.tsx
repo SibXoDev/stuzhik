@@ -4,7 +4,7 @@ import { useI18n } from "../i18n";
 import { sanitizeImageUrl } from "../utils/url-validator";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { MarkdownRenderer, HtmlRenderer } from "./MarkdownRenderer";
-import { ModalWrapper } from "../ui";
+import { ModalWrapper, Tooltip } from "../ui";
 import { formatSize } from "../utils/format-size";
 
 export interface ProjectInfoDialogProps {
@@ -160,7 +160,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
     try {
       await openUrl(url);
     } catch (e) {
-      console.error("Failed to open URL:", e);
+      if (import.meta.env.DEV) console.error("Failed to open URL:", e);
     }
   };
 
@@ -199,11 +199,11 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
             />
           </Show>
 
-          <div class="flex-1 min-w-0">
+          <div class="flex-1 min-w-0 flex flex-col gap-3">
             <div class="flex items-start justify-between gap-4">
-              <div class="flex-1 min-w-0">
-                <h2 class="text-2xl font-bold mb-1">{props.project.title}</h2>
-                <p class="text-muted mb-2">от {props.project.author || "Unknown"}</p>
+              <div class="flex-1 min-w-0 flex flex-col gap-2">
+                <h2 class="text-2xl font-bold">{props.project.title}</h2>
+                <p class="text-muted">от {props.project.author || "Unknown"}</p>
                 {/* Links in header */}
                 <div class="flex items-center gap-2 flex-wrap">
                   <Show when={props.project.source && props.project.source !== "local"}>
@@ -214,19 +214,20 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                         </span>
                       }
                     >
-                      <button
-                        class={`flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs transition-colors ${
-                          props.project.source === "modrinth"
-                            ? "bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30"
-                            : "bg-orange-600/20 text-orange-400 border border-orange-600/30 hover:bg-orange-600/30"
-                        }`}
-                        onClick={() => handleOpenExternal(props.project.links!.project!)}
-                        title={t().wiki?.openOnPlatform ?? "Open on platform"}
-                      >
-                        <i class={props.project.source === "modrinth" ? "i-simple-icons-modrinth w-3.5 h-3.5" : "i-simple-icons-curseforge w-3.5 h-3.5"} />
-                        {props.project.source === "modrinth" ? "Modrinth" : "CurseForge"}
-                        <i class="i-hugeicons-arrow-up-right-01 w-3 h-3" />
-                      </button>
+                      <Tooltip text={t().wiki?.openOnPlatform ?? "Open on platform"} position="bottom">
+                        <button
+                          class={`flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs transition-colors ${
+                            props.project.source === "modrinth"
+                              ? "bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600/30"
+                              : "bg-orange-600/20 text-orange-400 border border-orange-600/30 hover:bg-orange-600/30"
+                          }`}
+                          onClick={() => handleOpenExternal(props.project.links!.project!)}
+                        >
+                          <i class={props.project.source === "modrinth" ? "i-simple-icons-modrinth w-3.5 h-3.5" : "i-simple-icons-curseforge w-3.5 h-3.5"} />
+                          {props.project.source === "modrinth" ? "Modrinth" : "CurseForge"}
+                          <i class="i-hugeicons-arrow-up-right-01 w-3 h-3" />
+                        </button>
+                      </Tooltip>
                     </Show>
                   </Show>
                   <Show when={props.project.links?.source}>
@@ -267,16 +268,18 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                   </Show>
                 </div>
               </div>
-              <button
-                class="btn-close"
-                onClick={() => props.onClose()}
-                title={t().common?.close ?? "Close"}
-              >
-                <i class="i-hugeicons-cancel-01 w-5 h-5" />
-              </button>
+              <Tooltip text={t().common?.close ?? "Close"} position="bottom">
+                <button
+                  class="btn-close"
+                  onClick={() => props.onClose()}
+                  aria-label={t().common?.close ?? "Close"}
+                >
+                  <i class="i-hugeicons-cancel-01 w-5 h-5" aria-hidden="true" />
+                </button>
+              </Tooltip>
             </div>
 
-            <div class="flex items-center gap-3 mt-3 flex-wrap">
+            <div class="flex items-center gap-3 flex-wrap">
               <Show when={props.project.downloads}>
                 <span class="badge badge-gray">
                   <i class="i-hugeicons-download-02 w-3 h-3" />
@@ -304,8 +307,8 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
 
           {/* Full Body/Description with Show More */}
           <Show when={props.project.body && props.project.body !== props.project.description}>
-            <div>
-              <h3 class="text-sm font-medium text-gray-400 mb-2">
+            <div class="flex flex-col gap-2">
+              <h3 class="text-sm font-medium text-gray-400">
                 {t().wiki?.about ?? "About"}
               </h3>
               <div
@@ -322,7 +325,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
               </div>
               <Show when={isBodyLong()}>
                 <button
-                  class="mt-2 text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                  class="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-light)] flex items-center gap-1 transition-colors"
                   onClick={() => setShowFullBody(!showFullBody())}
                 >
                   <i
@@ -340,20 +343,30 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
 
           {/* Categories - Clickable */}
           <Show when={props.project.categories.length > 0}>
-            <div>
-              <h3 class="text-sm font-medium text-gray-400 mb-2">
+            <div class="flex flex-col gap-2">
+              <h3 class="text-sm font-medium text-gray-400">
                 {t().wiki?.categories ?? "Categories"}
               </h3>
               <div class="flex flex-wrap gap-2">
                 <For each={props.project.categories}>
                   {(category) => (
-                    <button
-                      class="px-2 py-1 bg-gray-800/50 border border-gray-700/50 rounded-2xl text-xs text-gray-300 capitalize hover:bg-gray-700/50 hover:border-gray-600/50 transition-colors cursor-pointer"
-                      onClick={() => props.onCategoryClick?.(category)}
-                      title={props.onCategoryClick ? `Search for ${category}` : undefined}
-                    >
-                      {category.replace(/-/g, " ")}
-                    </button>
+                    <Show when={props.onCategoryClick} fallback={
+                      <button
+                        class="px-2 py-1 bg-gray-800/50 border border-gray-700/50 rounded-2xl text-xs text-gray-300 capitalize hover:bg-gray-700/50 hover:border-gray-600/50 transition-colors cursor-pointer"
+                        onClick={() => props.onCategoryClick?.(category)}
+                      >
+                        {category.replace(/-/g, " ")}
+                      </button>
+                    }>
+                      <Tooltip text={`Search for ${category}`} position="bottom">
+                        <button
+                          class="px-2 py-1 bg-gray-800/50 border border-gray-700/50 rounded-2xl text-xs text-gray-300 capitalize hover:bg-gray-700/50 hover:border-gray-600/50 transition-colors cursor-pointer"
+                          onClick={() => props.onCategoryClick?.(category)}
+                        >
+                          {category.replace(/-/g, " ")}
+                        </button>
+                      </Tooltip>
+                    </Show>
                   )}
                 </For>
               </div>
@@ -362,8 +375,8 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
 
           {/* Supported Versions - Expandable */}
           <Show when={props.project.versions.length > 0}>
-            <div>
-              <h3 class="text-sm font-medium text-gray-400 mb-2">
+            <div class="flex flex-col gap-2">
+              <h3 class="text-sm font-medium text-gray-400">
                 {t().resources?.supportedVersions ?? "Supported Versions"}
               </h3>
               <div class="flex flex-wrap gap-1.5">
@@ -390,15 +403,15 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
 
           {/* Gallery */}
           <Show when={props.project.gallery && props.project.gallery.length > 0}>
-            <div>
-              <h3 class="text-sm font-medium text-gray-400 mb-2">
+            <div class="flex flex-col gap-2">
+              <h3 class="text-sm font-medium text-gray-400">
                 {t().wiki?.gallery ?? "Gallery"}
               </h3>
               <div class="grid grid-cols-3 gap-2">
                 <For each={props.project.gallery}>
                   {(image) => (
                     <button
-                      class="aspect-video rounded-xl overflow-hidden border-2 border-transparent hover:border-blue-500 transition-colors p-0"
+                      class="aspect-video rounded-xl overflow-hidden border-2 border-transparent hover:border-[var(--color-primary)] transition-colors p-0"
                       onClick={() => setSelectedImage(image.url)}
                     >
                       <img
@@ -416,8 +429,8 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
 
           {/* Version Selector (for catalog/install mode) */}
           <Show when={hasVersionSelector()}>
-            <div class="pt-4 border-t border-gray-700/50">
-              <div class="flex items-center justify-between mb-3">
+            <div class="pt-4 border-t border-gray-700/50 flex flex-col gap-3">
+              <div class="flex items-center justify-between">
                 <h3 class="text-sm font-medium text-gray-400">
                   {t().wiki?.versions ?? "Versions"}
                 </h3>
@@ -446,7 +459,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                       <button
                         class={`w-full text-left p-3 rounded-2xl border transition-colors duration-100 flex gap-3 ${
                           selectedVersion()?.id === version.id
-                            ? "bg-blue-600/20 border-blue-600/50"
+                            ? "bg-[var(--color-primary-bg)] border-[var(--color-primary-border)]"
                             : compatible
                               ? "bg-gray-800/50 border-gray-700 hover:border-gray-600"
                               : "bg-gray-800/30 border-gray-800 opacity-60"
@@ -457,7 +470,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                         <div
                           class={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center mt-0.5 ${
                             selectedVersion()?.id === version.id
-                              ? "border-blue-500 bg-blue-500"
+                              ? "border-[var(--color-primary)] bg-[var(--color-primary)]"
                               : "border-gray-500"
                           }`}
                         >
@@ -467,8 +480,8 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                         </div>
 
                         {/* Content */}
-                        <div class="flex-1 min-w-0">
-                          <div class="flex items-start justify-between gap-2 mb-1">
+                        <div class="flex-1 min-w-0 flex flex-col gap-2">
+                          <div class="flex items-start justify-between gap-2">
                             <div class="min-w-0 flex items-center gap-2">
                               <div>
                                 <p class="font-medium truncate">{version.version_name}</p>
@@ -489,7 +502,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                           </div>
 
                           {/* Tags */}
-                          <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                          <div class="flex flex-wrap items-center gap-1.5">
                             {/* Compatibility indicator */}
                             <Show when={compatible}>
                               <span class="px-2 py-0.5 text-xs rounded bg-green-600/20 text-green-400 border border-green-600/30 flex items-center gap-1">
@@ -531,7 +544,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
               </div>
               <Show when={totalVersionsCount() > 5}>
                 <button
-                  class="mt-2 text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors w-full justify-center"
+                  class="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-light)] flex items-center gap-1 transition-colors w-full justify-center"
                   onClick={() => setShowAllVersionsData(!showAllVersionsData())}
                 >
                   <i
@@ -547,36 +560,37 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
 
           {/* Installed Info (for installed items) */}
           <Show when={props.project.file_name || props.project.version}>
-            <div class="pt-4 border-t border-gray-700/50">
-              <h3 class="text-sm font-medium text-gray-400 mb-3">
+            <div class="pt-4 border-t border-gray-700/50 flex flex-col gap-3">
+              <h3 class="text-sm font-medium text-gray-400">
                 {t().wiki?.file ?? "File Info"}
               </h3>
               <div class="grid grid-cols-2 gap-4 text-sm">
                 <Show when={props.project.version}>
-                  <div>
+                  <div class="flex items-center gap-2">
                     <span class="text-gray-500">{t().wiki?.version ?? "Version"}:</span>
-                    <span class="text-white ml-2">{props.project.version}</span>
+                    <span class="text-white">{props.project.version}</span>
                   </div>
                 </Show>
                 <Show when={props.project.file_name}>
                   <div class="flex items-center gap-2">
                     <span class="text-gray-500">{t().wiki?.file ?? "File"}:</span>
-                    <span class="text-white ml-2 font-mono text-xs">{props.project.file_name}</span>
+                    <span class="text-white font-mono text-xs">{props.project.file_name}</span>
                     <Show when={props.filePath}>
-                      <button
-                        class="p-1 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
-                        onClick={() => props.filePath && revealItemInDir(props.filePath)}
-                        title={t().wiki?.openInExplorer ?? "Open in Explorer"}
-                      >
-                        <i class="i-hugeicons-folder-01 w-4 h-4" />
-                      </button>
+                      <Tooltip text={t().wiki?.openInExplorer ?? "Open in Explorer"} position="bottom">
+                        <button
+                          class="p-1 hover:bg-gray-700 rounded transition-colors text-gray-400 hover:text-white"
+                          onClick={() => props.filePath && revealItemInDir(props.filePath)}
+                        >
+                          <i class="i-hugeicons-folder-01 w-4 h-4" />
+                        </button>
+                      </Tooltip>
                     </Show>
                   </div>
                 </Show>
                 <Show when={props.project.file_size}>
-                  <div>
+                  <div class="flex items-center gap-2">
                     <span class="text-gray-500">{t().wiki?.size ?? "Size"}:</span>
-                    <span class="text-white ml-2">{fmtSize(props.project.file_size)}</span>
+                    <span class="text-white">{fmtSize(props.project.file_size)}</span>
                   </div>
                 </Show>
                 <Show when={props.project.enabled !== undefined}>
@@ -603,8 +617,8 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
           <Show when={props.project.installed_at || props.project.updated_at}>
             <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-700/50">
               <Show when={props.project.installed_at}>
-                <div>
-                  <h3 class="text-sm font-medium text-gray-400 mb-1">
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-sm font-medium text-gray-400">
                     {t().wiki?.installedAt ?? "Installed"}
                   </h3>
                   <p class="text-white text-sm">
@@ -613,8 +627,8 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
                 </div>
               </Show>
               <Show when={props.project.updated_at}>
-                <div>
-                  <h3 class="text-sm font-medium text-gray-400 mb-1">
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-sm font-medium text-gray-400">
                     {t().wiki?.updatedAt ?? "Updated"}
                   </h3>
                   <p class="text-white text-sm">
@@ -720,7 +734,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
       {/* Full-Screen Image Preview Modal */}
       <Show when={selectedImage()}>
         <div
-          class="fixed inset-0 bg-black z-[100] flex items-center justify-center pt-10"
+          class="fixed inset-0 bg-black z-[100] flex items-center justify-center pt-[var(--titlebar-height)]"
           onClick={() => setSelectedImage(null)}
         >
           {/* Image container - fills available space */}
@@ -732,7 +746,7 @@ export function ProjectInfoDialog(props: ProjectInfoDialogProps) {
           />
           {/* Close button - positioned below TitleBar, away from window controls */}
           <button
-            class="absolute top-14 right-4 p-2 bg-gray-800/80 rounded-xl text-white hover:bg-gray-700 transition-colors flex items-center gap-2"
+            class="absolute top-[calc(var(--titlebar-height)+1rem)] right-4 p-2 bg-gray-800/80 rounded-xl text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-2"
             onClick={(e) => {
               e.stopPropagation();
               setSelectedImage(null);

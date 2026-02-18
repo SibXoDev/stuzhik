@@ -11,6 +11,7 @@ import { addToast } from "../../../shared/components/Toast";
 import { useSafeTimers } from "../../../shared/hooks";
 import { formatSize } from "../../../shared/utils/format-size";
 import { useI18n } from "../../../shared/i18n";
+import { Tooltip } from "../../../shared/ui";
 
 interface Props {
   onClose: () => void;
@@ -62,6 +63,9 @@ const LANG_NAMES: Record<string, string> = {
   yml: "YAML",
   md: "Markdown",
 };
+
+// Отслеживание актуального запроса подсветки (вместо window as any)
+let lastHighlightRequest = 0;
 
 const SourceCodePage: Component<Props> = (props) => {
   const { t } = useI18n();
@@ -122,7 +126,7 @@ const SourceCodePage: Component<Props> = (props) => {
       for (const node of sorted) {
         if (!matchesSearch(node.path)) {
           if (node.type === "directory" && node.children) {
-            const hasMatch = node.children.some(c => matchesSearch(c.path));
+            const hasMatch = node.children.some((c: FileNode) => matchesSearch(c.path));
             if (!hasMatch) continue;
           } else {
             continue;
@@ -145,7 +149,7 @@ const SourceCodePage: Component<Props> = (props) => {
   const filteredChanges = createMemo(() => {
     const changes = sourceBundle.changes?.changes || [];
     if (!searchQuery()) return changes;
-    return changes.filter(c => matchesSearch(c.path));
+    return changes.filter((c: FileChange) => matchesSearch(c.path));
   });
 
   // Virtualizers - only create when tab is active AND refs are ready
@@ -298,9 +302,7 @@ const SourceCodePage: Component<Props> = (props) => {
       return;
     }
 
-    // Track request to handle race conditions
-    const requestId = Date.now();
-    (window as any).__lastHighlightRequest = requestId;
+    const requestId = ++lastHighlightRequest;
 
     setCodeLoading(true);
     setCodeError(null);
@@ -308,39 +310,35 @@ const SourceCodePage: Component<Props> = (props) => {
     const lang = detectLanguage(path);
     if (import.meta.env.DEV) console.log("[SourceCodePage] Highlighting", path, "as", lang);
 
-    // Defensive timeout - ensure loading state is cleared even if highlighter hangs
+    // Safety timeout — если highlighter зависнет
     const safetyTimeout = setTimeout(() => {
-      if ((window as any).__lastHighlightRequest === requestId) {
-        console.warn("[SourceCodePage] Safety timeout - highlighter might be stuck");
+      if (lastHighlightRequest === requestId) {
+        if (import.meta.env.DEV) console.warn("[SourceCodePage] Safety timeout - highlighter might be stuck");
         setCodeError("Подсветка синтаксиса недоступна (timeout)");
         setCodeHtml(`<pre class="shiki"><code>${escapeHtmlBasic(content)}</code></pre>`);
         setCodeLoading(false);
       }
-    }, 15000); // 15 second safety net
+    }, 15000);
 
-    // Cleanup timeout on effect re-run or unmount
     onCleanup(() => clearTimeout(safetyTimeout));
 
     highlightCode(content, lang)
       .then((html) => {
         clearTimeout(safetyTimeout);
-        // Only update if this is still the current request
-        if ((window as any).__lastHighlightRequest === requestId) {
+        if (lastHighlightRequest === requestId) {
           const isFallback = html.includes("shiki-fallback");
           if (import.meta.env.DEV) console.log("[SourceCodePage] Highlight done:", isFallback ? "fallback (plain text)" : "success", "HTML length:", html.length);
           setCodeHtml(html);
           setCodeLoading(false);
-          // Don't set error for fallback - it's still usable
           setCodeError(null);
         }
       })
       .catch((e) => {
         clearTimeout(safetyTimeout);
-        console.error("[SourceCodePage] Failed to highlight:", e);
-        if ((window as any).__lastHighlightRequest === requestId) {
+        if (import.meta.env.DEV) console.error("[SourceCodePage] Failed to highlight:", e);
+        if (lastHighlightRequest === requestId) {
           const errorMsg = e instanceof Error ? e.message : String(e);
           setCodeError(errorMsg);
-          // Still show fallback
           setCodeHtml(`<pre class="shiki"><code>${escapeHtmlBasic(content)}</code></pre>`);
           setCodeLoading(false);
         }
@@ -463,7 +461,7 @@ const SourceCodePage: Component<Props> = (props) => {
       setCopied(true);
       safeTimeout(() => setCopied(false), 2000);
     } catch (e) {
-      console.error("Failed to copy:", e);
+      if (import.meta.env.DEV) console.error("Failed to copy:", e);
     }
   };
 
@@ -475,7 +473,7 @@ const SourceCodePage: Component<Props> = (props) => {
       setFileCopied(true);
       safeTimeout(() => setFileCopied(false), 2000);
     } catch (e) {
-      console.error("Failed to copy:", e);
+      if (import.meta.env.DEV) console.error("Failed to copy:", e);
     }
   };
 
@@ -498,12 +496,12 @@ const SourceCodePage: Component<Props> = (props) => {
 
       // Add text files
       for (const [path, content] of Object.entries(sourceBundle.files)) {
-        zip.file(path, content);
+        zip.file(path, content as string);
       }
 
       // Add images (decode base64)
       for (const [path, dataUrl] of Object.entries(sourceBundle.images)) {
-        const base64 = dataUrl.split(",")[1];
+        const base64 = (dataUrl as string).split(",")[1];
         zip.file(path, base64, { base64: true });
       }
 
@@ -569,16 +567,18 @@ const SourceCodePage: Component<Props> = (props) => {
                 <p class="text-xs text-gray-500">v{sourceBundle.version}</p>
               </div>
             </div>
-            <button class="btn-ghost p-1.5" onClick={props.onClose} title="Закрыть">
-              <i class="i-hugeicons-cancel-01 w-5 h-5" />
-            </button>
+            <Tooltip text="Закрыть" position="bottom">
+              <button class="btn-ghost p-1.5" onClick={props.onClose}>
+                <i class="i-hugeicons-cancel-01 w-5 h-5" />
+              </button>
+            </Tooltip>
           </div>
         </div>
 
         {/* Tabs */}
         <div class="flex border-b border-gray-800">
           <button
-            class={`flex-1 py-2 text-sm font-medium transition-colors ${activeTab() === "files" ? "text-blue-400 border-b-2 border-blue-400" : "text-gray-500 hover:text-gray-300"}`}
+            class={`flex-1 py-2 text-sm font-medium transition-colors ${activeTab() === "files" ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]" : "text-gray-500 hover:text-gray-300"}`}
             onClick={() => switchTab("files")}
           >
             <div class="flex items-center justify-center gap-1.5">
@@ -586,52 +586,57 @@ const SourceCodePage: Component<Props> = (props) => {
               Файлы
             </div>
           </button>
+          <Tooltip text={hasChanges() ? `${sourceBundle.changes!.changes.length} изменений` : "Первый релиз"} position="bottom">
           <button
-            class={`flex-1 py-2 text-sm font-medium transition-colors ${activeTab() === "changes" ? "text-blue-400 border-b-2 border-blue-400" : "text-gray-500 hover:text-gray-300"}`}
+            class={`flex-1 py-2 text-sm font-medium transition-colors ${activeTab() === "changes" ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]" : "text-gray-500 hover:text-gray-300"}`}
             onClick={() => switchTab("changes")}
             disabled={!hasChanges()}
-            title={hasChanges() ? `${sourceBundle.changes!.changes.length} изменений` : "Первый релиз"}
           >
             <div class="flex items-center justify-center gap-1.5">
               <i class="i-hugeicons-git-compare w-4 h-4" />
               Изменения
               <Show when={hasChanges()}>
-                <span class="px-1.5 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400">
+                <span class="px-1.5 py-0.5 text-xs rounded-full bg-[var(--color-primary-bg)] text-[var(--color-primary)]">
                   {sourceBundle.changes!.changes.length}
                 </span>
               </Show>
             </div>
           </button>
+          </Tooltip>
         </div>
 
         {/* Search */}
-        <div class="border-b border-gray-800 flex items-center gap-2 p-2">
-          <i class="i-hugeicons-search-01 w-4 h-4 text-gray-500 flex-shrink-0" />
-          <input
-            type="text"
-            placeholder={useRegex() ? "Regex..." : "Поиск..."}
-            value={searchQuery()}
-            onInput={(e) => setSearchQuery(e.currentTarget.value)}
-            class="flex-1 bg-transparent text-sm outline-none min-w-0"
-          />
-          <button
-            class={`p-1 rounded transition-colors flex-shrink-0 ${useRegex() ? "text-blue-400 bg-blue-500/20" : "text-gray-500 hover:text-gray-300"}`}
-            onClick={() => setUseRegex(!useRegex())}
-            title="Регулярное выражение"
-          >
-            <span class="text-xs font-mono">.*</span>
-          </button>
-          <Show when={searchQuery()}>
-            <button
-              class="p-1 rounded text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
-              onClick={() => setSearchQuery("")}
-              title="Очистить"
-            >
-              <i class="i-hugeicons-cancel-01 w-3.5 h-3.5" />
-            </button>
-          </Show>
+        <div class="border-b border-gray-800 flex flex-col gap-1 p-2">
+          <div class="flex items-center gap-2">
+            <i class="i-hugeicons-search-01 w-4 h-4 text-gray-500 flex-shrink-0" />
+            <input
+              type="text"
+              placeholder={useRegex() ? "Regex..." : "Поиск..."}
+              value={searchQuery()}
+              onInput={(e) => setSearchQuery(e.currentTarget.value)}
+              class="flex-1 bg-transparent text-sm outline-none min-w-0"
+            />
+            <Tooltip text="Регулярное выражение" position="bottom">
+              <button
+                class={`p-1 rounded transition-colors flex-shrink-0 ${useRegex() ? "text-[var(--color-primary)] bg-[var(--color-primary-bg)]" : "text-gray-500 hover:text-gray-300"}`}
+                onClick={() => setUseRegex(!useRegex())}
+              >
+                <span class="text-xs font-mono">.*</span>
+              </button>
+            </Tooltip>
+            <Show when={searchQuery()}>
+              <Tooltip text="Очистить" position="bottom">
+                <button
+                  class="p-1 rounded text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <i class="i-hugeicons-cancel-01 w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
+            </Show>
+          </div>
           <Show when={regexError()}>
-            <p class="text-xs text-red-400 mt-1 px-1">{regexError()}</p>
+            <p class="text-xs text-red-400 px-1">{regexError()}</p>
           </Show>
         </div>
 
@@ -652,7 +657,7 @@ const SourceCodePage: Component<Props> = (props) => {
                       return (
                         <Show when={node()}>
                           <div
-                            class={`absolute left-0 right-0 flex items-center gap-2 px-2 py-1.5 cursor-pointer transition-colors ${selectedPath() === node()!.path ? "bg-blue-600/20 text-blue-400" : "hover:bg-gray-800/50"}`}
+                            class={`absolute left-0 right-0 flex items-center gap-2 px-2 py-1.5 cursor-pointer transition-colors ${selectedPath() === node()!.path ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]" : "hover:bg-gray-800/50"}`}
                             style={{ top: `${virtualRow.start}px`, height: `${virtualRow.size}px`, "padding-left": `${depth() * 12 + 8}px` }}
                             onClick={() => selectFile(node()!)}
                           >
@@ -681,19 +686,19 @@ const SourceCodePage: Component<Props> = (props) => {
         {/* Changes tab content */}
         <Show when={activeTab() === "changes"}>
           <Show when={hasChanges()} fallback={
-            <div class="flex-1 flex-col-center text-gray-500 p-4">
-              <i class="i-hugeicons-git-compare w-8 h-8 opacity-30 mb-2" />
+            <div class="flex-1 flex-col-center gap-2 text-gray-500 p-4">
+              <i class="i-hugeicons-git-compare w-8 h-8 opacity-30" />
               <p class="text-sm">Первый релиз</p>
             </div>
           }>
             {/* Summary */}
-            <div class="p-3 border-b border-gray-800 bg-gray-800/30">
+            <div class="p-3 border-b border-gray-800 bg-gray-800/30 flex flex-col gap-1">
               <div class="flex items-center gap-3 text-sm">
                 <span class="text-green-400">+{sourceBundle.changes!.summary.added}</span>
                 <span class="text-yellow-400">~{sourceBundle.changes!.summary.modified}</span>
                 <span class="text-red-400">-{sourceBundle.changes!.summary.deleted}</span>
               </div>
-              <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+              <div class="flex items-center gap-2 text-xs text-gray-500">
                 <span class="text-green-500">+{sourceBundle.changes!.summary.totalAdditions}</span>
                 <span class="text-red-500">-{sourceBundle.changes!.summary.totalDeletions}</span>
                 <span>строк</span>
@@ -709,21 +714,23 @@ const SourceCodePage: Component<Props> = (props) => {
                   <div style={{ height: `${virt().getTotalSize()}px`, position: "relative" }}>
                     <For each={virt().getVirtualItems()}>
                       {(virtualRow) => {
-                        const change = () => filteredChanges()[virtualRow.index];
-                        const style = () => getChangeTypeStyle(change().type);
+                        const change = () => filteredChanges()[virtualRow.index] as FileChange | undefined;
+                        const style = () => getChangeTypeStyle(change()?.type ?? "modified");
                         return (
-                          <div
-                            class={`absolute left-0 right-0 flex items-center gap-2 px-3 py-2 cursor-pointer border-l-2 ${style().border} ${selectedPath() === change().path ? `${style().bg} ${style().text}` : "hover:bg-gray-800/50"} ${change().type === "deleted" ? "opacity-60" : ""}`}
-                            style={{ top: `${virtualRow.start}px`, height: `${virtualRow.size}px` }}
-                            onClick={() => selectChangedFile(change())}
-                          >
-                            <i class={`w-4 h-4 flex-shrink-0 ${style().icon}`} />
-                            <span class="flex-1 truncate text-sm font-mono">{change().path}</span>
-                            <div class="flex items-center gap-1.5 text-xs">
-                              <Show when={change().additions > 0}><span class="text-green-400">+{change().additions}</span></Show>
-                              <Show when={change().deletions > 0}><span class="text-red-400">-{change().deletions}</span></Show>
+                          <Show when={change()}>
+                            <div
+                              class={`absolute left-0 right-0 flex items-center gap-2 px-3 py-2 cursor-pointer border-l-2 ${style().border} ${selectedPath() === change()!.path ? `${style().bg} ${style().text}` : "hover:bg-gray-800/50"} ${change()!.type === "deleted" ? "opacity-60" : ""}`}
+                              style={{ top: `${virtualRow.start}px`, height: `${virtualRow.size}px` }}
+                              onClick={() => selectChangedFile(change()!)}
+                            >
+                              <i class={`w-4 h-4 flex-shrink-0 ${style().icon}`} />
+                              <span class="flex-1 truncate text-sm font-mono">{change()!.path}</span>
+                              <div class="flex items-center gap-1.5 text-xs">
+                                <Show when={(change()?.additions ?? 0) > 0}><span class="text-green-400">+{change()!.additions}</span></Show>
+                                <Show when={(change()?.deletions ?? 0) > 0}><span class="text-red-400">-{change()!.deletions}</span></Show>
+                              </div>
                             </div>
-                          </div>
+                          </Show>
                         );
                       }}
                     </For>
@@ -737,18 +744,19 @@ const SourceCodePage: Component<Props> = (props) => {
         {/* Stats & Language bar */}
         <div class="border-t border-gray-800">
           {/* Language bar */}
-          <div class="p-3">
+          <div class="p-3 flex flex-col gap-2">
             <div class="flex h-2 rounded-full overflow-hidden bg-gray-800">
               <For each={languageStats()}>
                 {(lang) => (
-                  <div
-                    style={{ width: `${lang.percent}%`, "background-color": lang.color }}
-                    title={`${lang.name}: ${lang.percent.toFixed(1)}%`}
-                  />
+                  <Tooltip text={`${lang.name}: ${lang.percent.toFixed(1)}%`} position="bottom">
+                    <div
+                      style={{ width: `${lang.percent}%`, "background-color": lang.color }}
+                    />
+                  </Tooltip>
                 )}
               </For>
             </div>
-            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs">
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs">
               <For each={languageStats().slice(0, 4)}>
                 {(lang) => (
                   <div class="flex items-center gap-1.5">
@@ -772,28 +780,33 @@ const SourceCodePage: Component<Props> = (props) => {
 
         {/* Actions */}
         <div class="p-3 border-t border-gray-800 space-y-2">
-          <button
-            class="btn-secondary w-full text-sm"
-            onClick={handleDownloadZip}
-            disabled={downloading()}
-            title="Скачать ZIP"
-          >
-            <Show when={downloading()} fallback={<i class="i-hugeicons-download-02 w-4 h-4" />}>
-              <i class="i-svg-spinners-ring-resize w-4 h-4" />
-            </Show>
-            {downloading() ? "Создание..." : "Скачать ZIP"}
-          </button>
-          <div class="flex gap-2">
-            <button class="btn-ghost flex-1 text-sm" onClick={handleCopyGitClone} title="Копировать git clone">
-              <Show when={copied()} fallback={<i class="i-hugeicons-copy-01 w-4 h-4" />}>
-                <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
+          <Tooltip text="Скачать ZIP" position="bottom">
+            <button
+              class="btn-secondary w-full text-sm"
+              onClick={handleDownloadZip}
+              disabled={downloading()}
+            >
+              <Show when={downloading()} fallback={<i class="i-hugeicons-download-02 w-4 h-4" />}>
+                <i class="i-svg-spinners-ring-resize w-4 h-4" />
               </Show>
-              Clone
+              {downloading() ? "Создание..." : "Скачать ZIP"}
             </button>
-            <button class="btn-ghost flex-1 text-sm" onClick={() => openUrl("https://github.com/SibXoDev/stuzhik")} title="GitHub">
-              <i class="i-hugeicons-github w-4 h-4" />
-              GitHub
-            </button>
+          </Tooltip>
+          <div class="flex gap-2">
+            <Tooltip text="Копировать git clone" position="bottom">
+              <button class="btn-ghost flex-1 text-sm" onClick={handleCopyGitClone}>
+                <Show when={copied()} fallback={<i class="i-hugeicons-copy-01 w-4 h-4" />}>
+                  <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
+                </Show>
+                Clone
+              </button>
+            </Tooltip>
+            <Tooltip text="GitHub" position="bottom">
+              <button class="btn-ghost flex-1 text-sm" onClick={() => openUrl("https://github.com/SibXoDev/stuzhik")}>
+                <i class="i-hugeicons-github w-4 h-4" />
+                GitHub
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -810,20 +823,23 @@ const SourceCodePage: Component<Props> = (props) => {
           </div>
           <div class="flex items-center gap-1">
             <Show when={selectedPath() && isMarkdown() && !shouldShowMdAsCode()}>
-              <button
-                class={`btn-ghost p-1.5 ${showRawMd() ? "text-blue-400" : ""}`}
-                onClick={() => setShowRawMd(!showRawMd())}
-                title={showRawMd() ? "Показать красиво" : "Показать код"}
-              >
-                <i class={showRawMd() ? "i-hugeicons-text w-4 h-4" : "i-hugeicons-code w-4 h-4"} />
-              </button>
+              <Tooltip text={showRawMd() ? "Показать красиво" : "Показать код"} position="bottom">
+                <button
+                  class={`btn-ghost p-1.5 ${showRawMd() ? "text-[var(--color-primary)]" : ""}`}
+                  onClick={() => setShowRawMd(!showRawMd())}
+                >
+                  <i class={showRawMd() ? "i-hugeicons-text w-4 h-4" : "i-hugeicons-code w-4 h-4"} />
+                </button>
+              </Tooltip>
             </Show>
             <Show when={selectedPath()}>
-              <button class="btn-ghost p-1.5" onClick={handleCopyFile} title="Копировать">
-                <Show when={fileCopied()} fallback={<i class="i-hugeicons-copy-01 w-4 h-4" />}>
-                  <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
-                </Show>
-              </button>
+              <Tooltip text="Копировать" position="bottom">
+                <button class="btn-ghost p-1.5" onClick={handleCopyFile}>
+                  <Show when={fileCopied()} fallback={<i class="i-hugeicons-copy-01 w-4 h-4" />}>
+                    <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
+                  </Show>
+                </button>
+              </Tooltip>
             </Show>
           </div>
         </div>
@@ -837,25 +853,26 @@ const SourceCodePage: Component<Props> = (props) => {
           <Show when={selectedPath()} fallback={
             <div class="flex-col-center h-full gap-6 text-gray-500 p-8">
               <i class="i-hugeicons-source-code w-20 h-20 opacity-20" />
-              <div class="text-center">
-                <p class="text-xl font-medium text-gray-400 mb-2">Stuzhik Source Code</p>
+              <div class="text-center flex flex-col gap-2">
+                <p class="text-xl font-medium text-gray-400">Stuzhik Source Code</p>
                 <p class="text-sm">Выберите файл в дереве слева</p>
               </div>
 
               {/* Language stats like GitHub */}
-              <div class="w-full max-w-md mt-4">
-                <p class="text-xs text-gray-500 mb-2">Languages</p>
+              <div class="w-full max-w-md flex flex-col gap-2">
+                <p class="text-xs text-gray-500">Languages</p>
                 <div class="flex h-2 rounded-full overflow-hidden bg-gray-800">
                   <For each={languageStats()}>
                     {(lang) => (
-                      <div
-                        style={{ width: `${lang.percent}%`, "background-color": lang.color }}
-                        title={`${lang.name}: ${lang.percent.toFixed(1)}%`}
-                      />
+                      <Tooltip text={`${lang.name}: ${lang.percent.toFixed(1)}%`} position="bottom">
+                        <div
+                          style={{ width: `${lang.percent}%`, "background-color": lang.color }}
+                        />
+                      </Tooltip>
                     )}
                   </For>
                 </div>
-                <div class="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3 text-xs">
+                <div class="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs">
                   <For each={languageStats()}>
                     {(lang) => (
                       <div class="flex items-center gap-1.5">
@@ -871,26 +888,57 @@ const SourceCodePage: Component<Props> = (props) => {
           }>
             {/* Image view */}
             <Show when={isImage()}>
-              <div class="flex-col-center h-full p-8">
+              <div class="flex-col-center h-full gap-4 p-8">
                 <Show when={sourceBundle.images[selectedPath()!]} fallback={
-                  <>
-                    <i class="i-hugeicons-image-01 w-16 h-16 text-gray-600 mb-4" />
+                  <div class="flex flex-col items-center gap-4">
+                    <i class="i-hugeicons-image-01 w-16 h-16 text-gray-600" />
                     <p class="text-gray-500 text-sm">Изображение не найдено</p>
-                  </>
+                  </div>
                 }>
                   <img
                     src={sourceBundle.images[selectedPath()!]}
                     alt={getFileName()}
                     class="max-w-full max-h-[70vh] object-contain rounded-lg"
                   />
-                  <p class="text-gray-500 text-xs mt-4 font-mono">{selectedPath()}</p>
+                  <p class="text-gray-500 text-xs font-mono">{selectedPath()}</p>
                 </Show>
               </div>
             </Show>
 
             {/* Markdown pretty view */}
             <Show when={!isImage() && shouldRenderAsPrettyMd()}>
-              <div class="p-6 prose prose-invert max-w-none">
+              <div
+                class="p-6 prose prose-invert max-w-none"
+                onClick={(e) => {
+                  // Intercept relative link clicks and navigate within source viewer
+                  const anchor = (e.target as HTMLElement).closest("a");
+                  if (!anchor) return;
+                  const href = anchor.getAttribute("href");
+                  if (!href || href.startsWith("#") || href.startsWith("http://") || href.startsWith("https://")) return;
+
+                  e.preventDefault();
+                  e.stopPropagation();
+
+                  // Resolve relative path from current file's directory
+                  const currentDir = selectedPath()?.split("/").slice(0, -1).join("/") || "";
+                  const resolved = href.startsWith("./") ? href.slice(2) : href;
+                  const targetPath = currentDir ? `${currentDir}/${resolved}` : resolved;
+
+                  // Normalize path (handle ../)
+                  const parts = targetPath.split("/");
+                  const normalized: string[] = [];
+                  for (const part of parts) {
+                    if (part === "..") normalized.pop();
+                    else if (part !== "." && part !== "") normalized.push(part);
+                  }
+                  const finalPath = normalized.join("/");
+
+                  // Try to navigate to the file in source viewer
+                  if (sourceBundle.files[finalPath]) {
+                    setSelectedPath(finalPath);
+                  }
+                }}
+              >
                 <MarkdownRenderer content={selectedContent()!} />
               </div>
             </Show>
@@ -898,9 +946,9 @@ const SourceCodePage: Component<Props> = (props) => {
             {/* Code view - Shiki output directly */}
             <Show when={!isImage() && !shouldRenderAsPrettyMd() && selectedContent()}>
               <Show when={codeLoading()}>
-                <div class="flex-center p-8">
+                <div class="flex-center gap-2 p-8">
                   <i class="i-svg-spinners-ring-resize w-6 h-6 text-gray-500" />
-                  <span class="ml-2 text-sm text-gray-500">Загрузка подсветки...</span>
+                  <span class="text-sm text-gray-500">Загрузка подсветки...</span>
                 </div>
               </Show>
 
@@ -911,13 +959,14 @@ const SourceCodePage: Component<Props> = (props) => {
                     <i class="i-hugeicons-alert-02 w-4 h-4" />
                     <span>Ошибка подсветки: {codeError()}</span>
                   </div>
-                  <button
-                    class="btn-ghost p-1.5 text-yellow-400 hover:text-yellow-300"
-                    onClick={retryHighlight}
-                    title="Повторить"
-                  >
-                    <i class="i-hugeicons-refresh w-4 h-4" />
-                  </button>
+                  <Tooltip text="Повторить" position="bottom">
+                    <button
+                      class="btn-ghost p-1.5 text-yellow-400 hover:text-yellow-300"
+                      onClick={retryHighlight}
+                    >
+                      <i class="i-hugeicons-refresh w-4 h-4" />
+                    </button>
+                  </Tooltip>
                 </div>
               </Show>
 

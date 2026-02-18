@@ -9,7 +9,7 @@ use sha1::{Digest, Sha1};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use tauri::Emitter;
 use tokio_util::sync::CancellationToken;
 
@@ -21,20 +21,21 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 /// Forge/NeoForge скачивают библиотеки - может занять время на медленном соединении
 const JAVA_INSTALLER_TIMEOUT_SECS: u64 = 180;
 
+/// Use SHARED_HTTP_CLIENT from utils for all loader-related HTTP requests.
+use crate::utils::SHARED_HTTP_CLIENT;
+
 // Кэш для версий загрузчиков
-lazy_static::lazy_static! {
-    static ref LOADER_VERSIONS_CACHE: Arc<Mutex<HashMap<String, (Vec<FabricLoader>, std::time::Instant)>>> =
-        Arc::new(Mutex::new(HashMap::new()));
-    static ref NEOFORGE_VERSIONS_CACHE: Arc<Mutex<HashMap<String, (Vec<String>, std::time::Instant)>>> =
-        Arc::new(Mutex::new(HashMap::new()));
-    static ref FORGE_VERSIONS_CACHE: Arc<Mutex<HashMap<String, (Vec<String>, std::time::Instant)>>> =
-        Arc::new(Mutex::new(HashMap::new()));
-}
+static LOADER_VERSIONS_CACHE: LazyLock<Mutex<HashMap<String, (Vec<FabricLoader>, std::time::Instant)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static NEOFORGE_VERSIONS_CACHE: LazyLock<Mutex<HashMap<String, (Vec<String>, std::time::Instant)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static FORGE_VERSIONS_CACHE: LazyLock<Mutex<HashMap<String, (Vec<String>, std::time::Instant)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 const CACHE_TTL_SECS: u64 = 300; // 5 минут
 
-/// Вычисляет SHA1 хеш файла
-fn calculate_sha1(data: &[u8]) -> String {
+/// Вычисляет SHA1 хеш из байтов (используется только для верификации installer)
+fn calculate_sha1_bytes(data: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.update(data);
     let result = hasher.finalize();
@@ -46,7 +47,7 @@ async fn fetch_installer_sha1(installer_url: &str, loader_name: &str) -> Option<
     let sha1_url = format!("{}.sha1", installer_url);
     log::info!("Fetching {} SHA1 from: {}", loader_name, sha1_url);
 
-    match reqwest::get(&sha1_url).await {
+    match SHARED_HTTP_CLIENT.get(&sha1_url).send().await {
         Ok(resp) => {
             if resp.status().is_success() {
                 match resp.text().await {
@@ -94,7 +95,7 @@ async fn verify_installer_sha1(
     loader_name: &str,
 ) -> Result<()> {
     let content = tokio::fs::read(file_path).await?;
-    let actual_sha1 = calculate_sha1(&content);
+    let actual_sha1 = calculate_sha1_bytes(&content);
 
     if actual_sha1 != expected_sha1 {
         log::error!(
@@ -1453,7 +1454,7 @@ impl ForgeInstaller {
             // Верификация SHA1 хеша
             if let Some(expected) = expected_sha1 {
                 let content = tokio::fs::read(&installer_path).await?;
-                let actual_sha1 = calculate_sha1(&content);
+                let actual_sha1 = calculate_sha1_bytes(&content);
                 if actual_sha1 != expected {
                     log::error!(
                         "SHA1 MISMATCH for Forge server installer! Expected: {}, Got: {}",
@@ -1534,7 +1535,9 @@ impl ForgeInstaller {
             let run_sh = instance_path.join("run.sh");
             let run_bat = instance_path.join("run.bat");
 
-            if run_sh.exists() || run_bat.exists() {
+            if tokio::fs::try_exists(&run_sh).await.unwrap_or(false)
+                || tokio::fs::try_exists(&run_bat).await.unwrap_or(false)
+            {
                 // Современный Forge использует @libraries/... для запуска
                 // Возвращаем путь к libraries как маркер
                 log::info!("Modern Forge detected (run script present)");
@@ -2049,12 +2052,29 @@ impl ForgeInstaller {
                     let mut processed_count = 0;
 
                     for library in &version_json.libraries {
+                        // Check cancellation before each library
+                        if cancel_token.is_cancelled() {
+                            log::info!("Forge library download cancelled by user");
+                            return Err(LauncherError::OperationCancelled);
+                        }
+
                         if let Some(artifact) = &library.downloads.artifact {
                             let lib_path = instance_libs_dir.join(&artifact.path);
 
                             // Пропускаем если уже есть
                             if tokio::fs::try_exists(&lib_path).await.unwrap_or(false) {
                                 skipped_count += 1;
+                                processed_count += 1;
+
+                                // Update progress for skipped libraries too
+                                let _ = download_manager.app_handle().emit(
+                                    "instance-install-progress",
+                                    serde_json::json!({
+                                        "id": instance_id,
+                                        "step": "loader",
+                                        "message": format!("Загрузка библиотек Forge ({}/{})...", processed_count, total_libs)
+                                    }),
+                                );
                                 continue;
                             }
 
@@ -2086,6 +2106,17 @@ impl ForgeInstaller {
                                     // Продолжаем с остальными библиотеками
                                 }
                             }
+
+                            processed_count += 1;
+                            // Emit progress after each library download
+                            let _ = download_manager.app_handle().emit(
+                                "instance-install-progress",
+                                serde_json::json!({
+                                    "id": instance_id,
+                                    "step": "loader",
+                                    "message": format!("Загрузка библиотек Forge ({}/{})...", processed_count, total_libs)
+                                }),
+                            );
                         }
                     }
 

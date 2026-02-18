@@ -389,8 +389,10 @@ pub async fn start_instance(
         log::warn!("No stdout captured");
     }
 
-    // Store stdout receiver for crash analysis when process exits
-    let stdout_lines: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    // Store stdout receiver for crash analysis when process exits.
+    // VecDeque for O(1) pop_front instead of Vec::remove(0) which is O(n).
+    let stdout_lines: Arc<Mutex<std::collections::VecDeque<String>>> =
+        Arc::new(Mutex::new(std::collections::VecDeque::with_capacity(512)));
     let stdout_lines_collector = Arc::clone(&stdout_lines);
 
     thread::spawn(move || {
@@ -398,9 +400,9 @@ pub async fn start_instance(
             if let Ok(mut lines) = stdout_lines_collector.lock() {
                 // Keep last 500 lines for crash analysis
                 if lines.len() > 500 {
-                    lines.remove(0);
+                    lines.pop_front(); // O(1) вместо Vec::remove(0) O(n)
                 }
-                lines.push(line);
+                lines.push_back(line);
             }
         }
     });
@@ -491,7 +493,7 @@ pub async fn start_instance(
             // Also analyze collected stdout if no problems found
             if problems.is_empty() {
                 if let Ok(lines) = stdout_lines.lock() {
-                    let content = lines.join("\n");
+                    let content = lines.iter().cloned().collect::<Vec<_>>().join("\n");
                     let analyzer = LogAnalyzer::new();
                     let result = analyzer.analyze(&content);
                     problems = result.problems;
@@ -545,8 +547,11 @@ pub async fn start_instance(
             } else {
                 "stopped"
             };
+            // Только обновляем статус если он ещё "running" или "restarting".
+            // Это предотвращает race condition: stop_instance() уже мог установить "stopped",
+            // и monitor не должен перезаписывать его на "crashed".
             let _ = conn.execute(
-                "UPDATE instances SET status = ?1, pid = NULL, updated_at = ?2 WHERE id = ?3",
+                "UPDATE instances SET status = ?1, pid = NULL, updated_at = ?2 WHERE id = ?3 AND status IN ('running', 'restarting', 'starting')",
                 params![status, Utc::now().to_rfc3339(), instance_id],
             );
         }
@@ -1123,7 +1128,7 @@ async fn spawn_client_process(
         LoaderType::Fabric => {
             log::info!("Loading Fabric profile");
             let profile_path = instance_path.join("fabric-profile.json");
-            if !profile_path.exists() {
+            if !tokio::fs::try_exists(&profile_path).await.unwrap_or(false) {
                 return Err(LauncherError::InvalidConfig(
                     "Fabric profile not found. Please reinstall the instance.".to_string(),
                 ));
@@ -1142,7 +1147,7 @@ async fn spawn_client_process(
         LoaderType::Quilt => {
             log::info!("Loading Quilt profile");
             let profile_path = instance_path.join("quilt-profile.json");
-            if !profile_path.exists() {
+            if !tokio::fs::try_exists(&profile_path).await.unwrap_or(false) {
                 return Err(LauncherError::InvalidConfig(
                     "Quilt profile not found. Please reinstall the instance.".to_string(),
                 ));
@@ -1161,7 +1166,7 @@ async fn spawn_client_process(
         LoaderType::NeoForge => {
             log::info!("Loading NeoForge profile");
             let profile_path = instance_path.join("neoforge-profile.json");
-            if !profile_path.exists() {
+            if !tokio::fs::try_exists(&profile_path).await.unwrap_or(false) {
                 log::error!("NeoForge profile not found at: {:?}", profile_path);
                 return Err(LauncherError::InvalidConfig(
                     "NeoForge profile not found. Please reinstall the instance.".to_string(),
@@ -1869,17 +1874,21 @@ pub fn stop_instance(id: String, state: State<'_, ChildMap>) -> Result<()> {
                 pid
             );
 
-            // Try to kill the process by PID
-            let killed = kill_process_by_pid(pid as u32);
+            // Verify it's a Java process before killing (prevents PID reuse attacks)
+            let killed = verify_and_kill_orphaned_process(pid as u32);
 
             if killed {
                 log::info!(
-                    "Successfully killed orphaned process {} for instance {}",
+                    "Successfully killed orphaned Java process {} for instance {}",
                     pid,
                     id
                 );
             } else {
-                log::warn!("Failed to kill process {} (may already be dead)", pid);
+                log::warn!(
+                    "Did not kill process {} for instance {} (not running, not Java, or already dead)",
+                    pid,
+                    id
+                );
             }
 
             // Update DB regardless - the process is either dead or we can't kill it
@@ -1994,7 +2003,16 @@ pub fn force_kill_server(
 
         if let Some(pid) = pid {
             log::info!("Force killing orphaned process {} for server {}", pid, id);
-            kill_process_by_pid(pid as u32);
+            // Verify it's a Java process before killing (prevents PID reuse attacks)
+            let killed = verify_and_kill_orphaned_process(pid as u32);
+
+            if !killed {
+                log::warn!(
+                    "PID {} for server {} was not killed (not running or not a Java process). Cleaning up DB state.",
+                    pid,
+                    id
+                );
+            }
 
             conn.execute(
                 "UPDATE instances SET status = 'stopped', pid = NULL, updated_at = ?1 WHERE id = ?2",
@@ -2111,11 +2129,20 @@ pub fn cleanup_orphaned_processes() {
         let instance_dir = std::path::PathBuf::from(&dir);
         let was_killed;
 
-        // Check if process is still running
+        // Verify it's still a Java process before killing (prevents PID reuse)
         if is_process_running(pid as u32) {
-            log::info!("Process {} is still running, killing it", pid);
-            kill_process_by_pid(pid as u32);
-            was_killed = true;
+            if is_java_process(pid as u32) {
+                log::info!("Process {} is a running Java process, killing it", pid);
+                kill_process_by_pid(pid as u32);
+                was_killed = true;
+            } else {
+                log::warn!(
+                    "PID {} for instance '{}' is running but is NOT a Java process — PID was reused by the OS. Skipping kill.",
+                    pid,
+                    name
+                );
+                was_killed = false;
+            }
         } else {
             log::info!("Process {} is no longer running", pid);
             was_killed = false;
@@ -2188,4 +2215,63 @@ fn is_process_running(pid: u32) -> bool {
         // On Unix, check /proc/PID or use kill -0
         std::path::Path::new(&format!("/proc/{}", pid)).exists()
     }
+}
+
+/// Check if the process at the given PID is a Java process.
+/// This prevents killing unrelated processes after PID reuse by the OS.
+fn is_java_process(pid: u32) -> bool {
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        // Use tasklist with CSV format to reliably extract the image name
+        Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map(|o| {
+                let output = String::from_utf8_lossy(&o.stdout).to_lowercase();
+                output.contains("java.exe") || output.contains("javaw.exe")
+            })
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        // On Linux, read /proc/{pid}/comm for the short process name
+        // comm contains just the executable name (e.g. "java")
+        if let Ok(comm) = std::fs::read_to_string(format!("/proc/{}/comm", pid)) {
+            let comm = comm.trim().to_lowercase();
+            if comm == "java" || comm == "javaw" {
+                return true;
+            }
+        }
+        // Fallback: read /proc/{pid}/cmdline for the full command line
+        // cmdline uses null bytes as separators
+        if let Ok(cmdline) = std::fs::read_to_string(format!("/proc/{}/cmdline", pid)) {
+            let cmdline_lower = cmdline.to_lowercase();
+            return cmdline_lower.contains("java") || cmdline_lower.contains("javaw");
+        }
+        false
+    }
+}
+
+/// Verify that a PID belongs to a Java process, then kill it.
+/// Returns true if the process was killed, false otherwise.
+/// This is the safe way to kill orphaned processes — it prevents
+/// accidentally killing unrelated processes after OS PID reuse.
+fn verify_and_kill_orphaned_process(pid: u32) -> bool {
+    if !is_process_running(pid) {
+        log::info!("Orphaned PID {} is no longer running, nothing to kill", pid);
+        return false;
+    }
+
+    if !is_java_process(pid) {
+        log::warn!(
+            "PID {} is running but is NOT a Java process — likely PID reuse by the OS. Skipping kill to avoid harming an unrelated process.",
+            pid
+        );
+        return false;
+    }
+
+    log::info!("PID {} confirmed as Java process, proceeding with kill", pid);
+    kill_process_by_pid(pid)
 }

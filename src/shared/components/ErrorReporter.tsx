@@ -1,7 +1,9 @@
 import { createSignal, Show, onMount, onCleanup, For, createMemo } from "solid-js";
+import type { Component } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useI18n } from "../i18n";
+import { createFocusTrap } from "../hooks";
 
 interface SystemInfo {
   os: string;
@@ -129,7 +131,7 @@ async function captureError(
 
     errorListeners.forEach(fn => fn([...capturedErrors]));
   } catch (e) {
-    console.error("[ErrorReporter] Failed to capture error:", e);
+    if (import.meta.env.DEV) console.error("[ErrorReporter] Failed to capture error:", e);
   }
 
   // Cleanup old signatures
@@ -158,10 +160,189 @@ function ensureInitialized() {
   }
 }
 
+/** Inner panel component — mounts/unmounts with Show for correct focus trap */
+const ErrorPanel: Component<{
+  errors: CapturedError[];
+  selectedErrors: CapturedError[];
+  sending: boolean;
+  onClose: () => void;
+  onToggleSelect: (id: string) => void;
+  onSelectAll: () => void;
+  onDeselectAll: () => void;
+  onDeleteError: (id: string) => void;
+  onClearAll: () => void;
+  onSendReport: () => void;
+}> = (panelProps) => {
+  const { t } = useI18n();
+  let panelRef: HTMLDivElement | undefined;
+  createFocusTrap(() => panelRef);
+
+  return (
+    <div class="fixed inset-0 z-[100] bg-black/30 backdrop-blur-lg flex items-center justify-center p-4">
+      <div ref={panelRef} tabIndex={-1} class="bg-[var(--color-bg-modal)] border border-[var(--color-border)] rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div class="px-4 py-3 border-b border-gray-750 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <i class="i-hugeicons-alert-02 w-5 h-5 text-red-400" />
+            <h2 class="text-lg font-medium">{t().errorReporter?.title || "Отчеты об ошибках"}</h2>
+            <span class="text-sm text-gray-500">({panelProps.errors.length})</span>
+          </div>
+          <button
+            class="p-1 text-gray-400 hover:text-[var(--color-text)]"
+            onClick={panelProps.onClose}
+          >
+            <i class="i-hugeicons-cancel-01 w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Toolbar */}
+        <div class="px-4 py-2 border-b border-gray-750 flex items-center justify-between bg-gray-900">
+          <div class="flex items-center gap-2">
+            <button
+              class="px-2 py-1 text-xs text-gray-400 hover:text-[var(--color-text)] hover:bg-gray-800 rounded"
+              onClick={panelProps.onSelectAll}
+            >
+              {t().errorReporter?.selectAll || "Выбрать все"}
+            </button>
+            <button
+              class="px-2 py-1 text-xs text-gray-400 hover:text-[var(--color-text)] hover:bg-gray-800 rounded"
+              onClick={panelProps.onDeselectAll}
+            >
+              {t().errorReporter?.deselect || "Снять выделение"}
+            </button>
+            <Show when={panelProps.selectedErrors.length > 0}>
+              <span class="text-xs text-[var(--color-primary)]">
+                {panelProps.selectedErrors.length} {t().errorReporter?.selected || "выбрано"}
+              </span>
+            </Show>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              class="px-2 py-1 text-xs text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded"
+              onClick={panelProps.onClearAll}
+            >
+              {t().errorReporter?.clearAll || "Очистить все"}
+            </button>
+          </div>
+        </div>
+
+        {/* Error list */}
+        <div class="flex-1 overflow-auto p-2">
+          <Show when={panelProps.errors.length === 0}>
+            <div class="text-center text-gray-500 py-8">
+              {t().errorReporter?.noErrors || "Ошибок не обнаружено"}
+            </div>
+          </Show>
+          <For each={panelProps.errors}>
+            {(error) => (
+              <div
+                class={`p-3 mb-2 rounded-2xl border transition-colors cursor-pointer ${
+                  error.selected
+                    ? "bg-red-900/20 border-red-500/50"
+                    : "bg-gray-900 border-gray-750 hover:border-gray-700"
+                }`}
+                onClick={() => panelProps.onToggleSelect(error.id)}
+              >
+                <div class="flex items-start gap-3">
+                  {/* Checkbox */}
+                  <div class={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    error.selected
+                      ? "bg-red-600 border-red-600"
+                      : "border-gray-500 hover:border-gray-400"
+                  }`}>
+                    <Show when={error.selected}>
+                      <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-white" />
+                    </Show>
+                  </div>
+
+                  {/* Content */}
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium text-red-400">
+                        {error.errorType}
+                      </span>
+                      <Show when={error.count > 1}>
+                        <span class="px-1.5 py-0.5 text-[10px] font-bold bg-red-600 text-white rounded-full">
+                          {error.count}x
+                        </span>
+                      </Show>
+                      <span class="text-[10px] text-gray-500">
+                        {new Date(error.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1 line-clamp-2">
+                      {error.errorMessage}
+                    </p>
+                    <p class="text-[10px] text-gray-600 mt-1">
+                      {error.context}
+                    </p>
+                  </div>
+
+                  {/* Delete button */}
+                  <button
+                    class="p-1 text-gray-600 hover:text-red-400"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      panelProps.onDeleteError(error.id);
+                    }}
+                  >
+                    <i class="i-hugeicons-delete-02 w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </For>
+        </div>
+
+        {/* Footer with send button */}
+        <div class="px-4 py-3 border-t border-gray-750 bg-gray-900">
+          {/* Duplicate warning */}
+          <div class="flex items-start gap-2 mb-3 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded-2xl">
+            <i class="i-hugeicons-information-circle w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
+            <div class="text-xs text-yellow-200/80 inline-flex items-center gap-1 flex-wrap">
+              <span><span class="font-medium">{t().errorReporter?.beforeReporting || "Перед отправкой"}:</span> {t().errorReporter?.checkDuplicates || "Проверьте, не была ли эта ошибка уже отправлена"}.</span>
+              <button
+                class="text-yellow-400 hover:text-yellow-300 underline"
+                onClick={async () => {
+                  const searchQuery = panelProps.selectedErrors.length > 0
+                    ? panelProps.selectedErrors[0].errorType
+                    : "is:issue is:open";
+                  const url = `https://github.com/SibXoDev/stuzhik/issues?q=${encodeURIComponent(searchQuery)}`;
+                  await openUrl(url);
+                }}
+              >
+                {t().errorReporter?.searchIssues || "Поиск в GitHub"}
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <p class="text-xs text-gray-500">
+              {t().errorReporter?.selectToReport || "Выберите ошибки для отправки в GitHub"}
+            </p>
+            <button
+              class="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-2xl flex items-center gap-2"
+              onClick={panelProps.onSendReport}
+              disabled={panelProps.selectedErrors.length === 0 || panelProps.sending}
+            >
+              <Show
+                when={!panelProps.sending}
+                fallback={<i class="i-svg-spinners-6-dots-scale w-4 h-4" />}
+              >
+                <i class="i-hugeicons-sent w-4 h-4" />
+              </Show>
+              {t().errorReporter?.report || "Отправить"} {panelProps.selectedErrors.length > 0 ? `(${panelProps.selectedErrors.length})` : ""}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export function ErrorReporter() {
   ensureInitialized();
 
-  const { t } = useI18n();
   const [errors, setErrors] = createSignal<CapturedError[]>([]);
   const [showPanel, setShowPanel] = createSignal(false);
   const [sending, setSending] = createSignal(false);
@@ -275,7 +456,7 @@ ${errorsSection}
       // Clear selected after sending
       selected.forEach(e => deleteError(e.id));
     } catch (e) {
-      console.error("Failed to send report:", e);
+      if (import.meta.env.DEV) console.error("Failed to send report:", e);
     } finally {
       setSending(false);
     }
@@ -298,7 +479,7 @@ ${errorsSection}
       {/* Floating button with badge */}
       <Show when={errors().length > 0}>
         <button
-          class="fixed bottom-4 right-4 z-[200] p-3 bg-red-600 hover:bg-red-500 text-white rounded-full shadow-lg flex items-center gap-2"
+          class="fixed bottom-4 right-4 z-[90] p-3 bg-red-600 hover:bg-red-500 text-white rounded-full shadow-lg flex items-center gap-2"
           onClick={openPanel}
         >
           <i class="i-hugeicons-alert-02 w-5 h-5" />
@@ -312,166 +493,18 @@ ${errorsSection}
 
       {/* Error panel */}
       <Show when={showPanel()}>
-        <div class="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4">
-          <div class="bg-gray-850 border border-gray-750 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-            {/* Header */}
-            <div class="px-4 py-3 border-b border-gray-750 flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <i class="i-hugeicons-alert-02 w-5 h-5 text-red-400" />
-                <h2 class="text-lg font-medium">{t().errorReporter?.title || "Отчеты об ошибках"}</h2>
-                <span class="text-sm text-gray-500">({errors().length})</span>
-              </div>
-              <button
-                class="p-1 text-gray-400 hover:text-white"
-                onClick={() => setShowPanel(false)}
-              >
-                <i class="i-hugeicons-cancel-01 w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Toolbar */}
-            <div class="px-4 py-2 border-b border-gray-750 flex items-center justify-between bg-gray-900">
-              <div class="flex items-center gap-2">
-                <button
-                  class="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded"
-                  onClick={selectAll}
-                >
-                  {t().errorReporter?.selectAll || "Выбрать все"}
-                </button>
-                <button
-                  class="px-2 py-1 text-xs text-gray-400 hover:text-white hover:bg-gray-800 rounded"
-                  onClick={deselectAll}
-                >
-                  {t().errorReporter?.deselect || "Снять выделение"}
-                </button>
-                <Show when={selectedErrors().length > 0}>
-                  <span class="text-xs text-blue-400">
-                    {selectedErrors().length} {t().errorReporter?.selected || "выбрано"}
-                  </span>
-                </Show>
-              </div>
-              <div class="flex items-center gap-2">
-                <button
-                  class="px-2 py-1 text-xs text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded"
-                  onClick={clearAll}
-                >
-                  {t().errorReporter?.clearAll || "Очистить все"}
-                </button>
-              </div>
-            </div>
-
-            {/* Error list */}
-            <div class="flex-1 overflow-auto p-2">
-              <Show when={errors().length === 0}>
-                <div class="text-center text-gray-500 py-8">
-                  {t().errorReporter?.noErrors || "Ошибок не обнаружено"}
-                </div>
-              </Show>
-              <For each={errors()}>
-                {(error) => (
-                  <div
-                    class={`p-3 mb-2 rounded-2xl border transition-colors cursor-pointer ${
-                      error.selected
-                        ? "bg-red-900/20 border-red-500/50"
-                        : "bg-gray-900 border-gray-750 hover:border-gray-700"
-                    }`}
-                    onClick={() => toggleSelect(error.id)}
-                  >
-                    <div class="flex items-start gap-3">
-                      {/* Checkbox - более видимый */}
-                      <div class={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                        error.selected
-                          ? "bg-red-600 border-red-600"
-                          : "border-gray-500 hover:border-gray-400"
-                      }`}>
-                        <Show when={error.selected}>
-                          <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-white" />
-                        </Show>
-                      </div>
-
-                      {/* Content */}
-                      <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                          <span class="text-sm font-medium text-red-400">
-                            {error.errorType}
-                          </span>
-                          <Show when={error.count > 1}>
-                            <span class="px-1.5 py-0.5 text-[10px] font-bold bg-red-600 text-white rounded-full">
-                              {error.count}x
-                            </span>
-                          </Show>
-                          <span class="text-[10px] text-gray-500">
-                            {new Date(error.timestamp).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <p class="text-xs text-gray-400 mt-1 line-clamp-2">
-                          {error.errorMessage}
-                        </p>
-                        <p class="text-[10px] text-gray-600 mt-1">
-                          {error.context}
-                        </p>
-                      </div>
-
-                      {/* Delete button */}
-                      <button
-                        class="p-1 text-gray-600 hover:text-red-400"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteError(error.id);
-                        }}
-                      >
-                        <i class="i-hugeicons-delete-02 w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
-
-            {/* Footer with send button */}
-            <div class="px-4 py-3 border-t border-gray-750 bg-gray-900">
-              {/* Duplicate warning */}
-              <div class="flex items-start gap-2 mb-3 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded-2xl">
-                <i class="i-hugeicons-information-circle w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
-                <div class="text-xs text-yellow-200/80 inline-flex items-center gap-1 flex-wrap">
-                  <span><span class="font-medium">{t().errorReporter?.beforeReporting || "Перед отправкой"}:</span> {t().errorReporter?.checkDuplicates || "Проверьте, не была ли эта ошибка уже отправлена"}.</span>
-                  <button
-                    class="text-yellow-400 hover:text-yellow-300 underline"
-                    onClick={async () => {
-                      const selected = selectedErrors();
-                      const searchQuery = selected.length > 0
-                        ? selected[0].errorType
-                        : "is:issue is:open";
-                      const url = `https://github.com/SibXoDev/stuzhik/issues?q=${encodeURIComponent(searchQuery)}`;
-                      await openUrl(url);
-                    }}
-                  >
-                    {t().errorReporter?.searchIssues || "Поиск в GitHub"}
-                  </button>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between">
-                <p class="text-xs text-gray-500">
-                  {t().errorReporter?.selectToReport || "Выберите ошибки для отправки в GitHub"}
-                </p>
-                <button
-                  class="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-2xl flex items-center gap-2"
-                  onClick={sendSelectedReport}
-                  disabled={selectedErrors().length === 0 || sending()}
-                >
-                  <Show
-                    when={!sending()}
-                    fallback={<i class="i-svg-spinners-6-dots-scale w-4 h-4" />}
-                  >
-                    <i class="i-hugeicons-sent w-4 h-4" />
-                  </Show>
-                  {t().errorReporter?.report || "Отправить"} {selectedErrors().length > 0 ? `(${selectedErrors().length})` : ""}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ErrorPanel
+          errors={errors()}
+          selectedErrors={selectedErrors()}
+          sending={sending()}
+          onClose={() => setShowPanel(false)}
+          onToggleSelect={toggleSelect}
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
+          onDeleteError={deleteError}
+          onClearAll={clearAll}
+          onSendReport={sendSelectedReport}
+        />
       </Show>
     </>
   );

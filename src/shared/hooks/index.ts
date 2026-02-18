@@ -47,3 +47,18 @@ export {
   migrateLegacySecrets,
 } from './useSecureStorage';
 export type { StorageBackend } from './useSecureStorage';
+export {
+  useTour,
+  resetAllTours,
+  getCompletedTourIds,
+  hasWhatsNew,
+  dismissWhatsNew,
+  registerTour,
+  unregisterTour,
+  getRegisteredTours,
+  getTourById,
+  getSubTours,
+  getRootTours,
+} from './useTour';
+export type { TourStep, TourConfig, TourGroup, TourInstance } from './useTour';
+export { createFocusTrap } from './useFocusTrap';

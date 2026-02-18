@@ -116,7 +116,7 @@ impl Default for DownloadConfig {
             retries_per_mirror: 2,
             retry_delay_ms: 500,
             request_timeout: Duration::from_secs(60),
-            connect_timeout: Duration::from_secs(15),
+            connect_timeout: Duration::from_secs(10),
             bandwidth_limit: 0, // Без лимита
         }
     }

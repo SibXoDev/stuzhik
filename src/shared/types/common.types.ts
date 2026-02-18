@@ -1,3 +1,4 @@
+export type GameType = "minecraft" | "hytale";
 export type LoaderType = "vanilla" | "forge" | "neoforge" | "fabric" | "quilt";
 export type InstanceType = "client" | "server";
 export type InstanceStatus = "stopped" | "starting" | "running" | "stopping" | "error" | "installing" | "crashed";
@@ -8,6 +9,7 @@ export type LaunchBehavior = "minimize_to_tray" | "keep_open" | "close";
 export interface Instance {
   id: string;
   name: string;
+  game_type: GameType;
   version: string;
   loader: LoaderType;
   loader_version?: string | null;
@@ -179,6 +181,7 @@ export interface Settings {
   java_auto_install: boolean;
   launch_behavior: LaunchBehavior;
   auto_update_mods: boolean;
+  prefer_modrinth: boolean;
   download_threads: number;
   max_concurrent_downloads: number;
   /** Bandwidth limit in bytes/sec, 0 = unlimited */
@@ -187,7 +190,7 @@ export interface Settings {
   ely_by_server_url: string | null;
   // NOTE: ely_by_client_token is stored in secure OS keychain
   // Use store_auth_token / get_auth_token commands instead
-  language: 'ru' | 'en';
+  language: string;
   selected_gpu: string | null;
   // Developer mode - shows Console & Source Code in TitleBar
   developer_mode: boolean;
@@ -223,6 +226,7 @@ export interface GpuDetectionResult {
 
 export interface CreateInstanceRequest {
   name: string;
+  game_type?: GameType;
   version: string;
   loader: LoaderType;
   loader_version?: string;
@@ -256,6 +260,8 @@ export interface DownloadProgress {
   operation_id: string | null;
   /** Instance ID for grouping (optional) */
   instance_id?: string;
+  /** Source of the download: "modrinth", "curseforge", "forge", "fabric", etc. */
+  source?: string;
 }
 
 export interface ModSearchResult {
@@ -436,11 +442,21 @@ export interface InstallProgress {
   message: string;
 }
 
+export interface FailedModInfo {
+  file_name: string;
+  display_name: string;
+  curseforge_project_id?: number | null;
+  curseforge_file_id?: number | null;
+}
+
 export interface ModpackInstallSummary {
   total_mods: number;
   from_curseforge: string[];
   from_modrinth: string[];  // Важно! Эти моды были найдены автоматически и могут быть не той версии!
-  failed: string[];
+  failed: FailedModInfo[];
+  instance_id: string;
+  minecraft_version: string;
+  loader: string;
 }
 
 export interface ModpackGalleryImage {

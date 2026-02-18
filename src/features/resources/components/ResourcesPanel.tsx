@@ -46,7 +46,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
           try {
             await resources.installLocal(file.path, installGlobal());
           } catch (error) {
-            console.error(`Failed to install ${file.name}:`, error);
+            if (import.meta.env.DEV) console.error(`Failed to install ${file.name}:`, error);
           }
         }
       },
@@ -105,12 +105,6 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
       ? t().resources?.shaders ?? "Shaders"
       : t().resources?.resourcePacks ?? "Resource Packs";
 
-  // typeLabelSingular - reserved for future use
-  // const typeLabelSingular = () =>
-  //   props.resourceType === "shader"
-  //     ? t().resources?.shader ?? "Shader"
-  //     : t().resources?.resourcePack ?? "Resource Pack";
-
   // Handle search (empty query shows popular/trending)
   async function handleSearch(resetPage = true) {
     const query = searchQuery().trim();
@@ -134,7 +128,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
     try {
       await resources.installFromModrinth(slug, installGlobal(), props.minecraftVersion);
     } catch (e) {
-      console.error("Install failed:", e);
+      if (import.meta.env.DEV) console.error("Install failed:", e);
     }
   }
 
@@ -149,7 +143,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
       try {
         await resources.installLocal(selected as string, installGlobal());
       } catch (e) {
-        console.error("Local install failed:", e);
+        if (import.meta.env.DEV) console.error("Local install failed:", e);
       }
     }
   }
@@ -159,7 +153,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
     try {
       await resources.toggleResource(resource.id, !resource.enabled);
     } catch (e) {
-      console.error("Toggle failed:", e);
+      if (import.meta.env.DEV) console.error("Toggle failed:", e);
     }
   }
 
@@ -168,7 +162,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
     try {
       await resources.removeResource(resource.id);
     } catch (e) {
-      console.error("Remove failed:", e);
+      if (import.meta.env.DEV) console.error("Remove failed:", e);
     }
   }
 
@@ -180,14 +174,6 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
     }
   }
 
-  // formatSize - reserved for future use when displaying file sizes
-  // function formatSize(bytes?: number | null): string {
-  //   if (!bytes) return "—";
-  //   if (bytes < 1024) return `${bytes} B`;
-  //   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  //   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  // }
-
   return (
     <div class="flex flex-col">
       {/* Header */}
@@ -197,7 +183,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
           <button
             class={`px-3 py-1.5 rounded-2xl text-sm transition-colors ${
               view() === "installed"
-                ? "bg-blue-600 text-white"
+                ? "bg-[var(--color-primary)] text-white"
                 : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
             onClick={() => setView("installed")}
@@ -207,7 +193,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
           <button
             class={`px-3 py-1.5 rounded-2xl text-sm transition-colors ${
               view() === "browse"
-                ? "bg-blue-600 text-white"
+                ? "bg-[var(--color-primary)] text-white"
                 : "bg-gray-700 text-gray-300 hover:bg-gray-600"
             }`}
             onClick={() => setView("browse")}
@@ -227,7 +213,7 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
               placeholder={t().resources?.searchInstalled ?? "Search installed..."}
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
-              class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-sm focus:border-blue-500 focus:outline-none"
+              class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-sm focus:border-[var(--color-primary)] focus:outline-none"
             />
             <button
               onClick={handleInstallLocal}
@@ -290,12 +276,12 @@ export function ResourcesPanel(props: ResourcesPanelProps) {
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-sm focus:border-blue-500 focus:outline-none"
+              class="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-sm focus:border-[var(--color-primary)] focus:outline-none"
             />
             <button
               onClick={() => handleSearch()}
               disabled={resources.searchLoading()}
-              class="px-4 py-2 bg-blue-600 text-white rounded-2xl text-sm hover:bg-blue-700 transition-colors disabled:opacity-50"
+              class="btn-primary text-sm disabled:opacity-50"
             >
               {resources.searchLoading() ? (
                 <i class="i-svg-spinners-6-dots-scale w-4 h-4" />

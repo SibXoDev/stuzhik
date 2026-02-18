@@ -87,12 +87,12 @@ function PerformanceGraph(props: PerformanceGraphProps) {
   });
 
   return (
-    <div class="bg-gray-750/50 rounded-xl p-4">
-      <div class="flex items-center justify-between mb-3">
+    <div class="bg-gray-750/50 rounded-xl p-4 flex flex-col gap-3">
+      <div class="flex items-center justify-between">
         <div class="text-sm text-gray-400">{t().performance?.history || "History"}</div>
         <div class="flex items-center gap-4 text-xs">
           <span class="flex items-center gap-1">
-            <span class="w-3 h-0.5 bg-blue-500 rounded" />
+            <span class="w-3 h-0.5 bg-[var(--color-primary)] rounded" />
             RAM
           </span>
           <span class="flex items-center gap-1">
@@ -159,15 +159,15 @@ function PerformanceGraph(props: PerformanceGraphProps) {
         {/* Tooltip */}
         <Show when={hoveredSnapshot()}>
           <div
-            class="fixed z-50 px-3 py-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-xl text-xs pointer-events-none"
+            class="fixed z-50 px-3 py-2 bg-gray-900 border border-gray-700 rounded-2xl shadow-xl text-xs pointer-events-none flex flex-col gap-1"
             style={{
               left: `${Math.min(mousePos().x + 10, window.innerWidth - 180)}px`,
               top: `${mousePos().y - 70}px`,
             }}
           >
-            <div class="text-gray-400 mb-1">{formatTime(hoveredSnapshot()!.timestamp)}</div>
+            <div class="text-gray-400">{formatTime(hoveredSnapshot()!.timestamp)}</div>
             <div class="flex items-center gap-2">
-              <span class="w-2 h-2 rounded-full bg-blue-500" />
+              <span class="w-2 h-2 rounded-full bg-[var(--color-primary)]" />
               <span class="text-white">RAM: {props.formatMemory(hoveredSnapshot()!.memory_used_mb)}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -182,7 +182,7 @@ function PerformanceGraph(props: PerformanceGraphProps) {
       </div>
 
       {/* Time axis labels */}
-      <div class="flex justify-between text-xs text-gray-500 mt-2">
+      <div class="flex justify-between text-xs text-gray-500">
         <span>{graphData().snaps.length > 0 ? formatTime(graphData().snaps[0].timestamp) : ""}</span>
         <span>{t().performance?.maxRam || "Max RAM"}: {props.formatMemory(graphData().maxMem)}</span>
         <span>{t().performance?.maxCpu || "Max CPU"}: {Math.max(...graphData().snaps.map(s => s.cpu_percent), 0).toFixed(0)}%</span>
@@ -353,7 +353,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
       const recs = await perf.getRecommendations();
       setRecommendations(recs);
     } catch (e) {
-      console.error("Failed to apply fix:", e);
+      if (import.meta.env.DEV) console.error("Failed to apply fix:", e);
       addToast({
         type: "error",
         title: t().performance?.toast?.error || "Error",
@@ -511,23 +511,23 @@ export function PerformancePanel(props: PerformancePanelProps) {
               {/* Stats Cards */}
               <div class="grid grid-cols-4 gap-3">
                 {/* Memory */}
-                <div class="bg-gray-750/50 rounded-xl p-4">
-                  <div class="text-xs text-gray-500 mb-1" title="RSS (Resident Set Size) - вся память процесса">
+                <div class="bg-gray-750/50 rounded-xl p-4 flex flex-col gap-1">
+                  <div class="text-xs text-gray-500" title="RSS (Resident Set Size) - вся память процесса">
                     {t().performance?.memoryUsage || "Память"} (RSS)
                   </div>
                   <div class="text-2xl font-semibold text-white">
                     {formatMemory(perf.latestSnapshot()?.memory_used_mb || perf.avgMemory())}
                   </div>
                   <Show when={perf.latestSnapshot()?.memory_max_mb}>
-                    <div class="text-xs text-gray-500 mt-1">
+                    <div class="text-xs text-gray-500">
                       / {formatMemory(perf.latestSnapshot()!.memory_max_mb!)}
                     </div>
                   </Show>
                 </div>
 
                 {/* CPU - нормализованный процент 0-100% */}
-                <div class="bg-gray-750/50 rounded-xl p-4">
-                  <div class="text-xs text-gray-500 mb-1">
+                <div class="bg-gray-750/50 rounded-xl p-4 flex flex-col gap-1">
+                  <div class="text-xs text-gray-500">
                     {t().performance?.cpuUsage || "CPU"} (процесс)
                   </div>
                   {(() => {
@@ -543,7 +543,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                           {cpuPercent.toFixed(0)}
                           <span class="text-sm text-gray-500">%</span>
                         </div>
-                        <div class="text-xs text-gray-500 mt-1">
+                        <div class="text-xs text-gray-500">
                           {(t().performance?.coresThreads || "{cores} cores / {threads} threads").replace("{cores}", String(physicalCores)).replace("{threads}", String(cpuCores))}
                         </div>
                       </>
@@ -552,8 +552,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
                 </div>
 
                 {/* TPS */}
-                <div class="bg-gray-750/50 rounded-xl p-4">
-                  <div class="text-xs text-gray-500 mb-1">
+                <div class="bg-gray-750/50 rounded-xl p-4 flex flex-col gap-1">
+                  <div class="text-xs text-gray-500">
                     {t().performance?.tps || "TPS"}
                   </div>
                   <div class={`text-2xl font-semibold ${
@@ -565,8 +565,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
                 </div>
 
                 {/* MSPT */}
-                <div class="bg-gray-750/50 rounded-xl p-4">
-                  <div class="text-xs text-gray-500 mb-1">
+                <div class="bg-gray-750/50 rounded-xl p-4 flex flex-col gap-1">
+                  <div class="text-xs text-gray-500">
                     {t().performance?.mspt || "MSPT"}
                   </div>
                   <div class={`text-2xl font-semibold ${
@@ -601,26 +601,26 @@ export function PerformancePanel(props: PerformancePanelProps) {
                         const coreGroup = () => Math.floor(index() / 2);
                         const isEvenGroup = () => coreGroup() % 2 === 0;
                         return (
-                          <div class={`rounded-2xl p-2 text-center ${
+                          <div class={`rounded-2xl p-2 text-center flex flex-col gap-1 ${
                             isEvenGroup() ? "bg-gray-700/50" : "bg-gray-800/50"
                           }`}>
-                            <div class="text-xs text-gray-500 mb-1">
+                            <div class="text-xs text-gray-500">
                               {t().performance?.thread || "Thread"} {index() + 1}
                             </div>
                             <div class={`text-sm font-medium ${
                               usage >= 90 ? "text-red-400" :
                               usage >= 70 ? "text-yellow-400" :
-                              usage >= 50 ? "text-blue-400" : "text-green-400"
+                              usage >= 50 ? "text-[var(--color-primary)]" : "text-green-400"
                             }`}>
                               {usage.toFixed(0)}%
                             </div>
                             {/* Mini progress bar */}
-                            <div class="mt-1 h-1 bg-gray-600 rounded-full overflow-hidden">
+                            <div class="h-1 bg-gray-600 rounded-full overflow-hidden">
                               <div
                                 class={`h-full rounded-full transition-all ${
                                   usage >= 90 ? "bg-red-500" :
                                   usage >= 70 ? "bg-yellow-500" :
-                                  usage >= 50 ? "bg-blue-500" : "bg-green-500"
+                                  usage >= 50 ? "bg-[var(--color-primary)]" : "bg-green-500"
                                 }`}
                                 style={{ width: `${Math.min(usage, 100)}%` }}
                               />
@@ -635,8 +635,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
 
               {/* Realtime Bottlenecks */}
               <Show when={perf.realtimeBottlenecks().length > 0}>
-                <div class="bg-gray-750/50 rounded-xl p-4">
-                  <div class="flex items-center justify-between mb-3">
+                <div class="bg-gray-750/50 rounded-xl p-4 flex flex-col gap-3">
+                  <div class="flex items-center justify-between">
                     <div class="text-sm text-gray-400">{t().performance?.bottlenecks || "Проблемы"}</div>
                     <button
                       onClick={() => perf.clearRealtimeBottlenecks()}
@@ -663,8 +663,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
 
               {/* No data message */}
               <Show when={!perf.monitoring() && perf.snapshots().length === 0}>
-                <div class="flex flex-col items-center justify-center py-12 text-gray-500">
-                  <i class="i-hugeicons-chart-line-data-01 w-12 h-12 mb-3 opacity-50" />
+                <div class="flex flex-col items-center justify-center gap-3 py-12 text-gray-500">
+                  <i class="i-hugeicons-chart-line-data-01 w-12 h-12 opacity-50" />
                   <div class="text-sm">
                     {props.instanceStatus() === "running"
                       ? (t().performance?.clickToStart || "Нажмите \"Мониторинг\" для начала сбора данных")
@@ -681,16 +681,16 @@ export function PerformancePanel(props: PerformancePanelProps) {
               <Show
                 when={perf.sparkInfo()?.detected}
                 fallback={
-                  <div class="flex flex-col items-center justify-center py-12 text-gray-500">
-                    <i class="i-hugeicons-flash w-12 h-12 mb-3 opacity-50" />
-                    <div class="text-sm mb-2">{t().performance?.sparkNotInstalled || "Spark не установлен"}</div>
-                    <div class="text-xs text-gray-600 mb-4">
+                  <div class="flex flex-col items-center justify-center gap-3 py-12 text-gray-500">
+                    <i class="i-hugeicons-flash w-12 h-12 opacity-50" />
+                    <div class="text-sm">{t().performance?.sparkNotInstalled || "Spark не установлен"}</div>
+                    <div class="text-xs text-gray-600">
                       {t().performance?.installSparkHint || "Установите Spark для детального анализа производительности модов"}
                     </div>
                     <button
                       onClick={() => perf.installSpark()}
                       disabled={perf.sparkInstalling()}
-                      class="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm flex items-center gap-2 transition-colors"
+                      class="btn-primary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-sm flex items-center gap-2"
                     >
                       <Show
                         when={!perf.sparkInstalling()}
@@ -743,17 +743,17 @@ export function PerformancePanel(props: PerformancePanelProps) {
                   <div class="bg-gray-750/50 rounded-xl p-6">
                     <div class="flex items-start gap-4">
                       <i class="i-hugeicons-information-circle w-6 h-6 text-blue-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <div class="text-white font-medium mb-2">{t().performance?.modPerformanceInfo?.title || "How to get mod performance data"}</div>
-                        <div class="text-sm text-gray-400 space-y-2">
+                      <div class="flex flex-col gap-2">
+                        <div class="text-white font-medium">{t().performance?.modPerformanceInfo?.title || "How to get mod performance data"}</div>
+                        <div class="text-sm text-gray-400 flex flex-col gap-2">
                           <p>{t().performance?.modPerformanceInfo?.intro || "Spark is installed, but you need to create a profiling report:"}</p>
-                          <ol class="list-decimal list-inside space-y-1 text-gray-500">
+                          <ol class="list-decimal list-inside flex flex-col gap-1 text-gray-500">
                             <li>{t().performance?.modPerformanceInfo?.step1 || "In game chat, type:"} <code class="bg-gray-700 px-1.5 py-0.5 rounded text-blue-300">/sparkc profiler start</code></li>
                             <li>{t().performance?.modPerformanceInfo?.step2 || "Play for 30-60 seconds (load chunks, open mod inventories)"}</li>
                             <li>{t().performance?.modPerformanceInfo?.step3 || "Stop profiling:"} <code class="bg-gray-700 px-1.5 py-0.5 rounded text-blue-300">/sparkc profiler stop</code></li>
                             <li>{t().performance?.modPerformanceInfo?.step4 || "Spark will create a report link in chat"}</li>
                           </ol>
-                          <p class="text-xs text-gray-600 mt-3">
+                          <p class="text-xs text-gray-600">
                             {t().performance?.modPerformanceInfo?.otherCommands || "Other useful commands:"} <code class="bg-gray-700 px-1 rounded">/sparkc tps</code>, <code class="bg-gray-700 px-1 rounded">/sparkc health</code>
                           </p>
                         </div>
@@ -800,7 +800,7 @@ export function PerformancePanel(props: PerformancePanelProps) {
                               class={`ml-auto px-3 py-1 rounded-2xl text-xs font-medium transition-all ${
                                 applyingFix() === rec.title
                                   ? "bg-gray-600 text-gray-300 cursor-wait"
-                                  : "bg-blue-600 hover:bg-blue-500 text-white"
+                                  : "bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white"
                               }`}
                             >
                               <Show
@@ -827,8 +827,8 @@ export function PerformancePanel(props: PerformancePanelProps) {
               </For>
 
               <Show when={recommendations().length === 0}>
-                <div class="flex flex-col items-center justify-center py-12 text-gray-500">
-                  <i class="i-hugeicons-checkmark-circle-02 w-12 h-12 mb-3 text-green-500 opacity-50" />
+                <div class="flex flex-col items-center justify-center gap-3 py-12 text-gray-500">
+                  <i class="i-hugeicons-checkmark-circle-02 w-12 h-12 text-green-500 opacity-50" />
                   <div class="text-sm">{t().performance?.noRecommendations || "Нет рекомендаций - всё работает хорошо!"}</div>
                 </div>
               </Show>

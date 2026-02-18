@@ -83,26 +83,51 @@
   --color-purple-bg: rgba(139, 92, 246, 0.1);
   --color-purple-border: rgba(139, 92, 246, 0.3);
 
-  /* Gray scale */
-  --color-gray-50: #f9fafb;
-  --color-gray-100: #f3f4f6;
-  --color-gray-200: #e5e7eb;
-  --color-gray-300: #d1d5db;
-  --color-gray-400: #9ca3af;
-  --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563;
-  --color-gray-700: #374151;
+  /* Gray scale — pure gray without blue tint (matching uno.config.ts).
+     Overridden by applyTheme() for custom themes. */
+  --color-gray-50: #fafafb;
+  --color-gray-100: #f0f0f2;
+  --color-gray-200: #e0e1e4;
+  --color-gray-300: #c8c9cd;
+  --color-gray-400: #9a9ba0;
+  --color-gray-500: #6e6f74;
+  --color-gray-600: #505155;
+  --color-gray-700: #35363a;
   --color-gray-750: #2a2b2f;
-  --color-gray-800: #1f2937;
+  --color-gray-800: #222326;
   --color-gray-850: #1a1b1f;
-  --color-gray-900: #111827;
-  --color-gray-950: #0d0e11;
+  --color-gray-900: #141517;
+  --color-gray-925: #0d0d0f;
+  --color-gray-950: #0a0a0c;
+  --color-gray-975: #08090a;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+
+  /* Border Radius — переопределяются темой (default = round) */
+  --radius-none: 0px;
+  --radius-sm: 0.375rem;  /* 6px */
+  --radius-md: 0.5rem;    /* 8px */
+  --radius-lg: 0.75rem;   /* 12px */
+  --radius-xl: 1rem;      /* 16px */
+  --radius-2xl: 1.5rem;   /* 24px */
+  --radius-3xl: 2rem;     /* 32px */
+  --radius-full: 9999px;
+
+  /* Spacing scale — переопределяется темой */
+  --spacing-xs: 0.25rem;   /* 4px */
+  --spacing-sm: 0.5rem;    /* 8px */
+  --spacing-md: 1rem;      /* 16px */
+  --spacing-lg: 1.5rem;    /* 24px */
+  --spacing-xl: 2rem;      /* 32px */
+
+  /* Glass blur — переопределяется темой */
+  --blur-sm: 4px;
+  --blur-md: 8px;
+  --blur-lg: 16px;
 
   /* Animations */
   --transition-fast: 0.1s cubic-bezier(0.4, 0, 0.2, 1);
@@ -113,8 +138,9 @@
   --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   font-size: 16px;
-  color-scheme: dark !important;
+  color-scheme: dark;
 }
+/* Light/custom themes applied dynamically via applyTheme() in uiPreferences.ts */
 
 *,
 ::before,
@@ -266,7 +292,7 @@ input[type="checkbox"]:checked::after {
   display: block;
   width: 0.375rem;
   height: 0.625rem;
-  border: solid white;
+  border: solid var(--color-text-inverse);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) translateY(-1px);
 }
@@ -393,7 +419,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 1rem;
   margin-top: -0.3125rem;
   background: var(--color-primary);
-  border: 2px solid white;
+  border: 2px solid var(--color-bg-elevated);
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -415,7 +441,7 @@ input[type="range"]::-moz-range-thumb {
   width: 1rem;
   height: 1rem;
   background: var(--color-primary);
-  border: 2px solid white;
+  border: 2px solid var(--color-bg-elevated);
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -480,7 +506,7 @@ input[type="checkbox"].toggle::after,
 
 input[type="checkbox"].toggle:checked::after,
 .toggle-switch input[type="checkbox"]:checked::after {
-  background: white;
+  background: var(--color-text-inverse);
   transform: translateX(1.125rem);
 }
 
@@ -607,7 +633,7 @@ button[data-variant="ghost"] {
 }
 
 button[data-variant="ghost"]:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--color-bg-hover);
 }
 
 button[data-variant="danger"] {
@@ -742,13 +768,13 @@ fieldset legend {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(75, 85, 99, 0.5);
+  background-color: color-mix(in srgb, var(--color-gray-500) 50%, transparent);
   border-radius: 3px;
   transition: background-color var(--transition-base);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(75, 85, 99, 0.7);
+  background-color: color-mix(in srgb, var(--color-gray-500) 70%, transparent);
 }
 
 ::-webkit-scrollbar-corner {
@@ -758,7 +784,7 @@ fieldset legend {
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-gray-500) 50%, transparent) transparent;
 }
 
 /* ============================================
@@ -768,9 +794,9 @@ fieldset legend {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background-color: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   z-index: 40; /* TitleBar is z-60, stays on top */
   display: flex;
   align-items: center;
@@ -855,6 +881,7 @@ fieldset legend {
 .dropdown-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
   border-radius: 0.5rem; /* rounded-lg */
@@ -866,6 +893,20 @@ fieldset legend {
   background: transparent;
   width: 100%;
   text-align: left;
+}
+
+/* Center-aligned menus */
+:root[data-menu-align="center"] .dropdown-item {
+  justify-content: center;
+}
+
+/* Sidebar tabs — override global button centering */
+[aria-orientation="vertical"] > button[role="tab"] {
+  justify-content: flex-start;
+}
+
+:root[data-menu-align="center"] [aria-orientation="vertical"] > button[role="tab"] {
+  justify-content: center;
 }
 
 .dropdown-item:hover:not(:disabled) {
@@ -1189,11 +1230,11 @@ label.required::after {
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--color-bg-hover);
 }
 
 .btn-ghost:active:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--color-bg-active);
 }
 
 .btn-danger {
@@ -1397,7 +1438,7 @@ label.required::after {
 .markdown-content h4,
 .markdown-content h5,
 .markdown-content h6 {
-  color: var(--color-text-primary);
+  color: var(--color-text);
   font-weight: 600;
   margin-top: 1.5em;
   margin-bottom: 0.75em;
@@ -1472,7 +1513,7 @@ label.required::after {
 }
 
 .markdown-content code {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--color-bg-active);
   padding: 0.125em 0.375em;
   border-radius: 0.25rem;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
@@ -1480,7 +1521,7 @@ label.required::after {
 }
 
 .markdown-content pre {
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: var(--color-bg-hover);
   padding: 1em;
   border-radius: 0.5rem;
   overflow-x: auto;
@@ -1507,13 +1548,13 @@ label.required::after {
 }
 
 .markdown-content th {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--color-bg-hover);
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-text);
 }
 
 .markdown-content tr:nth-child(even) {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: var(--color-bg-hover);
 }
 
 .markdown-content hr {
@@ -1524,7 +1565,7 @@ label.required::after {
 
 .markdown-content strong {
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--color-text);
 }
 
 .markdown-content em {
@@ -1534,7 +1575,7 @@ label.required::after {
 .markdown-content details {
   margin: 1em 0;
   padding: 0.5em 1em;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: var(--color-bg-hover);
   border-radius: 0.5rem;
   border: 1px solid var(--color-border);
 }
@@ -1542,7 +1583,7 @@ label.required::after {
 .markdown-content summary {
   cursor: pointer;
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--color-text);
 }
 
 .markdown-content details[open] summary {
@@ -1630,4 +1671,42 @@ label.required::after {
 .shiki::-webkit-scrollbar-thumb:hover,
 .hljs::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-light);
+}
+
+/* ============================================
+   THEME ACCENT OVERRIDES
+   Переопределяет hardcoded blue в пользу
+   CSS-переменных --color-primary-*
+   ============================================ */
+
+/* Global accent overrides — applied for all themes */
+:focus-visible {
+  outline-color: var(--color-primary);
+}
+
+::selection {
+  background: var(--color-primary-bg);
+}
+
+/* Checkbox & radio accent — replaces hardcoded blue-600 */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-primary);
+}
+
+input[type="checkbox"]:checked,
+input[type="radio"]:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Card density variants */
+[data-density="compact"] .card,
+[data-density="compact"] .card-hover {
+  padding: 0.5rem 0.75rem;
+}
+
+[data-density="comfortable"] .card,
+[data-density="comfortable"] .card-hover {
+  padding: 1.25rem 1.5rem;
 }

@@ -98,7 +98,13 @@ impl MinecraftDataCache {
         )?;
 
         // Миграция: добавляем texture_path если не существует (для старых БД)
-        let _ = conn.execute("ALTER TABLE blocks ADD COLUMN texture_path TEXT", []);
+        if let Err(e) = conn.execute("ALTER TABLE blocks ADD COLUMN texture_path TEXT", []) {
+            // "duplicate column name" is expected for already-migrated DBs
+            let msg = e.to_string();
+            if !msg.contains("duplicate column") {
+                log::warn!("Failed to add texture_path column to blocks: {}", e);
+            }
+        }
 
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_blocks_mod_id ON blocks(mod_id)",

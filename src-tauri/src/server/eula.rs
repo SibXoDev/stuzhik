@@ -33,7 +33,7 @@ impl Default for EulaStatus {
 pub async fn check_eula(server_dir: impl AsRef<Path>) -> ServerResult<EulaStatus> {
     let eula_path = server_dir.as_ref().join("eula.txt");
 
-    if !eula_path.exists() {
+    if !fs::try_exists(&eula_path).await.unwrap_or(false) {
         return Ok(EulaStatus::default());
     }
 
@@ -71,7 +71,7 @@ pub async fn accept_eula(server_dir: impl AsRef<Path>) -> ServerResult<()> {
 pub async fn create_eula_file(server_dir: impl AsRef<Path>) -> ServerResult<()> {
     let eula_path = server_dir.as_ref().join("eula.txt");
 
-    if eula_path.exists() {
+    if fs::try_exists(&eula_path).await.unwrap_or(false) {
         return Ok(());
     }
 

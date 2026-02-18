@@ -2,6 +2,7 @@ import { Component, createSignal, createEffect, onMount, onCleanup, For, Show } 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Select } from "../../../shared/ui/Select";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import { useI18n } from "../../../shared/i18n";
 
 interface ServerLogEntry {
@@ -68,7 +69,7 @@ const ServerConsole: Component<Props> = (props) => {
       });
       setLogs(serverLogs);
     } catch (e) {
-      console.error("Failed to load server logs:", e);
+      if (import.meta.env.DEV) console.error("Failed to load server logs:", e);
     }
   };
 
@@ -215,7 +216,7 @@ const ServerConsole: Component<Props> = (props) => {
         // The command will appear in server logs via stdout
       }
     } catch (e) {
-      console.error("Failed to send command:", e);
+      if (import.meta.env.DEV) console.error("Failed to send command:", e);
     }
   };
 
@@ -229,7 +230,7 @@ const ServerConsole: Component<Props> = (props) => {
         id: props.instanceId,
       });
     } catch (e) {
-      console.error("Failed to stop server:", e);
+      if (import.meta.env.DEV) console.error("Failed to stop server:", e);
       setIsStopping(false);
     }
   };
@@ -243,7 +244,7 @@ const ServerConsole: Component<Props> = (props) => {
       });
       props.onStop?.();
     } catch (e) {
-      console.error("Failed to force kill server:", e);
+      if (import.meta.env.DEV) console.error("Failed to force kill server:", e);
     }
   };
 
@@ -310,7 +311,7 @@ const ServerConsole: Component<Props> = (props) => {
       await invoke("clear_server_logs", { instanceId: props.instanceId });
       setLogs([]);
     } catch (e) {
-      console.error("Failed to clear logs:", e);
+      if (import.meta.env.DEV) console.error("Failed to clear logs:", e);
     }
   };
 
@@ -342,13 +343,14 @@ const ServerConsole: Component<Props> = (props) => {
               </Show>
               {/* RCON status indicator */}
               <Show when={rconConfig()?.enabled}>
-                <span
-                  class={`flex items-center gap-1 ${rconConnected() ? "text-emerald-400" : "text-gray-500"}`}
-                  title={rconConnected() ? t().server.console.rconConnected : t().server.console.rconDisconnected}
-                >
-                  <i class="i-hugeicons-command-line w-3.5 h-3.5" />
-                  RCON
-                </span>
+                <Tooltip text={rconConnected() ? t().server.console.rconConnected : t().server.console.rconDisconnected} position="bottom">
+                  <span
+                    class={`flex items-center gap-1 ${rconConnected() ? "text-emerald-400" : "text-gray-500"}`}
+                  >
+                    <i class="i-hugeicons-command-line w-3.5 h-3.5" />
+                    RCON
+                  </span>
+                </Tooltip>
               </Show>
             </div>
           )}
@@ -370,22 +372,24 @@ const ServerConsole: Component<Props> = (props) => {
           />
 
           {/* Clear logs */}
-          <button
-            class="p-1.5 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800"
-            onClick={clearLogs}
-            title={t().server.console.clearLogs}
-          >
-            <i class="i-hugeicons-delete-02 w-4 h-4" />
-          </button>
+          <Tooltip text={t().server.console.clearLogs} position="bottom">
+            <button
+              class="p-1.5 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+              onClick={clearLogs}
+            >
+              <i class="i-hugeicons-delete-02 w-4 h-4" />
+            </button>
+          </Tooltip>
 
           {/* Auto-scroll toggle */}
-          <button
-            class={`p-1.5 rounded ${autoScroll() ? "text-blue-400 bg-blue-500/10" : "text-gray-500 hover:text-gray-300"}`}
-            onClick={() => setAutoScroll(!autoScroll())}
-            title={autoScroll() ? t().server.console.autoScrollOn : t().server.console.autoScrollOff}
-          >
-            <i class="i-hugeicons-arrow-down-01 w-4 h-4" />
-          </button>
+          <Tooltip text={autoScroll() ? t().server.console.autoScrollOn : t().server.console.autoScrollOff} position="bottom">
+            <button
+              class={`p-1.5 rounded ${autoScroll() ? "text-[var(--color-primary)] bg-[var(--color-primary-bg)]" : "text-gray-500 hover:text-gray-300"}`}
+              onClick={() => setAutoScroll(!autoScroll())}
+            >
+              <i class="i-hugeicons-arrow-down-01 w-4 h-4" />
+            </button>
+          </Tooltip>
 
           {/* Separator */}
           <div class="w-px h-4 bg-gray-700 mx-1" />
@@ -396,21 +400,22 @@ const ServerConsole: Component<Props> = (props) => {
             <Show
               when={props.instanceStatus === "stopping" || props.instanceStatus === "starting"}
               fallback={
-                <button
-                  class={`px-3 py-1 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
-                    isStopping()
-                      ? "bg-yellow-500/20 text-yellow-400 cursor-wait"
-                      : "bg-gray-700 text-gray-200 hover:bg-yellow-600 hover:text-white"
-                  }`}
-                  onClick={handleGracefulStop}
-                  disabled={isStopping()}
-                  title={isStopping() ? t().server.console.stopping : t().server.console.stopServer}
-                >
-                  <Show when={isStopping()} fallback={<i class="i-hugeicons-stop w-4 h-4" />}>
-                    <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                  </Show>
-                  <span>{isStopping() ? t().server.console.stopping : "Stop"}</span>
-                </button>
+                <Tooltip text={isStopping() ? t().server.console.stopping : t().server.console.stopServer} position="bottom">
+                  <button
+                    class={`px-3 py-1 rounded-lg flex items-center gap-1.5 text-sm font-medium transition-colors ${
+                      isStopping()
+                        ? "bg-yellow-500/20 text-yellow-400 cursor-wait"
+                        : "bg-gray-700 text-gray-200 hover:bg-yellow-600 hover:text-white"
+                    }`}
+                    onClick={handleGracefulStop}
+                    disabled={isStopping()}
+                  >
+                    <Show when={isStopping()} fallback={<i class="i-hugeicons-stop w-4 h-4" />}>
+                      <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
+                    </Show>
+                    <span>{isStopping() ? t().server.console.stopping : "Stop"}</span>
+                  </button>
+                </Tooltip>
               }
             >
               {/* Status indicator when stopping/starting */}
@@ -423,14 +428,15 @@ const ServerConsole: Component<Props> = (props) => {
 
           {/* Force kill button - shown during stopping/starting */}
           <Show when={["stopping", "starting"].includes(props.instanceStatus || "")}>
-            <button
-              class="px-3 py-1 rounded-lg flex items-center gap-1.5 text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30"
-              onClick={() => setShowForceKillConfirm(true)}
-              title={t().server.console.forceKillHint}
-            >
-              <i class="i-hugeicons-power-socket-01 w-4 h-4" />
-              <span>Force Kill</span>
-            </button>
+            <Tooltip text={t().server.console.forceKillHint} position="bottom">
+              <button
+                class="px-3 py-1 rounded-lg flex items-center gap-1.5 text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                onClick={() => setShowForceKillConfirm(true)}
+              >
+                <i class="i-hugeicons-power-socket-01 w-4 h-4" />
+                <span>Force Kill</span>
+              </button>
+            </Tooltip>
           </Show>
         </div>
       </div>
@@ -488,14 +494,16 @@ const ServerConsole: Component<Props> = (props) => {
         <div class="flex-1 flex items-center gap-2">
           {/* RCON indicator in input */}
           <Show when={rconConnected()}>
-            <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded" title="Команды отправляются через RCON">
-              RCON
-            </span>
+            <Tooltip text="Команды отправляются через RCON" position="bottom">
+              <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">
+                RCON
+              </span>
+            </Tooltip>
           </Show>
           <input
             ref={inputRef}
             type="text"
-            class="flex-1 bg-gray-800/50 border border-gray-700 rounded px-3 py-1.5 text-sm font-mono text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            class="flex-1 bg-gray-800/50 border border-gray-700 rounded px-3 py-1.5 text-sm font-mono text-gray-100 placeholder-gray-500 focus:border-[var(--color-primary)] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             placeholder={props.isRunning ? t().server.console.enterCommand : t().server.console.serverNotRunning}
             value={command()}
             onInput={(e) => setCommand(e.currentTarget.value)}

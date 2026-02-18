@@ -11,7 +11,7 @@ use tokio::fs;
 pub async fn parse_instance_json(instance_dir: &Path) -> LauncherResult<CurseForgeInstance> {
     let json_path = instance_dir.join("minecraftinstance.json");
 
-    if !json_path.exists() {
+    if !fs::try_exists(&json_path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "minecraftinstance.json not found in {}",
             instance_dir.display()
@@ -30,7 +30,7 @@ pub async fn parse_instance_json(instance_dir: &Path) -> LauncherResult<CurseFor
 async fn count_mods(instance_dir: &Path) -> usize {
     let mods_dir = instance_dir.join("mods");
 
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return 0;
     }
 
@@ -123,7 +123,7 @@ pub async fn parse_instance(instance_dir: &Path) -> LauncherResult<LauncherInsta
 pub async fn list_instances(launcher_root: &Path) -> LauncherResult<Vec<LauncherInstance>> {
     // CurseForge stores instances in Instances/ folder
     let instances_dir = launcher_root.join("Instances");
-    if !instances_dir.exists() {
+    if !fs::try_exists(&instances_dir).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "Instances directory not found in {}",
             launcher_root.display()
@@ -148,7 +148,7 @@ pub async fn list_instances(launcher_root: &Path) -> LauncherResult<Vec<Launcher
         }
 
         // Check if it's a valid instance (has minecraftinstance.json)
-        if !path.join("minecraftinstance.json").exists() {
+        if !fs::try_exists(path.join("minecraftinstance.json")).await.unwrap_or(false) {
             continue;
         }
 
@@ -215,9 +215,9 @@ pub async fn detect_installations() -> Vec<DetectedLauncher> {
 
     for path_opt in search_paths {
         if let Some(path) = path_opt {
-            if path.exists() {
+            if fs::try_exists(&path).await.unwrap_or(false) {
                 let instances_path = path.join("Instances");
-                if instances_path.exists() {
+                if fs::try_exists(&instances_path).await.unwrap_or(false) {
                     let instance_count = count_instances(&instances_path).await;
 
                     if instance_count > 0 {
@@ -244,7 +244,9 @@ async fn count_instances(instances_dir: &Path) -> usize {
     if let Ok(mut entries) = fs::read_dir(instances_dir).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
-            if path.is_dir() && path.join("minecraftinstance.json").exists() {
+            if path.is_dir()
+                && fs::try_exists(path.join("minecraftinstance.json")).await.unwrap_or(false)
+            {
                 count += 1;
             }
         }

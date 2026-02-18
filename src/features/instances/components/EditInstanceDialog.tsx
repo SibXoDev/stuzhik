@@ -129,7 +129,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
       });
       setAvailableJava(javaVersions);
     } catch (e) {
-      console.error("Failed to load Java versions:", e);
+      if (import.meta.env.DEV) console.error("Failed to load Java versions:", e);
     } finally {
       setLoadingJava(false);
     }
@@ -148,7 +148,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
       });
       setJavaCompatibility(result);
     } catch (e) {
-      console.error("Failed to check Java compatibility:", e);
+      if (import.meta.env.DEV) console.error("Failed to check Java compatibility:", e);
       setJavaCompatibility(null);
     }
   };
@@ -159,7 +159,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
       const memory = await invoke<number>("get_total_memory");
       setTotalMemory(memory);
     } catch (e) {
-      console.error("Failed to get total memory:", e);
+      if (import.meta.env.DEV) console.error("Failed to get total memory:", e);
     }
     await loadAvailableJava();
     if (javaPath()) {
@@ -217,7 +217,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
           try {
             await invoke("repair_instance", { id: instanceId() });
           } catch (repairError: unknown) {
-            console.error("Failed to repair instance:", repairError);
+            if (import.meta.env.DEV) console.error("Failed to repair instance:", repairError);
             const repairMsg = repairError instanceof Error ? repairError.message : String(repairError);
             setError(`${t().instances.edit.repairError}: ${repairMsg}`);
           }
@@ -229,7 +229,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
-      console.error("Failed to update instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to update instance:", e);
     } finally {
       setLoading(false);
     }
@@ -237,8 +237,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
 
   return (
     <ModalWrapper maxWidth="max-w-4xl">
-      <div class="p-6">
-        <div class="flex items-center justify-between mb-6">
+      <div class="p-6 flex flex-col gap-6">
+        <div class="flex items-center justify-between">
           <h2 class="text-2xl font-bold">{t().instances.edit.title}</h2>
           <button
             type="button"
@@ -267,8 +267,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
           </Show>
 
           {/* Версии Minecraft и Загрузчика */}
-          <div class="border border-gray-750 rounded-2xl p-4">
-            <div class="flex items-center justify-between mb-3">
+          <div class="border border-gray-750 rounded-2xl p-4 flex flex-col gap-3">
+            <div class="flex items-center justify-between">
               <h3 class="text-base font-semibold">{t().instances.edit.versions}</h3>
               <button
                 type="button"
@@ -299,8 +299,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                   <p>{t().instances.edit.versionWarning}</p>
                 </div>
 
-                <div>
-                  <label class="block text-sm font-medium mb-2">{t().instances.edit.minecraftVersion}</label>
+                <div class="flex flex-col gap-2">
+                  <label class="block text-sm font-medium">{t().instances.edit.minecraftVersion}</label>
                   <VersionSelector
                     value={version()}
                     onChange={(v) => {
@@ -312,8 +312,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                   />
                 </div>
 
-                <div>
-                  <label class="block text-sm font-medium mb-2">{t().instances.edit.loaderLabel}</label>
+                <div class="flex flex-col gap-2">
+                  <label class="block text-sm font-medium">{t().instances.edit.loaderLabel}</label>
                   <Select
                     value={loader()}
                     onChange={(val) => {
@@ -331,8 +331,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                   />
                 </div>
 
-                <div>
-                  <label class="block text-sm font-medium mb-2 inline-flex items-center gap-1">
+                <div class="flex flex-col gap-2">
+                  <label class="block text-sm font-medium inline-flex items-center gap-1">
                     {t().instances.edit.loaderVersion}
                     <span class="text-xs text-gray-400">{t().instances.edit.optional}</span>
                   </label>
@@ -352,8 +352,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
           </div>
 
           {/* Название */}
-          <div>
-            <label class="block text-sm font-medium mb-2">{t().instances.edit.name}</label>
+          <div class="flex flex-col gap-2">
+            <label class="block text-sm font-medium">{t().instances.edit.name}</label>
             <input
               type="text"
               value={name()}
@@ -361,13 +361,13 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
               placeholder={t().instances.edit.namePlaceholder}
               required
               disabled={loading()}
-              class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-blue-500"
+              class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-[var(--color-primary)]"
             />
           </div>
 
           {/* Память */}
-          <fieldset>
-            <legend class="text-base font-medium mb-4 inline-flex items-center gap-2">
+          <fieldset class="flex flex-col gap-4">
+            <legend class="text-base font-medium inline-flex items-center gap-2">
               {t().instances.edit.memory}
               <span class="text-xs text-gray-400">
                 {t().instances.edit.available}: {totalMemory()} MB
@@ -377,8 +377,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
             <div class="space-y-4">
               {/* Для КЛИЕНТА - один слайдер */}
               <Show when={instanceType() === "client"}>
-                <div>
-                  <div class="flex items-center justify-between mb-2">
+                <div class="flex flex-col gap-2">
+                  <div class="flex items-center justify-between">
                     <label class="text-sm font-medium">{t().instances.edit.allocateMemory}</label>
                     <span class="text-sm text-gray-400">{memoryMax()} MB ({(memoryMax() / 1024).toFixed(1)} GB)</span>
                   </div>
@@ -394,7 +394,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                     labelTicks={generateLabelTicks(generateMemoryMarkers(totalMemory()))}
                     formatLabel={formatMemoryLabel}
                   />
-                  <p class="text-xs text-gray-400 mt-1">
+                  <p class="text-xs text-gray-400">
                     {t().instances.edit.memoryHint}
                   </p>
                 </div>
@@ -403,8 +403,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
               {/* Для СЕРВЕРА - два слайдера min/max */}
               <Show when={instanceType() === "server"}>
                 <>
-                  <div>
-                    <div class="flex items-center justify-between mb-2">
+                  <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
                       <label class="text-sm font-medium">{t().instances.edit.minMemory}</label>
                       <span class="text-sm text-gray-400">{memoryMin()} MB ({(memoryMin() / 1024).toFixed(1)} GB)</span>
                     </div>
@@ -427,8 +427,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                     />
                   </div>
 
-                  <div>
-                    <div class="flex items-center justify-between mb-2">
+                  <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
                       <label class="text-sm font-medium">{t().instances.edit.maxMemory}</label>
                       <span class="text-sm text-gray-400">{memoryMax()} MB ({(memoryMax() / 1024).toFixed(1)} GB)</span>
                     </div>
@@ -457,23 +457,23 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
 
           {/* Порт сервера */}
           <Show when={instanceType() === "server"}>
-            <div>
-              <label class="block text-sm font-medium mb-2">{t().instances.edit.serverPort}</label>
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium">{t().instances.edit.serverPort}</label>
               <input
                 type="number"
                 value={port()}
                 onInput={(e) => setPort(Number(e.currentTarget.value))}
                 min="1024"
                 max="65535"
-                class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-blue-500"
+                class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-[var(--color-primary)]"
               />
             </div>
           </Show>
 
           {/* Имя игрока */}
           <Show when={instanceType() === "client"}>
-            <div>
-              <label class="block text-sm font-medium mb-2 inline-flex items-center gap-1">
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm font-medium inline-flex items-center gap-1">
                 {t().instances.edit.username}
                 <span class="text-xs text-gray-400">{t().instances.edit.optional}</span>
               </label>
@@ -482,14 +482,14 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                 value={username()}
                 onInput={(e) => setUsername(e.currentTarget.value)}
                 placeholder={t().instances.edit.fromGlobalSettings}
-                class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-blue-500"
+                class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-[var(--color-primary)]"
               />
             </div>
           </Show>
 
           {/* Выбор Java */}
-          <div>
-            <label class="block text-sm font-medium mb-2 inline-flex items-center gap-1">
+          <div class="flex flex-col gap-2">
+            <label class="block text-sm font-medium inline-flex items-center gap-1">
               {t().instances.edit.java}
               <span class="text-xs text-gray-400">{t().instances.edit.optional}</span>
             </label>
@@ -508,7 +508,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                   trigger={
                     <button
                       type="button"
-                      class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-blue-500 flex items-center justify-between"
+                      class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-[var(--color-primary)] flex items-center justify-between"
                       onClick={() => setJavaDropdownOpen(!javaDropdownOpen())}
                     >
                       <span class={javaPath() ? "" : "text-gray-400"}>
@@ -530,7 +530,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                     <button
                       type="button"
                       class={`w-full px-3 py-2.5 text-left text-sm hover:bg-gray-700/50 transition-colors rounded-xl flex items-center gap-2 ${
-                        !javaPath() ? "bg-blue-600/20 text-blue-400" : ""
+                        !javaPath() ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]" : ""
                       }`}
                       onClick={() => {
                         setJavaPath("");
@@ -551,7 +551,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                         <button
                           type="button"
                           class={`w-full px-3 py-2.5 text-left text-sm hover:bg-gray-700/50 transition-colors rounded-xl flex items-center gap-2 ${
-                            javaPath() === java.path ? "bg-blue-600/20 text-blue-400" : ""
+                            javaPath() === java.path ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]" : ""
                           }`}
                           onClick={() => {
                             setJavaPath(java.path);
@@ -616,8 +616,8 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
           </div>
 
           {/* Аргументы JVM */}
-          <div>
-            <label class="block text-sm font-medium mb-2 inline-flex items-center gap-1">
+          <div class="flex flex-col gap-2">
+            <label class="block text-sm font-medium inline-flex items-center gap-1">
               {t().instances.edit.javaArgs}
               <span class="text-xs text-gray-400">{t().instances.edit.optional}</span>
             </label>
@@ -626,9 +626,9 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
               value={javaArgs()}
               onInput={(e) => setJavaArgs(e.currentTarget.value)}
               placeholder={t().instances.edit.fromGlobalSettings}
-              class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-blue-500"
+              class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-[var(--color-primary)]"
             />
-            <p class="text-xs text-gray-400 mt-1">
+            <p class="text-xs text-gray-400">
               {t().instances.edit.javaArgsHint}
             </p>
           </div>
@@ -645,7 +645,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
                 value={gameArgs()}
                 onInput={(e) => setGameArgs(e.currentTarget.value)}
                 placeholder={t().instances.edit.gameArgsPlaceholder}
-                class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-blue-500"
+                class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-[var(--color-primary)]"
               />
             </div>
           </Show>
@@ -661,7 +661,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
               onInput={(e) => setNotes(e.currentTarget.value)}
               placeholder={t().instances.edit.notesPlaceholder}
               rows="3"
-              class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-blue-500 resize-none"
+              class="w-full px-3.5 py-2.5 border border-gray-700 rounded-2xl text-white transition-colors duration-150 hover:border-gray-600 focus:outline-none focus:border-[var(--color-primary)] resize-none"
             />
           </div>
 
@@ -677,7 +677,7 @@ function EditInstanceDialog(props: EditInstanceDialogProps) {
             </button>
             <button
               type="submit"
-              class="px-4 py-2.5 font-medium rounded-2xl inline-flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-400 disabled:opacity-40 transition-colors"
+              class="btn-primary px-4 py-2.5"
               disabled={loading()}
             >
               {loading() ? (

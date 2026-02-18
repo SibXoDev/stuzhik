@@ -9,8 +9,91 @@ const CURSEFORGE_API_BASE: &str = "https://api.curseforge.com/v1";
 
 const DEFAULT_CURSEFORGE_API_KEY: &str = "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm";
 
-fn get_curseforge_api_key() -> String {
+pub fn get_curseforge_api_key() -> String {
     std::env::var("CURSEFORGE_API_KEY").unwrap_or_else(|_| DEFAULT_CURSEFORGE_API_KEY.to_string())
+}
+
+/// Shared CurseForge HTTP client — created once, reused across all calls.
+/// Avoids DNS resolution, TLS handshake, and connection pool overhead per request.
+/// Uses 120s timeout for large batch API requests (500+ mods).
+static CF_SHARED_CLIENT: std::sync::LazyLock<Client> = std::sync::LazyLock::new(|| {
+    let api_key = get_curseforge_api_key()
+        .parse()
+        .expect("valid CurseForge API key header value");
+    Client::builder()
+        .user_agent(crate::USER_AGENT)
+        .timeout(std::time::Duration::from_secs(120))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .pool_max_idle_per_host(4)
+        .default_headers({
+            let mut headers = reqwest::header::HeaderMap::new();
+            headers.insert("x-api-key", api_key);
+            headers
+        })
+        .build()
+        .expect("Failed to build CurseForge shared HTTP client")
+});
+
+/// Get the shared CurseForge HTTP client (connection pooling, no repeated TLS handshake)
+pub fn shared_client() -> &'static Client {
+    &CF_SHARED_CLIENT
+}
+
+/// Retry helper for CurseForge API calls.
+/// Retries on connection-level errors (timeout, connect, request) with exponential backoff.
+/// Does NOT retry on HTTP errors (4xx, 5xx) — those are handled by the caller.
+pub async fn cf_api_retry<F, Fut, T>(operation_name: &str, make_request: F) -> Result<T>
+where
+    F: Fn() -> Fut,
+    Fut: std::future::Future<Output = std::result::Result<T, reqwest::Error>>,
+{
+    const MAX_RETRIES: u32 = 2;
+    const BASE_DELAY_MS: u64 = 500;
+
+    let mut last_err = None;
+
+    for attempt in 0..=MAX_RETRIES {
+        if attempt > 0 {
+            let delay = BASE_DELAY_MS * (1 << (attempt - 1));
+            log::info!(
+                "Retrying CurseForge API call '{}' (attempt {}/{}) after {}ms",
+                operation_name,
+                attempt + 1,
+                MAX_RETRIES + 1,
+                delay
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+        }
+
+        match make_request().await {
+            Ok(result) => return Ok(result),
+            Err(e) => {
+                let is_connection_error =
+                    e.is_timeout() || e.is_connect() || e.is_request();
+
+                if is_connection_error && attempt < MAX_RETRIES {
+                    log::warn!(
+                        "CurseForge API '{}' connection error (attempt {}/{}): {}",
+                        operation_name,
+                        attempt + 1,
+                        MAX_RETRIES + 1,
+                        e
+                    );
+                    last_err = Some(e);
+                    continue;
+                }
+
+                return Err(LauncherError::ApiError(format!(
+                    "CurseForge API '{}' failed: {}",
+                    operation_name, e
+                )));
+            }
+        }
+    }
+
+    Err(last_err
+        .map(|e| LauncherError::ApiError(format!("CurseForge API '{}' failed after retries: {}", operation_name, e)))
+        .unwrap_or_else(|| LauncherError::ApiError(format!("CurseForge API '{}' failed", operation_name))))
 }
 
 static CATEGORY_NAMES: OnceLock<HashMap<u32, String>> = OnceLock::new();
@@ -349,6 +432,61 @@ impl CurseForgeClient {
             .await
     }
 
+    /// Search Hytale mods on CurseForge
+    pub async fn search_mods_hytale(
+        &self,
+        query: &str,
+        class_id: Option<u32>,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<CurseForgeMod>> {
+        let cache = curseforge_cache();
+        let limiter = curseforge_limiter();
+        let cache_key = format!(
+            "hytale_search:{}:{}:{}:{}",
+            query,
+            class_id.unwrap_or(0),
+            limit,
+            offset
+        );
+
+        let result: CurseForgeSearchResult = cache
+            .get_or_fetch_throttled(&cache_key, CacheTTL::Medium, limiter, || async {
+                let mut params = vec![
+                    ("gameId", "83374".to_string()), // Hytale game ID
+                    ("searchFilter", query.to_string()),
+                    ("pageSize", limit.to_string()),
+                    ("index", offset.to_string()),
+                    ("sortField", "2".to_string()), // Sort by popularity
+                    ("sortOrder", "desc".to_string()),
+                ];
+
+                if let Some(cid) = class_id {
+                    params.push(("classId", cid.to_string()));
+                }
+
+                let url = reqwest::Url::parse_with_params(
+                    &format!("{}/mods/search", CURSEFORGE_API_BASE),
+                    &params
+                        .iter()
+                        .map(|(k, v)| (*k, v.as_str()))
+                        .collect::<Vec<_>>(),
+                )
+                .map_err(|e| LauncherError::ApiError(format!("Failed to build URL: {}", e)))?;
+
+                self.client
+                    .get(url)
+                    .send()
+                    .await?
+                    .json()
+                    .await
+                    .map_err(Into::into)
+            })
+            .await?;
+
+        Ok(result.data)
+    }
+
     /// Получение файлов мода (с кешированием и rate limiting)
     pub async fn get_mod_files(
         &self,
@@ -532,20 +670,29 @@ impl CurseForgeClient {
             exact_matches: Vec<FingerprintMatch>,
         }
 
-        let response = self
-            .client
-            .post(&url)
-            .json(&FingerprintRequest {
-                fingerprints: fingerprints.to_vec(),
-            })
-            .send()
-            .await?;
+        let fps = fingerprints.to_vec();
+        let client = &self.client;
 
-        if !response.status().is_success() {
-            return Ok(Vec::new());
-        }
+        let result: FingerprintResponse = cf_api_retry("fingerprint_matches", || {
+            let req = FingerprintRequest {
+                fingerprints: fps.clone(),
+            };
+            let u = url.clone();
+            async move {
+                let resp = client.post(&u).json(&req).send().await?;
+                if !resp.status().is_success() {
+                    // Return empty on HTTP errors (4xx) — not a connection issue
+                    return Ok(FingerprintResponse {
+                        data: FingerprintData {
+                            exact_matches: Vec::new(),
+                        },
+                    });
+                }
+                resp.json().await
+            }
+        })
+        .await?;
 
-        let result: FingerprintResponse = response.json().await?;
         Ok(result.data.exact_matches)
     }
 }

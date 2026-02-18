@@ -28,7 +28,7 @@ function Section(props: SectionProps) {
         onClick={() => setCollapsed(!collapsed())}
       >
         <div class="flex items-center gap-2">
-          <i class={`${props.icon} w-5 h-5 text-blue-400`} />
+          <i class={`${props.icon} w-5 h-5 text-[var(--color-primary)]`} />
           <span class="font-semibold">{props.title}</span>
         </div>
         <i class={`w-4 h-4 transition-transform ${collapsed() ? "i-hugeicons-arrow-right-01" : "i-hugeicons-arrow-down-01"}`} />
@@ -823,7 +823,7 @@ export function DevTests(props: { onClose: () => void }) {
           </div>
           <div class="flex items-center gap-2">
             <Show when={myShortCode()}>
-              <div class="px-3 py-1 bg-blue-600/20 border border-blue-500/30 rounded-lg text-sm font-mono">
+              <div class="px-3 py-1 bg-[var(--color-primary-bg)] border border-[var(--color-primary-border)] rounded-lg text-sm font-mono">
                 {myShortCode()}
               </div>
             </Show>

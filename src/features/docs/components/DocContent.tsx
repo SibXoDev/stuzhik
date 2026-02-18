@@ -54,12 +54,12 @@ const CodeRefCard: Component<{
 
   return (
     <button
-      class="flex items-center gap-3 w-full p-3 rounded-xl bg-gray-800/50 hover:bg-gray-800 border border-gray-750 hover:border-blue-500/50 transition-all text-left group"
+      class="flex items-center gap-3 w-full p-3 rounded-xl bg-gray-800/50 hover:bg-gray-800 border border-gray-750 hover:border-[var(--color-primary-border)] transition-all text-left group"
       onClick={() => props.onOpen?.(props.codeRef.path, props.codeRef.line)}
     >
       <i class={`${getLanguageIcon(props.codeRef.language)} w-5 h-5 flex-shrink-0`} />
       <div class="flex-1 min-w-0">
-        <div class="font-mono text-sm text-gray-300 truncate group-hover:text-blue-400 transition-colors">
+        <div class="font-mono text-sm text-gray-300 truncate group-hover:text-[var(--color-primary)] transition-colors">
           {props.codeRef.path}
           <Show when={props.codeRef.line}>
             <span class="text-gray-500">:{props.codeRef.line}</span>
@@ -69,7 +69,7 @@ const CodeRefCard: Component<{
           {getLocalizedText(t, props.codeRef.description)}
         </div>
       </div>
-      <i class="i-hugeicons-arrow-right-01 w-4 h-4 text-gray-600 group-hover:text-blue-400 transition-colors flex-shrink-0" />
+      <i class="i-hugeicons-arrow-right-01 w-4 h-4 text-gray-600 group-hover:text-[var(--color-primary)] transition-colors flex-shrink-0" />
     </button>
   );
 };
@@ -83,7 +83,7 @@ const FileLinkCard: Component<{
     try {
       await invoke("open_app_folder", { folderType: props.link.path });
     } catch (e) {
-      console.error("Failed to open folder:", e);
+      if (import.meta.env.DEV) console.error("Failed to open folder:", e);
     }
   };
 
@@ -240,7 +240,7 @@ const CardsComponent: Component<{
 
           return (
             <div
-              class={`card p-4 ${isClickable() ? "cursor-pointer hover:border-blue-500/50 hover:bg-gray-800/50 transition-all" : ""}`}
+              class={`card p-4 ${isClickable() ? "cursor-pointer hover:border-[var(--color-primary-border)] hover:bg-gray-800/50 transition-all" : ""}`}
               onClick={handleClick}
             >
               <div class="flex items-center gap-2 mb-2">

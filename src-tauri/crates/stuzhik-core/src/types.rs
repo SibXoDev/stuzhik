@@ -1,6 +1,62 @@
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Serialize};
 
+/// Supported game types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum GameType {
+    #[default]
+    Minecraft,
+    Hytale,
+}
+
+impl GameType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Minecraft => "minecraft",
+            Self::Hytale => "hytale",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "minecraft" => Some(Self::Minecraft),
+            "hytale" => Some(Self::Hytale),
+            _ => None,
+        }
+    }
+
+    pub fn curseforge_id(&self) -> u32 {
+        match self {
+            Self::Minecraft => 432,
+            Self::Hytale => 83374,
+        }
+    }
+}
+
+impl FromSql for GameType {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        match value.as_str()? {
+            "minecraft" => Ok(GameType::Minecraft),
+            "hytale" => Ok(GameType::Hytale),
+            other => Err(FromSqlError::Other(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Unknown GameType: {}", other),
+            )))),
+        }
+    }
+}
+
+impl ToSql for GameType {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        let s: &'static str = match self {
+            GameType::Minecraft => "minecraft",
+            GameType::Hytale => "hytale",
+        };
+        Ok(ToSqlOutput::from(s))
+    }
+}
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
@@ -196,6 +252,7 @@ impl ToSql for InstanceStatus {
 pub struct Instance {
     pub id: String,
     pub name: String,
+    pub game_type: GameType,
     pub version: String,
     pub loader: LoaderType,
     pub loader_version: Option<String>,
@@ -350,6 +407,7 @@ pub struct LoaderVersion {
 #[derive(Debug, Deserialize)]
 pub struct CreateInstanceRequest {
     pub name: String,
+    pub game_type: Option<String>,  // "minecraft" | "hytale", defaults to minecraft
     pub version: String,
     pub loader: String,
     pub loader_version: Option<String>,

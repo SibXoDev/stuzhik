@@ -343,15 +343,13 @@ async fn lookup_mod_by_hash(hash: &str) -> Option<String> {
         project_id: String,
     }
 
-    let client = reqwest::Client::new();
     let request = HashRequest {
         hashes: vec![hash],
         algorithm,
     };
 
-    let resp = client
+    let resp = crate::utils::SHARED_HTTP_CLIENT
         .post("https://api.modrinth.com/v2/version_files")
-        .header("User-Agent", crate::USER_AGENT)
         .json(&request)
         .send()
         .await
@@ -367,7 +365,7 @@ async fn lookup_mod_by_hash(hash: &str) -> Option<String> {
     // Get the first result and lookup project slug
     if let Some(version) = versions.into_values().next() {
         // Get project info to get the slug
-        let project_resp = client
+        let project_resp = crate::utils::SHARED_HTTP_CLIENT
             .get(format!(
                 "https://api.modrinth.com/v2/project/{}",
                 version.project_id

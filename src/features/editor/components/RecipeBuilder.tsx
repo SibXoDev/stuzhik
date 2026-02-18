@@ -90,7 +90,7 @@ function ItemIcon(props: { item: Ingredient | MinecraftEntry; size?: "sm" | "md"
 
   return (
     <div
-      class={`${sizeClass()} ${textureUrl() ? "bg-gray-800" : getModColor(id())} rounded flex-center font-bold text-white/90 select-none overflow-hidden`}
+      class={`${sizeClass()} ${textureUrl() ? "bg-gray-800" : getModColor(id())} rounded flex-center font-bold text-gray-200/90 select-none overflow-hidden`}
     >
       <Show when={textureUrl()} fallback={initials()}>
         <img
@@ -158,7 +158,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
       });
       setAvailableMods(mods);
     } catch (e) {
-      console.error("Failed to load mods:", e);
+      if (import.meta.env.DEV) console.error("Failed to load mods:", e);
     }
   };
 
@@ -173,7 +173,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
       });
       setInitialItems(results);
     } catch (e) {
-      console.error("Failed to load items:", e);
+      if (import.meta.env.DEV) console.error("Failed to load items:", e);
     }
   };
 
@@ -195,7 +195,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
 
       await Promise.all([loadItems(), loadMods()]);
     } catch (e) {
-      console.error("Failed to initialize cache:", e);
+      if (import.meta.env.DEV) console.error("Failed to initialize cache:", e);
     } finally {
       setLoadingInitial(false);
     }
@@ -255,7 +255,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
       });
       setSearchResults(results);
     } catch (e) {
-      console.error("Search failed:", e);
+      if (import.meta.env.DEV) console.error("Search failed:", e);
     } finally {
       setSearching(false);
     }
@@ -398,7 +398,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
         setCopied(true);
         debounce(() => setCopied(false), 2000);
       } catch (e) {
-        console.error("Failed to copy:", e);
+        if (import.meta.env.DEV) console.error("Failed to copy:", e);
       }
     }
   };
@@ -601,7 +601,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
       return hasItem
         ? "bg-gray-700 border-gray-600 hover:border-gray-500"
         : highlighted
-        ? "bg-blue-900/30 border-blue-500 border-solid"
+        ? "bg-[var(--color-primary-bg)] border-[var(--color-primary)] border-solid"
         : "bg-gray-800 border-gray-700 border-dashed hover:border-gray-600";
     };
 
@@ -667,7 +667,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
               value={searchQuery()}
               onInput={(e) => handleSearchInput(e.currentTarget.value)}
               placeholder={t().editor.searchItemsPlaceholder}
-              class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+              class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-[var(--color-primary)] text-sm"
             />
           </div>
 
@@ -675,7 +675,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
           <div ref={itemsScrollRef} class="h-48 overflow-y-auto">
             <Show when={rebuildingCache()}>
               <div class="flex flex-col items-center gap-3 py-6 text-gray-500">
-                <i class="i-svg-spinners-ring-resize w-8 h-8 text-blue-500" />
+                <i class="i-svg-spinners-ring-resize w-8 h-8 text-[var(--color-primary)]" />
                 <div class="flex flex-col items-center gap-1">
                   <p class="text-sm font-medium">{t().editor.rebuildingCache}</p>
                   <p class="text-xs text-gray-600">{t().editor.rebuildingCacheHint}</p>
@@ -705,7 +705,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
                 <span>{t().editor.dragToPlace} ({displayItems().length})</span>
                 <Show when={selectedItem()}>
                   <button
-                    class="text-blue-400 hover:text-blue-300"
+                    class="text-[var(--color-primary)] hover:text-[var(--color-primary-light)]"
                     onClick={() => setSelectedItem(null)}
                   >
                     {t().common.cancel}
@@ -741,7 +741,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
                                 onPointerUp={handlePointerUp}
                                 onClick={() => !isDragging() && !justEndedDrag && handleItemClick(item)}
                                 class={`flex-center w-10 h-10 border-1 border-transparent cursor-grab active:cursor-grabbing select-none rounded transition-colors touch-none ${
-                                  isSelected() ? "border-blue-500 bg-blue-900/30" : ""
+                                  isSelected() ? "border-[var(--color-primary)] bg-[var(--color-primary-bg)]" : ""
                                 } ${isItemDragging() ? "border-orange-500" : ""}`}
                                 title={`${typeLabel()} ${item.name}\nID: ${item.id}`}
                               >
@@ -782,7 +782,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
                   setRebuildStats(result);
                   await Promise.all([loadItems(selectedModId() || undefined), loadMods()]);
                 } catch (e) {
-                  console.error("Rebuild failed:", e);
+                  if (import.meta.env.DEV) console.error("Rebuild failed:", e);
                 } finally {
                   setRebuildingCache(false);
                 }
@@ -862,7 +862,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
                   data-drop-slot="shapeless"
                   class={`flex flex-wrap gap-1 p-2 bg-gray-800 rounded-lg min-h-[120px] w-[156px] transition-all cursor-pointer ${
                     dragOverSlot() === "shapeless" || (selectedItem() && shapelessIngredients().length < 9)
-                      ? "ring-2 ring-blue-500"
+                      ? "ring-2 ring-[var(--color-primary)]"
                       : ""
                   }`}
                   onClick={() => handleSlotClick("shapeless")}
@@ -959,7 +959,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
               value={recipeName()}
               onInput={(e) => setRecipeName(e.currentTarget.value)}
               placeholder={t().editor.recipeNamePlaceholder}
-              class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+              class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-[var(--color-primary)] text-sm"
             />
           </div>
 
@@ -1012,7 +1012,7 @@ export function RecipeBuilder(props: RecipeBuilderProps) {
       {/* Floating drag preview */}
       <Show when={isDragging() && pointerPos() && draggedItem()}>
         <div
-          class="fixed pointer-events-none z-50 bg-gray-800 border border-blue-500 rounded-lg p-2 shadow-lg"
+          class="fixed pointer-events-none z-50 bg-gray-800 border border-[var(--color-primary)] rounded-lg p-2 shadow-lg"
           style={{
             left: `${pointerPos()!.x + 12}px`,
             top: `${pointerPos()!.y + 12}px`,

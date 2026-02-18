@@ -9,6 +9,7 @@ import { listen } from '@tauri-apps/api/event';
 const mockInstance: Instance = {
   id: 'test-instance-1',
   name: 'Test Instance',
+  game_type: 'minecraft',
   version: '1.20.1',
   loader: 'forge',
   loader_version: '47.2.0',

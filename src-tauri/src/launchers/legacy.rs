@@ -40,7 +40,7 @@ pub async fn parse_launcher_profiles(legacy_dir: &Path) -> LauncherResult<Vec<La
     let tl_props_path = legacy_dir.join("tl.properties");
 
     // Check if game directory exists
-    if !game_dir.exists() {
+    if !fs::try_exists(&game_dir).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "Game directory not found at {}",
             game_dir.display()
@@ -58,7 +58,7 @@ pub async fn parse_launcher_profiles(legacy_dir: &Path) -> LauncherResult<Vec<La
 
     let versions_dir = game_dir.join("versions");
 
-    if versions_dir.exists() {
+    if fs::try_exists(&versions_dir).await.unwrap_or(false) {
         // Scan versions - each is a potential instance
         if let Ok(mut entries) = fs::read_dir(&versions_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
@@ -103,7 +103,7 @@ pub async fn parse_launcher_profiles(legacy_dir: &Path) -> LauncherResult<Vec<La
     }
 
     // If no versions found, create a single instance for the game folder
-    if instances.is_empty() && game_dir.join("mods").exists() {
+    if instances.is_empty() && fs::try_exists(game_dir.join("mods")).await.unwrap_or(false) {
         let mods_count = count_mods(&game_dir).await;
         let total_size = calculate_dir_size(&game_dir).await;
 
@@ -182,7 +182,7 @@ fn detect_loader_from_version(version: &str) -> (&'static str, Option<String>) {
 
 /// Detect loader from mods folder (by scanning jar files)
 async fn detect_loader_from_mods(mods_dir: &Path) -> String {
-    if !mods_dir.exists() {
+    if !fs::try_exists(mods_dir).await.unwrap_or(false) {
         return "vanilla".to_string();
     }
 
@@ -205,7 +205,7 @@ async fn detect_loader_from_mods(mods_dir: &Path) -> String {
 /// Count mods in mods folder
 async fn count_mods(game_dir: &Path) -> usize {
     let mods_dir = game_dir.join("mods");
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return 0;
     }
 
@@ -227,7 +227,7 @@ async fn calculate_dir_size(dir: &Path) -> u64 {
 
     // Just count mods folder size for now
     let mods_dir = dir.join("mods");
-    if mods_dir.exists() {
+    if fs::try_exists(&mods_dir).await.unwrap_or(false) {
         if let Ok(mut entries) = fs::read_dir(&mods_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 if let Ok(meta) = entry.metadata().await {
@@ -239,7 +239,7 @@ async fn calculate_dir_size(dir: &Path) -> u64 {
 
     // Add config folder size
     let config_dir = dir.join("config");
-    if config_dir.exists() {
+    if fs::try_exists(&config_dir).await.unwrap_or(false) {
         if let Ok(mut entries) = fs::read_dir(&config_dir).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 if let Ok(meta) = entry.metadata().await {
@@ -327,7 +327,7 @@ pub async fn detect_installations() -> Vec<DetectedLauncher> {
     for path in search_paths {
         // Check if game folder exists (this is the actual .minecraft-like directory)
         let game_dir = path.join("game");
-        if game_dir.exists() {
+        if fs::try_exists(&game_dir).await.unwrap_or(false) {
             // Count instances (versions or just check if there are mods)
             let instance_count = match parse_launcher_profiles(&path).await {
                 Ok(instances) => instances.len(),

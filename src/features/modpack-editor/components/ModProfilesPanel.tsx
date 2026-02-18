@@ -8,6 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { useI18n } from "../../../shared/i18n";
+import { Tooltip } from "../../../shared/ui";
 
 interface ModProfilesPanelProps {
   instanceId: string;
@@ -218,9 +219,9 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
     <div class="flex h-full gap-4">
       {/* Left Panel - Create Profile */}
       <div class="w-96 flex flex-col gap-3 flex-shrink-0">
-        <div class="card">
-          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
-            <i class="i-hugeicons-add-circle w-5 h-5 text-blue-400" />
+        <div class="card flex flex-col gap-4">
+          <h3 class="text-lg font-semibold flex items-center gap-2">
+            <i class="i-hugeicons-add-circle w-5 h-5 text-[var(--color-primary)]" />
             {t().editor?.modProfiles?.title || "Create Profile"}
           </h3>
 
@@ -305,14 +306,15 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
             <i class="i-hugeicons-layers-01 w-5 h-5 text-gray-500" />
             {t().editor?.modProfiles?.savedProfiles || "Saved Profiles"} ({profiles.profiles().length})
           </h3>
-          <button
-            class="btn-secondary btn-sm"
-            onClick={handleImportProfile}
-            title={t().editor?.modProfiles?.importTitle || "Import profile from file"}
-          >
-            <i class="i-hugeicons-upload-02 w-4 h-4" />
-            {t().editor?.modProfiles?.import || "Import"}
-          </button>
+          <Tooltip text={t().editor?.modProfiles?.importTitle || "Import profile from file"} position="bottom">
+            <button
+              class="btn-secondary btn-sm"
+              onClick={handleImportProfile}
+            >
+              <i class="i-hugeicons-upload-02 w-4 h-4" />
+              {t().editor?.modProfiles?.import || "Import"}
+            </button>
+          </Tooltip>
         </div>
 
         {/* Loading */}
@@ -341,7 +343,7 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
                 const stats = getProfileStats(profile);
 
                 return (
-                  <div class="card hover:border-blue-600/50 transition-colors">
+                  <div class="card hover:border-[var(--color-primary-border)] transition-colors">
                     <div class="flex items-start justify-between mb-3">
                       <div class="flex-1">
                         <h4 class="font-semibold text-lg">{profile.name}</h4>
@@ -351,20 +353,22 @@ export function ModProfilesPanel(props: ModProfilesPanelProps) {
                       </div>
 
                       <div class="flex gap-1">
-                        <button
-                          class="text-blue-400 hover:text-blue-300 p-1"
-                          onClick={() => handleExportProfile(profile)}
-                          title={t().editor?.modProfiles?.exportTitle || "Export profile"}
-                        >
-                          <i class="i-hugeicons-download-02 w-4 h-4" />
-                        </button>
-                        <button
-                          class="text-red-400 hover:text-red-300 p-1"
-                          onClick={() => handleDeleteProfile(profile)}
-                          title={t().editor?.modProfiles?.deleteTitle || "Delete profile"}
-                        >
-                          <i class="i-hugeicons-delete-02 w-4 h-4" />
-                        </button>
+                        <Tooltip text={t().editor?.modProfiles?.exportTitle || "Export profile"} position="bottom">
+                          <button
+                            class="text-[var(--color-primary)] hover:text-[var(--color-primary-light)] p-1"
+                            onClick={() => handleExportProfile(profile)}
+                          >
+                            <i class="i-hugeicons-download-02 w-4 h-4" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip text={t().editor?.modProfiles?.deleteTitle || "Delete profile"} position="bottom">
+                          <button
+                            class="text-red-400 hover:text-red-300 p-1"
+                            onClick={() => handleDeleteProfile(profile)}
+                          >
+                            <i class="i-hugeicons-delete-02 w-4 h-4" />
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
 

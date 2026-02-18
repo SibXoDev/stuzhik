@@ -62,7 +62,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       });
       setSnapshot(existing);
     } catch (e) {
-      console.error("Failed to load snapshot:", e);
+      if (import.meta.env.DEV) console.error("Failed to load snapshot:", e);
     }
   });
 
@@ -84,7 +84,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       });
       setCompatibility(result);
     } catch (e) {
-      console.error("Failed to check compatibility:", e);
+      if (import.meta.env.DEV) console.error("Failed to check compatibility:", e);
       setCompatibility(null);
     } finally {
       setCheckingCompatibility(false);
@@ -113,7 +113,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       setPreview(null);
       setResult(null);
     } catch (e) {
-      console.error("Failed to load patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to load patch:", e);
       setError(String(e));
     } finally {
       setLoading(false);
@@ -136,7 +136,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       });
       setPreview(previewResult);
     } catch (e) {
-      console.error("Failed to preview patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to preview patch:", e);
       setError(String(e));
     } finally {
       setLoading(false);
@@ -159,7 +159,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       });
       setResult(applyResult);
     } catch (e) {
-      console.error("Failed to apply patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to apply patch:", e);
       setError(String(e));
     } finally {
       setApplying(false);
@@ -191,7 +191,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       });
       setSnapshot(newSnapshot);
     } catch (e) {
-      console.error("Failed to create snapshot:", e);
+      if (import.meta.env.DEV) console.error("Failed to create snapshot:", e);
       setError(String(e));
     } finally {
       setCreatingSnapshot(false);
@@ -210,7 +210,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       setSnapshot(null);
       setChanges(null);
     } catch (e) {
-      console.error("Failed to delete snapshot:", e);
+      if (import.meta.env.DEV) console.error("Failed to delete snapshot:", e);
       setError(String(e));
     }
   };
@@ -229,7 +229,7 @@ export const PatchesPanel: Component<Props> = (props) => {
       });
       setChanges(detectedChanges);
     } catch (e) {
-      console.error("Failed to detect changes:", e);
+      if (import.meta.env.DEV) console.error("Failed to detect changes:", e);
       setError(String(e));
     } finally {
       setDetectingChanges(false);
@@ -275,7 +275,7 @@ export const PatchesPanel: Component<Props> = (props) => {
         setPatchAuthor("");
       }
     } catch (e) {
-      console.error("Failed to create patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to create patch:", e);
       setError(String(e));
     } finally {
       setCreatingPatch(false);
@@ -338,9 +338,9 @@ export const PatchesPanel: Component<Props> = (props) => {
       <Show when={mode() === "apply"}>
         {/* File Selection */}
         <Show when={!patch()}>
-          <div class="p-8 border-2 border-dashed border-gray-600 rounded-2xl text-center">
-            <i class="i-hugeicons-file-add w-12 h-12 text-gray-500 mx-auto mb-4" />
-            <p class="text-gray-400 mb-4">
+          <div class="p-8 border-2 border-dashed border-gray-600 rounded-2xl flex flex-col items-center gap-4 text-center">
+            <i class="i-hugeicons-file-add w-12 h-12 text-gray-500" />
+            <p class="text-gray-400">
               {t().modpackCompare?.patch?.selectFile || "Select a patch file (.stzhk)"}
             </p>
             <button
@@ -400,15 +400,15 @@ export const PatchesPanel: Component<Props> = (props) => {
           {(() => {
             const compat = compatibility()!;
             return (
-              <div class={`p-3 rounded-xl border ${statusColors[compat.status]}`}>
-                <div class="flex items-center gap-2 mb-2">
+              <div class={`p-3 rounded-xl border flex flex-col gap-2 ${statusColors[compat.status]}`}>
+                <div class="flex items-center gap-2">
                   <i class={`w-4 h-4 ${statusIcons[compat.status]}`} />
                   <span class="font-medium text-sm">{statusLabels[compat.status]}</span>
                 </div>
 
                 {/* Errors */}
                 <Show when={compat.errors.length > 0}>
-                  <ul class="text-xs space-y-1 mb-2">
+                  <ul class="text-xs space-y-1">
                     <For each={compat.errors}>
                       {(err) => <li class="text-red-300">• {err}</li>}
                     </For>
@@ -417,7 +417,7 @@ export const PatchesPanel: Component<Props> = (props) => {
 
                 {/* Warnings */}
                 <Show when={compat.warnings.length > 0}>
-                  <ul class="text-xs space-y-1 mb-2">
+                  <ul class="text-xs space-y-1">
                     <For each={compat.warnings}>
                       {(warn) => <li class="text-yellow-300">• {warn}</li>}
                     </For>
@@ -426,7 +426,7 @@ export const PatchesPanel: Component<Props> = (props) => {
 
                 {/* Recommendation */}
                 <Show when={compat.recommendation}>
-                  <p class="text-xs text-muted mt-2 italic">{compat.recommendation}</p>
+                  <p class="text-xs text-muted italic">{compat.recommendation}</p>
                 </Show>
               </div>
             );
@@ -535,8 +535,8 @@ export const PatchesPanel: Component<Props> = (props) => {
 
             {/* Warnings */}
             <Show when={preview()!.warnings.length > 0}>
-              <div class="p-3 bg-yellow-600/10 border border-yellow-600/30 rounded-xl">
-                <p class="text-xs text-yellow-400 font-medium mb-2">
+              <div class="p-3 bg-yellow-600/10 border border-yellow-600/30 rounded-xl flex flex-col gap-2">
+                <p class="text-xs text-yellow-400 font-medium">
                   <i class="i-hugeicons-alert-02 w-3 h-3 inline mr-1" />
                   {t().modpackCompare?.patch?.warnings || "Warnings"}
                 </p>
@@ -548,8 +548,8 @@ export const PatchesPanel: Component<Props> = (props) => {
 
             {/* Errors */}
             <Show when={preview()!.errors.length > 0}>
-              <div class="p-3 bg-red-600/10 border border-red-600/30 rounded-xl">
-                <p class="text-xs text-red-400 font-medium mb-2">
+              <div class="p-3 bg-red-600/10 border border-red-600/30 rounded-xl flex flex-col gap-2">
+                <p class="text-xs text-red-400 font-medium">
                   <i class="i-hugeicons-alert-circle w-3 h-3 inline mr-1" />
                   {t().modpackCompare?.patch?.errors || "Errors"}
                 </p>
@@ -583,11 +583,11 @@ export const PatchesPanel: Component<Props> = (props) => {
         {/* Apply Result */}
         <Show when={result()}>
           <div
-            class={`p-4 rounded-xl border ${
+            class={`p-4 rounded-xl border flex flex-col gap-3 ${
               result()!.success ? "bg-green-600/10 border-green-600/30" : "bg-red-600/10 border-red-600/30"
             }`}
           >
-            <div class="flex items-center gap-2 mb-3">
+            <div class="flex items-center gap-2">
               <i
                 class={`w-5 h-5 ${
                   result()!.success ? "i-hugeicons-checkmark-circle-02 text-green-400" : "i-hugeicons-cancel-circle text-red-400"
@@ -600,24 +600,27 @@ export const PatchesPanel: Component<Props> = (props) => {
               </span>
             </div>
 
-            <Show when={result()!.mods_added.length > 0}>
-              <p class="text-xs text-green-400 mb-1">+ {result()!.mods_added.length} mods added</p>
-            </Show>
-            <Show when={result()!.mods_removed.length > 0}>
-              <p class="text-xs text-red-400 mb-1">- {result()!.mods_removed.length} mods removed</p>
-            </Show>
-            <Show when={result()!.configs_changed.length > 0}>
-              <p class="text-xs text-blue-400 mb-1">{result()!.configs_changed.length} configs changed</p>
-            </Show>
+            <div class="flex flex-col gap-1">
+              <Show when={result()!.mods_added.length > 0}>
+                <p class="text-xs text-green-400">+ {result()!.mods_added.length} mods added</p>
+              </Show>
+              <Show when={result()!.mods_removed.length > 0}>
+                <p class="text-xs text-red-400">- {result()!.mods_removed.length} mods removed</p>
+              </Show>
+              <Show when={result()!.configs_changed.length > 0}>
+                <p class="text-xs text-blue-400">{result()!.configs_changed.length} configs changed</p>
+              </Show>
+            </div>
+
             <Show when={result()!.errors.length > 0}>
-              <div class="mt-2 text-xs text-red-300">
-                <p class="font-medium mb-1">Errors:</p>
+              <div class="text-xs text-red-300 flex flex-col gap-1">
+                <p class="font-medium">Errors:</p>
                 <For each={result()!.errors}>{(err) => <p>- {err}</p>}</For>
               </div>
             </Show>
 
             {/* Apply another patch button */}
-            <button class="btn-secondary mt-4 w-full" onClick={handleReset}>
+            <button class="btn-secondary w-full" onClick={handleReset}>
               <i class="i-hugeicons-add-01 w-4 h-4" />
               {t().modpackCompare?.patch?.applyAnother || "Apply Another Patch"}
             </button>
@@ -648,8 +651,8 @@ export const PatchesPanel: Component<Props> = (props) => {
           <Show
             when={snapshot()}
             fallback={
-              <div class="text-center py-4">
-                <p class="text-sm text-muted mb-3">
+              <div class="flex flex-col items-center gap-3 text-center py-4">
+                <p class="text-sm text-muted">
                   {t().patches?.noSnapshot || "No snapshot exists. Create one to start tracking changes."}
                 </p>
                 <button
@@ -712,8 +715,8 @@ export const PatchesPanel: Component<Props> = (props) => {
               <div class="space-y-2">
                 {/* Added Mods */}
                 <Show when={changes()!.mods_added.length > 0}>
-                  <div>
-                    <p class="text-xs text-green-400 font-medium mb-1">
+                  <div class="flex flex-col gap-1">
+                    <p class="text-xs text-green-400 font-medium">
                       + {changes()!.mods_added.length} {t().patches?.modsAdded || "mods added"}
                     </p>
                     <div class="flex flex-wrap gap-1">
@@ -735,8 +738,8 @@ export const PatchesPanel: Component<Props> = (props) => {
 
                 {/* Removed Mods */}
                 <Show when={changes()!.mods_removed.length > 0}>
-                  <div>
-                    <p class="text-xs text-red-400 font-medium mb-1">
+                  <div class="flex flex-col gap-1">
+                    <p class="text-xs text-red-400 font-medium">
                       - {changes()!.mods_removed.length} {t().patches?.modsRemoved || "mods removed"}
                     </p>
                     <div class="flex flex-wrap gap-1">
@@ -790,8 +793,8 @@ export const PatchesPanel: Component<Props> = (props) => {
             </h4>
 
             <div class="space-y-3">
-              <div>
-                <label class="block text-xs text-muted mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-xs text-muted">
                   {t().patches?.description || "Description"} *
                 </label>
                 <input
@@ -803,8 +806,8 @@ export const PatchesPanel: Component<Props> = (props) => {
                 />
               </div>
 
-              <div>
-                <label class="block text-xs text-muted mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-xs text-muted">
                   {t().patches?.author || "Author"} ({t().common.optional || "optional"})
                 </label>
                 <input

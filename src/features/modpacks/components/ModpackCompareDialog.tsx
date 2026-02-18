@@ -10,10 +10,12 @@ import {
   type ModpackPatch, type PatchModAdd, type PatchModRemove, type PatchConfigAdd, type PatchChanges, type PatchBaseInfo
 } from "../../../shared/types";
 import { useI18n } from "../../../shared/i18n";
-import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
-import { Select, Tabs } from "../../../shared/ui";
-import { useDebounce } from "../../../shared/hooks";
+import { createFocusTrap } from "../../../shared/hooks";
+import { Tabs, Tooltip } from "../../../shared/ui";
 import { formatSize } from "../../../shared/utils/format-size";
+import { ModDownloadSearch } from "./ModDownloadSearch";
+import { CompareModList, type DownloadState } from "./CompareModList";
+import { CompareSourceSelector } from "./CompareSourceSelector";
 
 interface Props {
   instances: Instance[];
@@ -21,12 +23,6 @@ interface Props {
 }
 
 type Tab = "mods" | "configs" | "other";
-
-interface DownloadState {
-  downloading: Set<string>;
-  completed: Set<string>;
-  failed: Set<string>;
-}
 
 interface SourceInfo {
   type: CompareSourceType;
@@ -40,14 +36,16 @@ const CloseConfirmDialog: Component<{
   onCancel: () => void;
 }> = (props) => {
   const { t } = useI18n();
+  let dialogRef: HTMLDivElement | undefined;
+  createFocusTrap(() => dialogRef);
   return (
-    <div class="fixed inset-0 bg-black/80 flex-center z-[60]" style="animation: fadeIn 0.1s ease-out">
-      <div class="card w-[400px] p-6" style="animation: scaleIn 0.1s ease-out">
-        <div class="flex items-center gap-3 mb-4">
+    <div class="fixed inset-0 bg-black/80 flex-center z-50" style="animation: fadeIn 0.1s ease-out">
+      <div ref={dialogRef} tabIndex={-1} class="card w-[400px] p-6 flex flex-col gap-4" style="animation: scaleIn 0.1s ease-out">
+        <div class="flex items-center gap-3">
           <i class="i-hugeicons-alert-02 w-10 h-10 p-2.5 rounded-2xl bg-yellow-600/20 text-yellow-400 flex-shrink-0" />
           <h3 class="text-lg font-semibold">{t().modpackCompare.closeConfirm.title}</h3>
         </div>
-        <p class="text-sm text-muted mb-6">
+        <p class="text-sm text-muted">
           {t().modpackCompare.closeConfirm.message}
         </p>
         <div class="flex justify-end gap-2">
@@ -68,10 +66,12 @@ const CreatePatchDialog: Component<{
   const { t } = useI18n();
   const [description, setDescription] = createSignal("");
   const [author, setAuthor] = createSignal("");
+  let dialogRef: HTMLDivElement | undefined;
+  createFocusTrap(() => dialogRef);
 
   return (
-    <div class="fixed inset-0 bg-black/80 flex-center z-[60]" style="animation: fadeIn 0.1s ease-out">
-      <div class="card w-[450px] p-6" style="animation: scaleIn 0.1s ease-out">
+    <div class="fixed inset-0 bg-black/80 flex-center z-50" style="animation: fadeIn 0.1s ease-out">
+      <div ref={dialogRef} tabIndex={-1} class="card w-[450px] p-6" style="animation: scaleIn 0.1s ease-out">
         <div class="flex items-center gap-3 mb-4">
           <i class="i-hugeicons-file-add w-10 h-10 p-2.5 rounded-2xl bg-cyan-600/20 text-cyan-400 flex-shrink-0" />
           <h3 class="text-lg font-semibold">{t().modpackCompare.patch?.createTitle || "Create Patch"}</h3>
@@ -117,251 +117,6 @@ const CreatePatchDialog: Component<{
             </Show>
           </button>
         </div>
-      </div>
-    </div>
-  );
-};
-
-// Компонент поиска мода для скачивания
-const ModDownloadSearch: Component<{
-  modName: string;
-  onClose: () => void;
-  onDownloaded: (filename: string) => void;
-}> = (props) => {
-  const { t } = useI18n();
-  const [searching, setSearching] = createSignal(false);
-  const [results, setResults] = createSignal<ModSearchInfo[]>([]);
-  const [downloading, setDownloading] = createSignal<string | null>(null);
-  const [error, setError] = createSignal<string | null>(null);
-  const [source, setSource] = createSignal<"modrinth" | "curseforge">("modrinth");
-  const [targetPath, setTargetPath] = createSignal("");
-
-  const search = async () => {
-    setSearching(true);
-    setError(null);
-    setResults([]);
-    try {
-      const res = await invoke<ModSearchInfo[]>("search_mod_by_name", {
-        name: props.modName,
-        source: source(),
-      });
-      setResults(res);
-      if (res.length === 0) setError(t().modpackCompare.download.noResults);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const selectFolder = async () => {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: t().modpackCompare.download.selectFolderTitle
-      });
-      if (selected && typeof selected === "string") {
-        setTargetPath(selected);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const download = async (mod: ModSearchInfo) => {
-    if (!targetPath()) {
-      setError(t().modpackCompare.download.selectFolderRequired);
-      return;
-    }
-    setDownloading(mod.project_id);
-    setError(null);
-    try {
-      const filename = await invoke<string>("download_mod_to_path", {
-        source: mod.source,
-        projectId: mod.project_id,
-        versionId: mod.version_id,
-        destPath: targetPath(),
-      });
-      props.onDownloaded(filename);
-      props.onClose();
-    } catch (e) {
-      setError(String(e));
-      setDownloading(null);
-    }
-  };
-
-  search();
-
-  return (
-    <div class="fixed inset-0 bg-black/80 flex-center z-[60]" style="animation: fadeIn 0.1s ease-out">
-      <div class="card w-[500px] max-h-[70vh] overflow-hidden flex flex-col" style="animation: scaleIn 0.1s ease-out">
-        <div class="flex items-center justify-between pb-4 border-b border-gray-800">
-          <h3 class="font-semibold">{t().modpackCompare.download.title}: {props.modName}</h3>
-          <button
-            class="btn-close"
-            onClick={props.onClose}
-            aria-label={t().ui?.tooltips?.close ?? "Close"}
-          >
-            <i class="i-hugeicons-cancel-01 w-5 h-5" />
-          </button>
-        </div>
-
-        <div class="py-4 space-y-4 flex-1 overflow-hidden flex flex-col">
-          {/* Выбор папки */}
-          <button class="btn-secondary w-full text-left" onClick={selectFolder}>
-            <i class="i-hugeicons-folder-01 w-4 h-4" />
-            {targetPath() ? targetPath().split(/[/\\]/).pop() : t().modpackCompare.download.selectFolder}
-          </button>
-
-          {/* Выбор источника */}
-          <div class="flex gap-2">
-            <button
-              class={`flex-1 py-2 px-3 rounded-2xl text-sm font-medium transition-colors duration-100 ${source() === "modrinth" ? "bg-green-600 text-white" : "bg-gray-800 text-muted hover:bg-gray-700"}`}
-              onClick={() => { setSource("modrinth"); search(); }}
-            >
-              Modrinth
-            </button>
-            <button
-              class={`flex-1 py-2 px-3 rounded-2xl text-sm font-medium transition-colors duration-100 ${source() === "curseforge" ? "bg-orange-600 text-white" : "bg-gray-800 text-muted hover:bg-gray-700"}`}
-              onClick={() => { setSource("curseforge"); search(); }}
-            >
-              CurseForge
-            </button>
-          </div>
-
-          <Show when={error()}>
-            <div class="p-2 bg-red-600/20 border border-red-600/40 rounded text-sm text-red-400">{error()}</div>
-          </Show>
-
-          <Show when={searching()}>
-            <div class="flex-center py-8 gap-2">
-              <i class="i-svg-spinners-6-dots-scale w-6 h-6" />
-              <span class="text-muted">{t().modpackCompare.download.searching}</span>
-            </div>
-          </Show>
-
-          <Show when={!searching() && results().length > 0}>
-            <div class="flex-1 overflow-y-auto space-y-2">
-              <For each={results()}>
-                {(mod) => (
-                  <div class="p-3 bg-gray-alpha-50 rounded-2xl hover:bg-gray-800 transition-colors duration-100">
-                    <div class="flex items-start gap-3">
-                      <Show when={sanitizeImageUrl(mod.icon_url)} fallback={
-                        <div class="w-10 h-10 rounded bg-gray-700 flex-center">
-                          <i class="i-hugeicons-package w-5 h-5 text-muted" />
-                        </div>
-                      }>
-                        <img src={sanitizeImageUrl(mod.icon_url)} class="w-10 h-10 rounded" alt="" />
-                      </Show>
-                      <div class="flex-1 min-w-0">
-                        <div class="font-medium truncate">{mod.name}</div>
-                        <div class="text-xs text-muted truncate">{mod.version || mod.file_name}</div>
-                      </div>
-                      <button
-                        class="btn-primary btn-sm"
-                        onClick={() => download(mod)}
-                        disabled={!!downloading() || !targetPath()}
-                      >
-                        <Show when={downloading() === mod.project_id} fallback={
-                          <><i class="i-hugeicons-download-02 w-4 h-4" /> {t().modpackCompare.download.download}</>
-                        }>
-                          <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                        </Show>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
-          </Show>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Список модов с фиксированными классами
-const ModList: Component<{
-  mods: ModInfo[];
-  variant: "purple" | "blue" | "green";
-  icon: string;
-  title: string;
-  onDownload?: (mod: ModInfo) => void;
-  downloadState?: DownloadState;
-  fmtSize: (bytes: number) => string;
-  downloadTooltip?: string;
-  downloadedTooltip?: string;
-  failedTooltip?: string;
-}> = (props) => {
-  const bgClass = () => {
-    switch (props.variant) {
-      case "purple": return "bg-purple-600/10 border-purple-600/30";
-      case "blue": return "bg-blue-600/10 border-blue-600/30";
-      case "green": return "bg-green-600/10 border-green-600/30";
-    }
-  };
-
-  const textClass = () => {
-    switch (props.variant) {
-      case "purple": return "text-purple-400";
-      case "blue": return "text-blue-400";
-      case "green": return "text-green-400";
-    }
-  };
-
-  return (
-    <div class="space-y-2">
-      <Show when={props.title}>
-        <h3 class={`text-sm font-medium ${textClass()} flex items-center gap-2`}>
-          <i class={`${props.icon} w-4 h-4`} />
-          {props.title} ({props.mods.length})
-        </h3>
-      </Show>
-      <div class="grid gap-1 max-h-64 overflow-y-auto">
-        <For each={props.mods}>
-          {(mod) => {
-            const isDownloading = () => props.downloadState?.downloading.has(mod.name);
-            const isCompleted = () => props.downloadState?.completed.has(mod.name);
-            const isFailed = () => props.downloadState?.failed.has(mod.name);
-
-            return (
-              <div class={`flex items-center justify-between p-2 rounded border ${bgClass()}`}>
-                <div class="min-w-0 flex-1">
-                  <span class="font-medium truncate block">{mod.name}</span>
-                  <Show when={mod.version}>
-                    <span class="text-xs text-muted">{mod.version}</span>
-                  </Show>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs text-muted whitespace-nowrap">{props.fmtSize(mod.size)}</span>
-                  <Show when={props.onDownload}>
-                    <Show when={isCompleted()} fallback={
-                      <Show when={isFailed()} fallback={
-                        <button
-                          class="btn-ghost btn-sm p-1"
-                          onClick={() => props.onDownload?.(mod)}
-                          disabled={isDownloading()}
-                          title={props.downloadTooltip}
-                        >
-                          <Show when={isDownloading()} fallback={
-                            <i class="i-hugeicons-download-02 w-4 h-4 text-green-400" />
-                          }>
-                            <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                          </Show>
-                        </button>
-                      }>
-                        <i class="i-hugeicons-alert-02 w-4 h-4 text-red-400" title={props.failedTooltip} />
-                      </Show>
-                    }>
-                      <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" title={props.downloadedTooltip} />
-                    </Show>
-                  </Show>
-                </div>
-              </div>
-            );
-          }}
-        </For>
       </div>
     </div>
   );
@@ -452,7 +207,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
       });
       setResults(res.results);
     } catch (e) {
-      console.error("Search error:", e);
+      if (import.meta.env.DEV) console.error("Search error:", e);
     } finally {
       setSearching(false);
     }
@@ -466,7 +221,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
       });
       setVersions(versions);
     } catch (e) {
-      console.error("Load versions error:", e);
+      if (import.meta.env.DEV) console.error("Load versions error:", e);
     }
   };
 
@@ -479,7 +234,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
       });
       if (selected && typeof selected === "string") setter(selected);
     } catch (e) {
-      console.error("File selection error:", e);
+      if (import.meta.env.DEV) console.error("File selection error:", e);
     }
   };
 
@@ -536,7 +291,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
     try {
       await writeTextFile(filePath, content);
     } catch (e) {
-      console.error("Export error:", e);
+      if (import.meta.env.DEV) console.error("Export error:", e);
     }
   };
 
@@ -702,8 +457,6 @@ const ModpackCompareDialog: Component<Props> = (props) => {
   // Localized size formatter
   const fmtSize = (bytes: number) => formatSize(bytes, t().ui?.units);
 
-  const getFileName = (path: string) => path.split(/[/\\]/).pop() || path;
-
   const handleDownloadMod = (mod: ModInfo) => {
     setDownloadSearchMod(mod);
   };
@@ -732,7 +485,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
         return selected;
       }
     } catch (e) {
-      console.error("Folder selection error:", e);
+      if (import.meta.env.DEV) console.error("Folder selection error:", e);
     }
     return null;
   };
@@ -813,7 +566,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
           }
         }
       } catch (e) {
-        console.error(`Failed to download ${mod.name}:`, e);
+        if (import.meta.env.DEV) console.error(`Failed to download ${mod.name}:`, e);
         setDownloadState(prev => ({
           ...prev,
           failed: new Set([...Array.from(prev.failed), mod.name]),
@@ -908,191 +661,11 @@ const ModpackCompareDialog: Component<Props> = (props) => {
 
       setShowCreatePatch(false);
     } catch (e) {
-      console.error("Failed to create patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to create patch:", e);
       setError(String(e));
     } finally {
       setCreatingPatch(false);
     }
-  };
-
-  // Компонент выбора источника
-  const SourceSelector: Component<{
-    sourceType: CompareSourceType;
-    setSourceType: (t: CompareSourceType) => void;
-    path: string;
-    setPath: (p: string) => void;
-    selectedInstance: string;
-    setSelectedInstance: (id: string) => void;
-    platformSearch: string;
-    setPlatformSearch: (s: string) => void;
-    platformResults: ModpackSearchResult[];
-    setPlatformResults: (r: ModpackSearchResult[]) => void;
-    selectedModpack: ModpackSearchResult | null;
-    setSelectedModpack: (m: ModpackSearchResult | null) => void;
-    modpackVersions: ModpackVersionInfo[];
-    setModpackVersions: (v: ModpackVersionInfo[]) => void;
-    selectedVersion: string;
-    setSelectedVersion: (v: string) => void;
-    searching: boolean;
-    setSearching: (s: boolean) => void;
-    label: string;
-    colorClass: string;
-  }> = (p) => {
-    const { debounce } = useDebounce();
-
-    const handleSearchInput = (value: string) => {
-      p.setPlatformSearch(value);
-      if (value.length >= 2) {
-        debounce(() => {
-          const source = p.sourceType === "modrinth" ? "modrinth" : "curseforge";
-          searchPlatform(value, source as "modrinth" | "curseforge", p.setPlatformResults, p.setSearching);
-        }, 300);
-      }
-    };
-
-    const selectModpack = (modpack: ModpackSearchResult) => {
-      p.setSelectedModpack(modpack);
-      p.setPlatformResults([]);
-      loadVersions(modpack, p.setModpackVersions);
-    };
-
-    return (
-      <div class="space-y-3">
-        <label class={`text-sm font-medium ${p.colorClass}`}>{p.label}</label>
-
-        <div class="grid grid-cols-4 gap-1">
-          <button
-            class={`py-1.5 px-2 rounded text-xs font-medium transition-colors duration-100 ${p.sourceType === "file" ? "bg-blue-600 text-white" : "bg-gray-800 text-muted hover:bg-gray-700"}`}
-            onClick={() => p.setSourceType("file")}
-          >
-            {t().modpackCompare.sourceType.file}
-          </button>
-          <button
-            class={`py-1.5 px-2 rounded text-xs font-medium transition-colors duration-100 ${p.sourceType === "instance" ? "bg-blue-600 text-white" : "bg-gray-800 text-muted hover:bg-gray-700"}`}
-            onClick={() => p.setSourceType("instance")}
-          >
-            {t().modpackCompare.sourceType.instance}
-          </button>
-          <button
-            class={`py-1.5 px-2 rounded text-xs font-medium transition-colors duration-100 ${p.sourceType === "modrinth" ? "bg-green-600 text-white" : "bg-gray-800 text-muted hover:bg-gray-700"}`}
-            onClick={() => p.setSourceType("modrinth")}
-          >
-            Modrinth
-          </button>
-          <button
-            class={`py-1.5 px-2 rounded text-xs font-medium transition-colors duration-100 ${p.sourceType === "curseforge" ? "bg-orange-600 text-white" : "bg-gray-800 text-muted hover:bg-gray-700"}`}
-            onClick={() => p.setSourceType("curseforge")}
-          >
-            CurseForge
-          </button>
-        </div>
-
-        <Switch>
-          <Match when={p.sourceType === "file"}>
-            <button class="btn-secondary w-full" onClick={() => selectFile(p.setPath)}>
-              <i class="i-hugeicons-folder-01 w-4 h-4" />
-              {p.path ? getFileName(p.path) : t().modpackCompare.selectFile}
-            </button>
-          </Match>
-
-          <Match when={p.sourceType === "instance"}>
-            <Select
-              value={p.selectedInstance}
-              onChange={p.setSelectedInstance}
-              placeholder={t().modpackCompare.selectInstance}
-              options={[
-                { value: "", label: t().modpackCompare.selectInstance },
-                ...props.instances.map(instance => ({
-                  value: instance.id,
-                  label: instance.name
-                }))
-              ]}
-            />
-          </Match>
-
-          <Match when={p.sourceType === "modrinth" || p.sourceType === "curseforge"}>
-            <Show when={!p.selectedModpack} fallback={
-              <div class="space-y-2">
-                <div class="flex items-center gap-2 p-2 bg-gray-800 rounded-2xl">
-                  <Show when={sanitizeImageUrl(p.selectedModpack?.icon_url)}>
-                    <img src={sanitizeImageUrl(p.selectedModpack?.icon_url)} class="w-8 h-8 rounded" alt="" />
-                  </Show>
-                  <div class="flex-1 min-w-0">
-                    <div class="font-medium truncate">{p.selectedModpack?.title}</div>
-                    <div class="text-xs text-muted">{p.selectedModpack?.author}</div>
-                  </div>
-                  <button
-                    class="btn-ghost btn-sm"
-                    onClick={() => {
-                      p.setSelectedModpack(null);
-                      p.setModpackVersions([]);
-                      p.setSelectedVersion("");
-                    }}
-                    aria-label={t().ui?.tooltips?.close ?? "Close"}
-                  >
-                    <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                  </button>
-                </div>
-                <Show when={p.modpackVersions.length > 0}>
-                  <Select
-                    value={p.selectedVersion}
-                    onChange={p.setSelectedVersion}
-                    placeholder={t().modpackCompare.latestVersion}
-                    options={[
-                      { value: "", label: t().modpackCompare.latestVersion },
-                      ...p.modpackVersions.map(v => ({
-                        value: v.id,
-                        label: `${v.name} (${v.game_versions.join(", ")})`
-                      }))
-                    ]}
-                  />
-                </Show>
-              </div>
-            }>
-              <div class="space-y-2">
-                <div>
-                  <input
-                    type="text"
-                    class="input w-full pl-8"
-                    placeholder={t().modpackCompare.searchModpack}
-                    value={p.platformSearch}
-                    onInput={(e) => handleSearchInput(e.target.value)}
-                  />
-                  <i class="i-hugeicons-search-01 w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
-                  <Show when={p.searching}>
-                    <i class="i-svg-spinners-6-dots-scale w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2" />
-                  </Show>
-                </div>
-                <Show when={p.platformResults.length > 0}>
-                  <div class="max-h-40 overflow-y-auto space-y-1 p-1 bg-gray-900 rounded-2xl">
-                    <For each={p.platformResults}>
-                      {(modpack) => (
-                        <button
-                          class="w-full flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition-colors duration-100 text-left"
-                          onClick={() => selectModpack(modpack)}
-                        >
-                          <Show when={sanitizeImageUrl(modpack.icon_url)} fallback={
-                            <div class="w-8 h-8 rounded bg-gray-700 flex-center">
-                              <i class="i-hugeicons-package w-4 h-4 text-muted" />
-                            </div>
-                          }>
-                            <img src={sanitizeImageUrl(modpack.icon_url)} class="w-8 h-8 rounded" alt="" />
-                          </Show>
-                          <div class="flex-1 min-w-0">
-                            <div class="text-sm font-medium truncate">{modpack.title}</div>
-                            <div class="text-xs text-muted">{modpack.author}</div>
-                          </div>
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-              </div>
-            </Show>
-          </Match>
-        </Switch>
-      </div>
-    );
   };
 
   const stats = createMemo(() => {
@@ -1135,7 +708,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
 
           <Show when={!result()}>
             <div class="py-6 space-y-6 overflow-y-auto">
-              <SourceSelector
+              <CompareSourceSelector
                 sourceType={source1Type()}
                 setSourceType={setSource1Type}
                 path={path1()}
@@ -1156,6 +729,10 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                 setSearching={setSearchingPlatform1}
                 label={t().modpackCompare.source1}
                 colorClass="text-purple-400"
+                instances={props.instances}
+                onSelectFile={selectFile}
+                onSearchPlatform={searchPlatform}
+                onLoadVersions={loadVersions}
               />
 
               <div class="flex-center">
@@ -1164,7 +741,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                 </div>
               </div>
 
-              <SourceSelector
+              <CompareSourceSelector
                 sourceType={source2Type()}
                 setSourceType={setSource2Type}
                 path={path2()}
@@ -1185,6 +762,10 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                 setSearching={setSearchingPlatform2}
                 label={t().modpackCompare.source2}
                 colorClass="text-blue-400"
+                instances={props.instances}
+                onSelectFile={selectFile}
+                onSearchPlatform={searchPlatform}
+                onLoadVersions={loadVersions}
               />
 
               <Show when={error()}>
@@ -1203,8 +784,8 @@ const ModpackCompareDialog: Component<Props> = (props) => {
             <div class="flex-1 overflow-hidden flex flex-col">
               {/* Памятка источников */}
               <div class="py-3 px-4 bg-gray-alpha-50 border-b border-gray-800 flex gap-4">
-                <div class="flex-1 min-w-0">
-                  <div class="text-xs text-muted mb-0.5">{t().modpackCompare.source1}</div>
+                <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <div class="text-xs text-muted">{t().modpackCompare.source1}</div>
                   <div class="text-sm font-medium text-purple-400 truncate">{sourceInfo1()?.name}</div>
                 </div>
                 <div class="flex-center text-muted">
@@ -1255,7 +836,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                 <Switch>
                   <Match when={activeTab() === "mods"}>
                     <Show when={result()!.mods_only_in_first.length > 0}>
-                      <ModList
+                      <CompareModList
                         mods={result()!.mods_only_in_first}
                         variant="purple"
                         icon="i-hugeicons-arrow-left-01"
@@ -1266,7 +847,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
 
                     <Show when={result()!.mods_only_in_second.length > 0}>
                       <div class="space-y-2">
-                        <ModList
+                        <CompareModList
                           mods={result()!.mods_only_in_second}
                           variant="blue"
                           icon="i-hugeicons-arrow-right-01"
@@ -1278,11 +859,11 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                           downloadedTooltip={t().modpackCompare.download.downloaded}
                           failedTooltip={t().modpackCompare.download.failed}
                         />
+                        <Tooltip text={t().modpackCompare.download.downloadAllHint} position="bottom">
                         <button
                           class="btn-primary btn-sm w-full"
                           onClick={handleBulkDownload}
                           disabled={bulkDownloading() || downloadState().completed.size === result()!.mods_only_in_second.length}
-                          title={t().modpackCompare.download.downloadAllHint}
                         >
                           <Show when={bulkDownloading()} fallback={
                             <>
@@ -1299,6 +880,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                             {bulkDownloadProgress().current}/{bulkDownloadProgress().total}
                           </Show>
                         </button>
+                        </Tooltip>
                       </div>
                     </Show>
 
@@ -1332,7 +914,7 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                           <i class="i-hugeicons-arrow-down-01 w-4 h-4 group-open:rotate-180 transition-transform duration-100" />
                         </summary>
                         <div class="mt-2">
-                          <ModList mods={result()!.mods_identical} variant="green" icon="" title="" fmtSize={fmtSize} />
+                          <CompareModList mods={result()!.mods_identical} variant="green" icon="" title="" fmtSize={fmtSize} />
                         </div>
                       </details>
                     </Show>
@@ -1444,19 +1026,24 @@ const ModpackCompareDialog: Component<Props> = (props) => {
                   <i class="i-hugeicons-arrow-left-01 w-4 h-4" /> {t().modpackCompare.newComparison}
                 </button>
                 <div class="flex gap-2">
-                  <button
-                    class="btn-primary bg-cyan-600 hover:bg-cyan-700"
-                    onClick={() => setShowCreatePatch(true)}
-                    title={t().modpackCompare.patch?.createHint || "Create a patch file from these differences"}
-                  >
-                    <i class="i-hugeicons-file-add w-4 h-4" /> {t().modpackCompare.patch?.create || "Create Patch"}
-                  </button>
-                  <button class="btn-ghost" onClick={() => exportResults("json")} title={t().modpackCompare.export.exportJson}>
-                    <i class="i-hugeicons-file-export w-4 h-4" /> JSON
-                  </button>
-                  <button class="btn-ghost" onClick={() => exportResults("text")} title={t().modpackCompare.export.exportText}>
-                    <i class="i-hugeicons-file-01 w-4 h-4" /> TXT
-                  </button>
+                  <Tooltip text={t().modpackCompare.patch?.createHint || "Create a patch file from these differences"} position="bottom">
+                    <button
+                      class="btn-primary bg-cyan-600 hover:bg-cyan-700"
+                      onClick={() => setShowCreatePatch(true)}
+                    >
+                      <i class="i-hugeicons-file-add w-4 h-4" /> {t().modpackCompare.patch?.create || "Create Patch"}
+                    </button>
+                  </Tooltip>
+                  <Tooltip text={t().modpackCompare.export.exportJson} position="bottom">
+                    <button class="btn-ghost" onClick={() => exportResults("json")}>
+                      <i class="i-hugeicons-file-export w-4 h-4" /> JSON
+                    </button>
+                  </Tooltip>
+                  <Tooltip text={t().modpackCompare.export.exportText} position="bottom">
+                    <button class="btn-ghost" onClick={() => exportResults("text")}>
+                      <i class="i-hugeicons-file-01 w-4 h-4" /> TXT
+                    </button>
+                  </Tooltip>
                   <button class="btn-ghost" onClick={handleClose}>{t().common.close}</button>
                 </div>
               </div>

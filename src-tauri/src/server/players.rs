@@ -65,7 +65,7 @@ pub struct PlayerManagement {
 pub async fn load_whitelist(server_dir: impl AsRef<Path>) -> ServerResult<Vec<WhitelistEntry>> {
     let path = server_dir.as_ref().join("whitelist.json");
 
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Ok(Vec::new());
     }
 
@@ -91,7 +91,7 @@ pub async fn save_whitelist(
 pub async fn load_ops(server_dir: impl AsRef<Path>) -> ServerResult<Vec<OpEntry>> {
     let path = server_dir.as_ref().join("ops.json");
 
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Ok(Vec::new());
     }
 
@@ -114,7 +114,7 @@ pub async fn save_ops(server_dir: impl AsRef<Path>, ops: &[OpEntry]) -> ServerRe
 pub async fn load_banned_players(server_dir: impl AsRef<Path>) -> ServerResult<Vec<BannedPlayer>> {
     let path = server_dir.as_ref().join("banned-players.json");
 
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Ok(Vec::new());
     }
 
@@ -140,7 +140,7 @@ pub async fn save_banned_players(
 pub async fn load_banned_ips(server_dir: impl AsRef<Path>) -> ServerResult<Vec<BannedIp>> {
     let path = server_dir.as_ref().join("banned-ips.json");
 
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Ok(Vec::new());
     }
 
@@ -358,7 +358,7 @@ pub async fn lookup_uuid(username: &str) -> ServerResult<Option<String>> {
         username
     );
 
-    let response = reqwest::Client::new()
+    let response = crate::utils::SHARED_HTTP_CLIENT
         .get(&url)
         .send()
         .await

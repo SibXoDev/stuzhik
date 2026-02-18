@@ -355,7 +355,9 @@ impl BackupManager {
 
             // Удаляем запись из БД
             let conn = get_db_conn()?;
-            let _ = conn.execute("DELETE FROM backups WHERE id = ?1", [&backup.id]);
+            if let Err(e) = conn.execute("DELETE FROM backups WHERE id = ?1", [&backup.id]) {
+                log::warn!("Failed to delete backup record {}: {}", backup.id, e);
+            }
         }
 
         log::info!(
@@ -398,23 +400,27 @@ impl BackupManager {
 
     /// Удалить конкретный бэкап
     pub async fn delete_backup(backup_id: &str) -> Result<()> {
-        let conn = get_db_conn()?;
+        // Scope DB access before async operations (rusqlite Connection is !Send)
+        let path: String = {
+            let conn = get_db_conn()?;
+            conn.query_row(
+                "SELECT path FROM backups WHERE id = ?1",
+                [backup_id],
+                |row| row.get(0),
+            )?
+        };
 
-        // Получаем путь
-        let path: String = conn.query_row(
-            "SELECT path FROM backups WHERE id = ?1",
-            [backup_id],
-            |row| row.get(0),
-        )?;
-
-        // Удаляем файл
+        // Удаляем файл (async I/O — conn must be dropped by now)
         let backup_path = Path::new(&path);
         if fs::try_exists(backup_path).await.unwrap_or(false) {
             fs::remove_file(backup_path).await?;
         }
 
-        // Удаляем запись
-        conn.execute("DELETE FROM backups WHERE id = ?1", [backup_id])?;
+        // Re-acquire conn for DB delete
+        {
+            let conn = get_db_conn()?;
+            conn.execute("DELETE FROM backups WHERE id = ?1", [backup_id])?;
+        }
 
         Ok(())
     }

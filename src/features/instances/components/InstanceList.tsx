@@ -2,15 +2,19 @@ import { For, Show, createSignal, createMemo, createEffect, on, onMount, onClean
 import type { Component } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
 import type { Instance } from "../../../shared/types";
 import { useI18n } from "../../../shared/i18n";
 import { DELETE_CONFIRM_TIMEOUT_MS } from "../../../shared/constants";
+import { getViewMode, setViewMode } from "../../../shared/stores/uiPreferences";
+import { ViewModeSwitch } from "../../../shared/ui";
 import GameSettingsDialog from "./GameSettingsDialog";
 import { IntegrityChecker } from "../../../shared/components/IntegrityChecker";
 import { StzhkExportDialog } from "../../modpacks/components/StzhkExportDialog";
-import { LoaderIcon } from "../../../shared/components/LoaderSelector";
+import ConvertToServerDialog from "./ConvertToServerDialog";
 import InstanceDetail, { type Tab } from "./InstanceDetail";
-import { Tooltip } from "../../../shared/ui/Tooltip";
+import { InstanceCard } from "./InstanceCard";
+import { InstanceContextMenu } from "./InstanceContextMenu";
 import { useSafeTimers } from "../../../shared/hooks";
 import { useDragDrop, registerDropHandler, type DroppedFile } from "../../../shared/stores/dragDrop";
 import { addToast } from "../../../shared/components/Toast";
@@ -31,7 +35,7 @@ interface Props {
 }
 
 const InstanceList: Component<Props> = (props) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { setTimeout: safeTimeout } = useSafeTimers();
   const { isDragging, draggedFiles, dragPosition, isInDetailView, setIsInDetailView } = useDragDrop();
   const [detailInstance, setDetailInstance] = createSignal<Instance | null>(null);
@@ -46,6 +50,9 @@ const InstanceList: Component<Props> = (props) => {
   const [integrityInstance, setIntegrityInstance] = createSignal<Instance | null>(null);
   const [showStzhkExport, setShowStzhkExport] = createSignal(false);
   const [stzhkExportInstance, setStzhkExportInstance] = createSignal<Instance | null>(null);
+  const [showConvertToServer, setShowConvertToServer] = createSignal(false);
+  const [convertInstance, setConvertInstance] = createSignal<Instance | null>(null);
+  const [menuMode, setMenuMode] = createSignal<"primary" | "advanced">("primary");
 
   // Drag & drop: track which instance is being hovered for mod drops
   const [dragHoveredInstance, setDragHoveredInstance] = createSignal<string | null>(null);
@@ -87,8 +94,8 @@ const InstanceList: Component<Props> = (props) => {
     if (!canAcceptMods(instance)) {
       addToast({
         type: "error",
-        title: "Невозможно установить мод",
-        message: `${instance.name} не поддерживает моды (нужен Fabric, Forge или другой загрузчик)`,
+        title: t().instances.cannotInstallMod,
+        message: t().instances.noModLoaderMessage.replace("{name}", instance.name),
         duration: 5000,
       });
       return;
@@ -109,10 +116,10 @@ const InstanceList: Component<Props> = (props) => {
 
       // Show summary toast
       if (successes.length > 0) {
-        const verifiedMsg = verified.length > 0 ? ` (${verified.length} верифицировано)` : "";
+        const verifiedMsg = verified.length > 0 ? ` (${t().instances.modsVerified.replace("{count}", String(verified.length))})` : "";
         addToast({
           type: "success",
-          title: `Установлено ${successes.length} модов${verifiedMsg}`,
+          title: t().instances.modsInstalled.replace("{count}", String(successes.length)) + verifiedMsg,
           message: `→ ${instance.name}`,
           duration: 3000,
         });
@@ -120,12 +127,13 @@ const InstanceList: Component<Props> = (props) => {
 
       // Show individual errors
       for (const failure of failures) {
-        const errorMsg = failure.error || "Неизвестная ошибка";
+        const errorMsg = failure.error || t().instances.unknownErrorShort;
+        const isAlreadyInstalled = errorMsg.includes("уже установлен") || errorMsg.includes("already installed");
         addToast({
-          type: errorMsg.includes("уже установлен") ? "warning" : "error",
-          title: errorMsg.includes("уже установлен") ? "Мод уже установлен" : "Ошибка установки",
+          type: isAlreadyInstalled ? "warning" : "error",
+          title: isAlreadyInstalled ? t().instances.modAlreadyInstalled : t().instances.installationFailed,
           message: `${failure.file_name}: ${errorMsg}`,
-          duration: errorMsg.includes("уже установлен") ? 3000 : 5000,
+          duration: isAlreadyInstalled ? 3000 : 5000,
         });
       }
     } catch (e: unknown) {
@@ -136,10 +144,10 @@ const InstanceList: Component<Props> = (props) => {
         ? e.message
         : (e && typeof e === "object" && "details" in e)
           ? String((e as { details: unknown }).details)
-          : "Неизвестная ошибка";
+          : t().instances.unknownErrorShort;
       addToast({
         type: "error",
-        title: "Ошибка пакетной установки",
+        title: t().instances.batchInstallError,
         message: errorMessage,
         duration: 5000,
       });
@@ -332,10 +340,52 @@ const InstanceList: Component<Props> = (props) => {
     try {
       await invoke("open_instance_folder", { id: instance.id });
     } catch (e) {
-      console.error("Failed to open folder:", e);
+      if (import.meta.env.DEV) console.error("Failed to open folder:", e);
     }
     setOpenMenuId(null);
     setMenuPosition(null);
+  };
+
+  const handleReimportManifest = async (instance: Instance) => {
+    setOpenMenuId(null);
+    setMenuPosition(null);
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: "Manifest", extensions: ["json"] }],
+      });
+      if (!selected) return;
+      if (typeof selected !== "string") return;
+      const filePath = selected;
+
+      addToast({
+        type: "info",
+        title: t().instances?.reimport?.started ?? "Re-importing manifest...",
+        duration: 3000,
+      });
+
+      const result = await invoke<{
+        total_in_manifest: number;
+        already_present: number;
+        downloaded: number;
+        failed: number;
+      }>("reimport_manifest", { instanceId: instance.id, filePath });
+
+      addToast({
+        type: result.failed > 0 ? "warning" : "success",
+        title: t().instances?.reimport?.complete ?? "Re-import complete",
+        message: `${result.downloaded} ${t().instances?.reimport?.downloaded ?? "downloaded"}, ${result.already_present} ${t().instances?.reimport?.alreadyPresent ?? "already present"}, ${result.failed} ${t().instances?.reimport?.failed ?? "failed"}`,
+        duration: 5000,
+      });
+    } catch (e: unknown) {
+      if (import.meta.env.DEV) console.error("Reimport failed:", e);
+      addToast({
+        type: "error",
+        title: t().instances?.reimport?.error ?? "Re-import failed",
+        message: e instanceof Error ? e.message : String(e),
+        duration: 5000,
+      });
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -358,7 +408,7 @@ const InstanceList: Component<Props> = (props) => {
       const button = event.currentTarget as HTMLElement;
       const rect = button.getBoundingClientRect();
       const menuWidth = 220;
-      const menuHeight = 500; // 11 кнопок × 40px + 3 разделителя × 17px + padding
+      const menuHeight = 340; // Primary menu: ~7 items × 40px + dividers + padding
       const padding = 12; // Отступ от краёв viewport
       const titleBarHeight = 40; // Высота TitleBar - меню не должно заходить за него
 
@@ -413,6 +463,7 @@ const InstanceList: Component<Props> = (props) => {
       }
 
       setMenuPosition({ top, left, maxHeight });
+      setMenuMode("primary");
       setOpenMenuId(id);
     }
   };
@@ -486,12 +537,16 @@ const InstanceList: Component<Props> = (props) => {
         <InstanceDetail
           instance={detailInstance()!}
           initialTab={detailInitialTab()}
-          onBack={() => setDetailInstance(null)}
+          onBack={() => {
+            setDetailInstance(null);
+            setDetailInitialTab("mods"); // Reset to default to prevent stale tab on next open
+          }}
           onStart={props.onStart}
           onStop={props.onStop}
           onDelete={(id) => {
             props.onDelete(id);
             setDetailInstance(null);
+            setDetailInitialTab("mods");
           }}
           onRepair={props.onRepair}
           onConfigure={props.onConfigure}
@@ -508,7 +563,7 @@ const InstanceList: Component<Props> = (props) => {
 
       {/* Main List - scrollable when not in detail view */}
       <Show when={!detailInstance()}>
-        <div class="flex flex-col flex-1 min-h-0 overflow-y-auto">
+        <div class="flex flex-col flex-1 min-h-0 overflow-y-auto" data-tour="instance-list">
         <Show when={props.instances.length === 0}>
           {/* Empty state - centered in available space */}
           <div class="flex flex-col items-center justify-center text-center">
@@ -560,6 +615,11 @@ const InstanceList: Component<Props> = (props) => {
               {t().instances.title} · {props.instances.length}
             </h3>
             <div class="flex items-center gap-3">
+              <ViewModeSwitch
+                value={getViewMode("instances")}
+                onChange={(mode) => setViewMode("instances", mode)}
+                modes={["grid", "list"]}
+              />
               <Show when={props.onImportLauncher}>
                 <button
                   class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
@@ -582,420 +642,80 @@ const InstanceList: Component<Props> = (props) => {
           </div>
         </Show>
 
-        <div class="grid grid-cols-1 gap-3">
+        <div data-tour="instance-grid" class={getViewMode("instances") === "list" ? "flex flex-col gap-2" : "grid grid-cols-1 xl:grid-cols-2 gap-3"}>
           <For each={sortedInstances()}>
-            {(instance) => {
-              const acceptsMods = canAcceptMods(instance);
-              const isHovered = () => dragHoveredInstance() === instance.id;
-
-              // Determine card classes based on drag state and loader support
-              const cardClasses = () => {
-                if (!isDraggingMods()) {
-                  return "card-hover";
-                }
-
-                if (acceptsMods) {
-                  if (isHovered()) {
-                    // Active drop target - solid blue border
-                    return "bg-[var(--color-bg-card)] rounded-xl p-4 border border-blue-500";
-                  }
-                  // Valid drop target - dashed blue border
-                  return "bg-[var(--color-bg-card)] rounded-xl p-4 border border-dashed border-blue-500/50";
-                }
-
-                // Invalid drop target (vanilla) - dashed gray border
-                return "bg-[var(--color-bg-card)] rounded-xl p-4 border border-dashed border-gray-600/50 opacity-50";
-              };
-
-              return (
-              <div
-                ref={(el) => registerInstanceCard(instance.id, el)}
-                class={`group cursor-pointer transition-all duration-150 ${cardClasses()}`}
+            {(instance) => (
+              <InstanceCard
+                instance={instance}
+                hasBothTypes={hasBothTypes()}
+                isDraggingMods={isDraggingMods()}
+                isHovered={dragHoveredInstance() === instance.id}
+                acceptsMods={canAcceptMods(instance)}
+                getStatusText={getStatusText}
                 onClick={() => openInstanceDetail(instance)}
-              >
-                {/* Drop zone indicator overlay for valid targets */}
-                <Show when={isDraggingMods() && isHovered() && acceptsMods}>
-                  <div class="absolute inset-0 flex items-center justify-center bg-blue-500/10 rounded-xl pointer-events-none z-10">
-                    <div class="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded-full text-white text-sm font-medium shadow-lg animate-pulse">
-                      <i class="i-hugeicons-download-02 w-4 h-4" />
-                      <span>Отпустите для установки</span>
-                    </div>
-                  </div>
-                </Show>
-
-                {/* Drop zone indicator overlay for invalid targets */}
-                <Show when={isDraggingMods() && isHovered() && !acceptsMods}>
-                  <div class="absolute inset-0 flex items-center justify-center bg-red-500/10 rounded-xl pointer-events-none z-10">
-                    <div class="flex items-center gap-2 px-4 py-2 bg-red-600/80 rounded-full text-white text-sm font-medium shadow-lg">
-                      <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                      <span>Нужен загрузчик модов</span>
-                    </div>
-                  </div>
-                </Show>
-
-                <div class="flex items-center gap-4">
-                  {/* Loader Icon */}
-                  <div class="w-12 h-12 rounded-2xl bg-black/30 flex-center flex-shrink-0 border border-gray-700/50">
-                    <LoaderIcon loader={instance.loader} class="w-7 h-7" />
-                  </div>
-
-                  {/* Info */}
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-3 mb-1">
-                      <h3 class="text-base font-medium truncate text-gray-100">
-                        {instance.name}
-                      </h3>
-                      {/* Instance Type Badge - only show when both types exist */}
-                      <Show when={hasBothTypes()}>
-                        <span
-                          class={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
-                            instance.instance_type === "server"
-                              ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
-                              : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                          }`}
-                        >
-                          {instance.instance_type === "server" ? "Server" : "Client"}
-                        </span>
-                      </Show>
-                      {/* Status Indicator */}
-                      <Show when={instance.status !== "stopped"}>
-                        <Show
-                          when={instance.status === "error" && instance.installation_error}
-                          fallback={
-                            <span
-                              class={`px-2 py-0.5 text-xs rounded-full ${
-                                instance.status === "running"
-                                  ? "bg-emerald-500/10 text-emerald-400"
-                                  : instance.status === "starting"
-                                    ? "bg-yellow-500/10 text-yellow-400"
-                                    : instance.status === "installing"
-                                      ? "bg-blue-500/10 text-blue-400"
-                                      : instance.status === "error"
-                                        ? "bg-red-500/10 text-red-400"
-                                        : "bg-gray-500/10 text-gray-400"
-                              }`}
-                            >
-                              {getStatusText(instance.status)}
-                            </span>
-                          }
-                        >
-                          <Tooltip
-                            text={instance.installation_error || t().instances.status.error}
-                            position="bottom"
-                            delay={100}
-                          >
-                            <span class="px-2 py-0.5 text-xs rounded-full bg-red-500/10 text-red-400 cursor-help flex items-center gap-1">
-                              <i class="i-hugeicons-alert-02 w-3 h-3" />
-                              {getStatusText(instance.status)}
-                            </span>
-                          </Tooltip>
-                        </Show>
-                      </Show>
-                    </div>
-                    <div class="flex items-center gap-2 text-xs text-gray-500">
-                      <span>{instance.version}</span>
-                      <span class="w-1 h-1 rounded-full bg-gray-700" />
-                      <span class="capitalize">{instance.loader || "vanilla"}</span>
-                      <Show when={instance.last_played}>
-                        <span class="w-1 h-1 rounded-full bg-gray-700" />
-                        <span>{new Date(instance.last_played!).toLocaleDateString("ru-RU")}</span>
-                      </Show>
-                      <Show when={instance.total_playtime > 0}>
-                        <span class="w-1 h-1 rounded-full bg-gray-700" />
-                        <span>
-                          {Math.floor(instance.total_playtime / 3600)}ч{" "}
-                          {Math.floor((instance.total_playtime % 3600) / 60)}м
-                        </span>
-                      </Show>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {/* Primary Action Button */}
-                    <Show
-                      when={instance.status === "running"}
-                      fallback={
-                        <button
-                          class="px-4 py-2 text-sm font-medium rounded-2xl bg-white/10 hover:bg-white/15 text-white transition-colors disabled:opacity-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            props.onStart(instance.id);
-                          }}
-                          disabled={
-                            instance.status === "starting" ||
-                            instance.status === "installing"
-                          }
-                        >
-                          <Show
-                            when={instance.status === "starting"}
-                            fallback={
-                              <span class="flex items-center gap-2">
-                                <i class="i-hugeicons-play w-3.5 h-3.5" />
-                                Играть
-                              </span>
-                            }
-                          >
-                            <span class="flex items-center gap-2">
-                              <i class="i-svg-spinners-6-dots-scale w-3.5 h-3.5" />
-                              Запуск
-                            </span>
-                          </Show>
-                        </button>
-                      }
-                    >
-                      <button
-                        class="px-4 py-2 text-sm font-medium rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          props.onStop(instance.id);
-                        }}
-                        disabled={instance.status === "stopping"}
-                      >
-                        <Show
-                          when={instance.status === "stopping"}
-                          fallback={
-                            <span class="flex items-center gap-2">
-                              <i class="i-hugeicons-stop w-3.5 h-3.5" />
-                              Стоп
-                            </span>
-                          }
-                        >
-                          <span class="flex items-center gap-2">
-                            <i class="i-svg-spinners-6-dots-scale w-3.5 h-3.5" />
-                            ...
-                          </span>
-                        </Show>
-                      </button>
-                    </Show>
-
-                    {/* More Actions Menu Button */}
-                    <button
-                      class="p-2 rounded-2xl hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleMenu(instance.id, e);
-                      }}
-                      title={t().instances.moreActions}
-                    >
-                      <i class="i-hugeicons-more-horizontal w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              );
-            }}
+                onStart={props.onStart}
+                onStop={props.onStop}
+                onToggleMenu={toggleMenu}
+                registerRef={registerInstanceCard}
+                t={t}
+                language={language}
+              />
+            )}
           </For>
         </div>
         </div>
 
-        {/* Context Menu Portal - рендерится отдельно с fixed позиционированием */}
+        {/* Context Menu */}
         <Show when={openMenuId() && menuPosition()}>
           {(() => {
             const instance = props.instances.find(i => i.id === openMenuId());
             if (!instance) return null;
-            const pos = menuPosition()!;
             return (
-              <>
-                {/* Backdrop для закрытия */}
-                <div
-                  class="fixed inset-0 z-40"
-                  onClick={handleClickOutside}
-                />
-                {/* Само меню */}
-                <div
-                  ref={menuRef}
-                  class={`fixed z-50 bg-[--color-bg-elevated] border border-[--color-border] rounded-xl shadow-xl p-2 w-[220px] animate-scale-in ${pos.maxHeight ? 'overflow-y-auto' : 'overflow-hidden'}`}
-                  style={{
-                    top: `${pos.top}px`,
-                    left: `${pos.left}px`,
-                    ...(pos.maxHeight ? { "max-height": `${pos.maxHeight}px` } : {})
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    class="dropdown-item"
-                    onClick={() => handleOpenMods(instance)}
-                  >
-                    <i class="i-hugeicons-package w-4 h-4" />
-                    {t().mods.title}
-                  </button>
-
-                  {/* Game Settings - only for clients */}
-                  <Show when={instance.instance_type !== "server"}>
-                    <button
-                      class="dropdown-item"
-                      onClick={() => {
-                        setGameSettingsInstance(instance);
-                        setShowGameSettings(true);
-                        setOpenMenuId(null);
-                        setMenuPosition(null);
-                      }}
-                    >
-                      <i class="i-hugeicons-game-controller-03 w-4 h-4" />
-                      {t().instances.gameSettings}
-                    </button>
-                  </Show>
-
-                  {/* Server Console - only for servers */}
-                  <Show when={instance.instance_type === "server"}>
-                    <button
-                      class="dropdown-item"
-                      onClick={() => {
-                        openInstanceDetail(instance, "console");
-                        setOpenMenuId(null);
-                        setMenuPosition(null);
-                      }}
-                    >
-                      <i class="i-hugeicons-computer-terminal-01 w-4 h-4" />
-                      {t().instances.console}
-                    </button>
-                    <button
-                      class="dropdown-item"
-                      onClick={() => {
-                        openInstanceDetail(instance, "settings");
-                        setOpenMenuId(null);
-                        setMenuPosition(null);
-                      }}
-                    >
-                      <i class="i-hugeicons-settings-02 w-4 h-4" />
-                      {t().instances.serverSettings}
-                    </button>
-                  </Show>
-
-                  <div class="dropdown-divider" />
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      setDetailInitialTab("logs");
-                      setDetailInstance(instance);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <i class="i-hugeicons-file-view w-4 h-4" />
-                    {t().instances.analyzeLogs}
-                  </button>
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      setIntegrityInstance(instance);
-                      setShowIntegrityChecker(true);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <i class="i-hugeicons-checkmark-circle-02 w-4 h-4" />
-                    {t().instances.checkIntegrity}
-                  </button>
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      setStzhkExportInstance(instance);
-                      setShowStzhkExport(true);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <i class="i-hugeicons-share-01 w-4 h-4" />
-                    {t().instances.exportStzhk}
-                  </button>
-
-                  <div class="dropdown-divider" />
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => handleOpenFolder(instance)}
-                  >
-                    <i class="i-hugeicons-folder-01 w-4 h-4" />
-                    {t().instances.openFolder}
-                  </button>
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      props.onConfigure(instance);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <i class="i-hugeicons-settings-02 w-4 h-4" />
-                    {t().common.edit}
-                  </button>
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      props.onRepair(instance.id);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                    disabled={
-                      instance.status === "running" ||
-                      instance.status === "starting"
-                    }
-                  >
-                    <i class="i-hugeicons-wrench-01 w-4 h-4" />
-                    {t().instances.repair}
-                  </button>
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      setDetailInitialTab("backups");
-                      setDetailInstance(instance);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <i class="i-hugeicons-floppy-disk w-4 h-4" />
-                    {t().backup.title}
-                  </button>
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      setDetailInitialTab("patches");
-                      setDetailInstance(instance);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <i class="i-hugeicons-git-compare w-4 h-4" />
-                    {t().patches?.title || "Патчи"}
-                  </button>
-
-                  <button
-                    class="dropdown-item"
-                    onClick={() => {
-                      setDetailInitialTab("performance");
-                      setDetailInstance(instance);
-                      setOpenMenuId(null);
-                      setMenuPosition(null);
-                    }}
-                  >
-                    <i class="i-hugeicons-activity-01 w-4 h-4" />
-                    {t().performance?.title || "Производительность"}
-                  </button>
-
-                  <div class="dropdown-divider" />
-
-                  <button
-                    class="dropdown-item"
-                    data-danger="true"
-                    onClick={() => handleDelete(instance.id)}
-                    disabled={instance.status === "running"}
-                  >
-                    <i class="i-hugeicons-delete-02 w-4 h-4" />
-                    {confirmDelete() === instance.id
-                      ? t().instances.confirmDelete
-                      : t().common.delete}
-                  </button>
-                </div>
-              </>
+              <InstanceContextMenu
+                instance={instance}
+                position={menuPosition()!}
+                menuMode={menuMode()}
+                confirmDelete={confirmDelete()}
+                setMenuMode={setMenuMode}
+                onOpenMods={handleOpenMods}
+                onOpenDetail={openInstanceDetail}
+                onOpenFolder={handleOpenFolder}
+                onConfigure={(inst) => {
+                  props.onConfigure(inst);
+                  setOpenMenuId(null);
+                  setMenuPosition(null);
+                }}
+                onDelete={handleDelete}
+                onGameSettings={(inst) => {
+                  setGameSettingsInstance(inst);
+                  setShowGameSettings(true);
+                  setOpenMenuId(null);
+                  setMenuPosition(null);
+                }}
+                onCheckIntegrity={(inst) => {
+                  setIntegrityInstance(inst);
+                  setShowIntegrityChecker(true);
+                  setOpenMenuId(null);
+                  setMenuPosition(null);
+                }}
+                onExportStzhk={(inst) => {
+                  setStzhkExportInstance(inst);
+                  setShowStzhkExport(true);
+                  setOpenMenuId(null);
+                  setMenuPosition(null);
+                }}
+                onReimportManifest={handleReimportManifest}
+                onConvertToServer={(inst) => {
+                  setConvertInstance(inst);
+                  setShowConvertToServer(true);
+                  setOpenMenuId(null);
+                  setMenuPosition(null);
+                }}
+                onRepair={props.onRepair}
+                onClose={handleClickOutside}
+                menuRef={(el) => { menuRef = el; }}
+                t={t}
+              />
             );
           })()}
         </Show>
@@ -1034,7 +754,7 @@ const InstanceList: Component<Props> = (props) => {
           <div class="card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-100">
             <div class="flex items-center justify-between mb-4 flex-shrink-0">
               <div>
-                <h2 class="text-xl font-bold">Проверка целостности</h2>
+                <h2 class="text-xl font-bold">{t().instances.checkIntegrity}</h2>
                 <p class="text-sm text-muted">{integrityInstance()!.name}</p>
               </div>
               <button
@@ -1069,6 +789,23 @@ const InstanceList: Component<Props> = (props) => {
           onClose={() => {
             setShowStzhkExport(false);
             setStzhkExportInstance(null);
+          }}
+        />
+      </Show>
+
+      {/* Convert to Server Dialog */}
+      <Show when={showConvertToServer() && convertInstance()}>
+        <ConvertToServerDialog
+          instance={convertInstance()!}
+          onClose={() => {
+            setShowConvertToServer(false);
+            setConvertInstance(null);
+          }}
+          onConverted={(updated) => {
+            // Refresh the instance list to show updated type
+            props.onConfigure(updated);
+            setShowConvertToServer(false);
+            setConvertInstance(null);
           }}
         />
       </Show>

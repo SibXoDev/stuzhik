@@ -96,7 +96,7 @@ pub struct MinecraftFolderAnalysis {
 
 /// Analyze a .minecraft folder
 pub async fn analyze_folder(minecraft_dir: &Path) -> LauncherResult<MinecraftFolderAnalysis> {
-    if !minecraft_dir.exists() {
+    if !fs::try_exists(minecraft_dir).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "Directory not found: {}",
             minecraft_dir.display()
@@ -170,7 +170,7 @@ async fn scan_suspicious(dir: &Path, analysis: &mut MinecraftFolderAnalysis) {
 /// Detect loader by inspecting mod JARs
 async fn detect_loader_from_mods(minecraft_dir: &Path, analysis: &mut MinecraftFolderAnalysis) {
     let mods_dir = minecraft_dir.join("mods");
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return;
     }
 
@@ -291,7 +291,7 @@ async fn detect_version_from_config(minecraft_dir: &Path) -> Option<String> {
     let fml_cache = minecraft_dir
         .join("config")
         .join("fml-cache-annotation.json");
-    if fml_cache.exists() {
+    if fs::try_exists(&fml_cache).await.unwrap_or(false) {
         if let Ok(content) = fs::read_to_string(&fml_cache).await {
             // Parse version from FML cache
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -304,7 +304,7 @@ async fn detect_version_from_config(minecraft_dir: &Path) -> Option<String> {
 
     // Check defaultconfigs/.fabric (Fabric)
     let fabric_marker = minecraft_dir.join(".fabric");
-    if fabric_marker.exists() {
+    if fs::try_exists(&fabric_marker).await.unwrap_or(false) {
         // Try to find version in .fabric folder
         // This is a heuristic - actual version detection is more complex
     }
@@ -315,13 +315,13 @@ async fn detect_version_from_config(minecraft_dir: &Path) -> Option<String> {
 /// Detect Fabric loader version
 async fn detect_fabric_version(minecraft_dir: &Path) -> Option<(String, String)> {
     let fabric_dir = minecraft_dir.join(".fabric");
-    if !fabric_dir.exists() {
+    if !fs::try_exists(&fabric_dir).await.unwrap_or(false) {
         return None;
     }
 
     // Check for remappedJars folder naming
     let remapped_jars = fabric_dir.join("remappedJars");
-    if remapped_jars.exists() {
+    if fs::try_exists(&remapped_jars).await.unwrap_or(false) {
         if let Ok(mut entries) = fs::read_dir(&remapped_jars).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
                 let name = entry.file_name().to_string_lossy().to_string();
@@ -342,7 +342,7 @@ async fn detect_fabric_version(minecraft_dir: &Path) -> Option<(String, String)>
 /// Detect version from mod filenames (heuristic)
 async fn detect_version_from_mod_names(minecraft_dir: &Path) -> Option<String> {
     let mods_dir = minecraft_dir.join("mods");
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return None;
     }
 
@@ -386,7 +386,7 @@ async fn detect_version_from_mod_names(minecraft_dir: &Path) -> Option<String> {
 
 /// Count mods in directory
 async fn count_mods(mods_dir: &Path) -> usize {
-    if !mods_dir.exists() {
+    if !fs::try_exists(mods_dir).await.unwrap_or(false) {
         return 0;
     }
 
@@ -556,7 +556,7 @@ pub async fn get_importable_paths(minecraft_dir: &Path) -> Vec<PathBuf> {
 
     for safe_dir in SAFE_DIRS {
         let path = minecraft_dir.join(safe_dir);
-        if path.exists() {
+        if fs::try_exists(&path).await.unwrap_or(false) {
             paths.push(path);
         }
     }
@@ -570,7 +570,7 @@ pub async fn get_importable_paths(minecraft_dir: &Path) -> Vec<PathBuf> {
     ];
     for file in &safe_files {
         let path = minecraft_dir.join(file);
-        if path.exists() {
+        if fs::try_exists(&path).await.unwrap_or(false) {
             paths.push(path);
         }
     }

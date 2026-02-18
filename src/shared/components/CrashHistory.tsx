@@ -89,7 +89,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
         <button
           class={`px-4 py-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${
             activeTab() === "stats"
-              ? "text-blue-400 border-b-2 border-blue-400"
+              ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]"
               : "text-gray-400 hover:text-gray-200"
           }`}
           onClick={() => setActiveTab("stats")}
@@ -100,7 +100,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
         <button
           class={`px-4 py-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${
             activeTab() === "history"
-              ? "text-blue-400 border-b-2 border-blue-400"
+              ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]"
               : "text-gray-400 hover:text-gray-200"
           }`}
           onClick={() => setActiveTab("history")}
@@ -111,7 +111,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
         <button
           class={`px-4 py-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${
             activeTab() === "trends"
-              ? "text-blue-400 border-b-2 border-blue-400"
+              ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]"
               : "text-gray-400 hover:text-gray-200"
           }`}
           onClick={() => setActiveTab("trends")}
@@ -219,8 +219,8 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
 
               {/* Empty State */}
               <Show when={crashHistory.statistics()?.total_crashes === 0}>
-                <div class="flex flex-col items-center justify-center py-8 text-gray-400">
-                  <i class="i-hugeicons-checkmark-circle-02 w-12 h-12 text-green-400 mb-3" />
+                <div class="flex flex-col items-center justify-center gap-3 py-8 text-gray-400">
+                  <i class="i-hugeicons-checkmark-circle-02 w-12 h-12 text-green-400" />
                   <p class="text-sm">{t().crashHistory.noCrashes}</p>
                 </div>
               </Show>
@@ -231,8 +231,8 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
           <Show when={activeTab() === "history"}>
             <div class="space-y-2">
               <Show when={crashHistory.history().length === 0}>
-                <div class="flex flex-col items-center justify-center py-8 text-gray-400">
-                  <i class="i-hugeicons-file-01 w-10 h-10 mb-3" />
+                <div class="flex flex-col items-center justify-center gap-3 py-8 text-gray-400">
+                  <i class="i-hugeicons-file-01 w-10 h-10" />
                   <p class="text-sm">{t().crashHistory.noHistory}</p>
                 </div>
               </Show>
@@ -240,7 +240,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
               <For each={crashHistory.history()}>
                 {(record) => (
                   <div
-                    class={`p-3 rounded-2xl border transition-colors cursor-pointer ${
+                    class={`flex flex-col gap-2 p-3 rounded-2xl border transition-colors cursor-pointer ${
                       record.was_fixed
                         ? "bg-green-900/20 border-green-700/30 hover:border-green-600/50"
                         : "bg-gray-800/30 border-gray-700/30 hover:border-gray-600/50"
@@ -273,7 +273,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
 
                     {/* Suspected Mods */}
                     <Show when={record.suspected_mods.length > 0}>
-                      <div class="mt-2 flex flex-wrap gap-1">
+                      <div class="flex flex-wrap gap-1">
                         <For each={record.suspected_mods.slice(0, 5)}>
                           {(mod) => (
                             <span class="text-xs px-1.5 py-0.5 rounded bg-orange-900/30 text-orange-300 border border-orange-700/30">
@@ -289,7 +289,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
 
                     {/* Expanded Details */}
                     <Show when={selectedCrash() === record}>
-                      <div class="mt-3 pt-3 border-t border-gray-700/30 space-y-2">
+                      <div class="pt-3 border-t border-gray-700/30 space-y-2">
                         <Show when={record.minecraft_version}>
                           <div class="text-xs text-gray-400">
                             Minecraft: {record.minecraft_version}
@@ -344,7 +344,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
               {/* Clear History */}
               <Show when={crashHistory.history().length > 0}>
                 <button
-                  class="mt-4 text-xs px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors inline-flex items-center gap-1"
+                  class="text-xs px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors inline-flex items-center gap-1"
                   onClick={async () => {
                     const confirmed = await confirm({
                       title: t().crashHistory.clearHistory,
@@ -369,16 +369,16 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
           <Show when={activeTab() === "trends"}>
             <div class="space-y-4">
               <Show when={crashHistory.trends().length === 0}>
-                <div class="flex flex-col items-center justify-center py-8 text-gray-400">
-                  <i class="i-hugeicons-analytics-01 w-10 h-10 mb-3" />
+                <div class="flex flex-col items-center justify-center gap-3 py-8 text-gray-400">
+                  <i class="i-hugeicons-analytics-01 w-10 h-10" />
                   <p class="text-sm">{t().crashHistory.noTrends}</p>
                 </div>
               </Show>
 
               <For each={crashHistory.trends()}>
                 {(trend) => (
-                  <div class="p-3 bg-gray-800/30 rounded-2xl border border-gray-700/30">
-                    <div class="flex items-center justify-between mb-3">
+                  <div class="flex flex-col gap-3 p-3 bg-gray-800/30 rounded-2xl border border-gray-700/30">
+                    <div class="flex items-center justify-between">
                       <div class="flex items-center gap-2">
                         <span class="font-medium text-gray-200">{trend.mod_id}</span>
                         <i class={`w-4 h-4 ${getTrendIcon(trend.trend)}`} />
@@ -387,7 +387,7 @@ export const CrashHistory: Component<CrashHistoryProps> = (props) => {
                     </div>
 
                     {/* Mini Bar Chart */}
-                    <div class="flex items-end gap-1 h-12 mb-2">
+                    <div class="flex items-end gap-1 h-12">
                       <For each={trend.daily_crashes}>
                         {(day) => {
                           const maxCount = Math.max(...trend.daily_crashes.map((d) => d.count), 1);

@@ -106,14 +106,17 @@ impl JavaManager {
 
     /// Проверка наличия установленной Java
     pub async fn get_installed_java(version: &str) -> Result<Option<PathBuf>> {
-        let conn = get_db_conn()?;
-        let mut stmt = conn.prepare("SELECT path FROM java_installations WHERE version = ?1")?;
-
-        let path: Option<String> = stmt.query_row([version], |row| row.get(0)).ok();
+        // Собираем путь из БД и дропаем conn/stmt ДО .await
+        // (rusqlite::Statement содержит *mut sqlite3_stmt — не Send)
+        let path = {
+            let conn = get_db_conn()?;
+            let mut stmt = conn.prepare("SELECT path FROM java_installations WHERE version = ?1")?;
+            stmt.query_row([version], |row| row.get::<_, String>(0)).ok()
+        };
 
         if let Some(p) = path {
             let path = PathBuf::from(p);
-            if path.exists() {
+            if tokio::fs::try_exists(&path).await.unwrap_or(false) {
                 return Ok(Some(path));
             }
         }
@@ -130,7 +133,7 @@ impl JavaManager {
                 PathBuf::from(&java_home).join("bin/java")
             };
 
-            if java.exists() {
+            if tokio::fs::try_exists(&java).await.unwrap_or(false) {
                 return Some(java);
             }
         }
@@ -243,11 +246,7 @@ impl JavaManager {
 
         log::info!("Fetching Java releases from Adoptium API: {}", url);
 
-        let response = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .map_err(|e| LauncherError::ApiError(format!("Failed to build HTTP client: {}", e)))?
+        let response = crate::utils::SHARED_HTTP_CLIENT
             .get(&url)
             .send()
             .await
@@ -743,7 +742,7 @@ impl JavaManager {
         let path = PathBuf::from(java_path);
 
         // Проверяем что файл существует
-        if !path.exists() {
+        if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
             return Err(LauncherError::InvalidConfig(format!(
                 "Java не найдена по пути: {}",
                 java_path
@@ -801,7 +800,7 @@ impl JavaManager {
     pub async fn validate_java_path(java_path: &str) -> Result<SystemJavaInfo> {
         let path = PathBuf::from(java_path);
 
-        if !path.exists() {
+        if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
             return Err(LauncherError::InvalidConfig(format!(
                 "Файл не найден: {}",
                 java_path
@@ -908,7 +907,7 @@ impl JavaManager {
         // Сначала проверяем настройку активной Java
         if let Some(active_path) = Self::get_active_java_sync(major_version) {
             let path = PathBuf::from(&active_path);
-            if path.exists() {
+            if tokio::fs::try_exists(&path).await.unwrap_or(false) {
                 return Ok(Some(path));
             }
         }

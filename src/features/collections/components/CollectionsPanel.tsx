@@ -199,9 +199,9 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
   }
 
   return (
-    <div class="flex flex-col">
+    <div class="flex flex-col gap-4">
       {/* Header */}
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">
           {t().collections?.title ?? "Mod Collections"}
         </h2>
@@ -246,7 +246,7 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               {(collection) => (
                 <button
                   class={`w-full aspect-[16/9] bg-cover bg-center text-left transition-all overflow-hidden p-0 hover:brightness-110 rounded-xl ${
-                    selectedCollection()?.id === collection.id ? "ring-2 ring-blue-500" : ""
+                    selectedCollection()?.id === collection.id ? "ring-2 ring-[var(--color-primary)]" : ""
                   }`}
                   style={{
                     "background-image": `url(${getCollectionIconUrl(collection.icon)})`,
@@ -276,28 +276,28 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
             when={selectedCollection()}
             fallback={
               <div class="flex items-center justify-center py-12 text-gray-500">
-                <div class="text-center">
-                  <i class="i-hugeicons-folder-add w-12 h-12 mb-2 opacity-50" />
+                <div class="flex flex-col items-center gap-2 text-center">
+                  <i class="i-hugeicons-folder-add w-12 h-12 opacity-50" />
                   <p>{t().collections?.selectCollection ?? "Select a collection"}</p>
                 </div>
               </div>
             }
           >
             {(selected) => (
-              <div>
+              <div class="flex flex-col gap-4">
                 {/* Collection Header - full width banner */}
                 <div
-                  class="aspect-[21/9] rounded-2xl bg-cover bg-center overflow-hidden mb-4"
+                  class="aspect-[21/9] rounded-2xl bg-cover bg-center overflow-hidden"
                   style={{
                     "background-image": `url(${getCollectionIconUrl(selected().icon)})`,
                   }}
                 >
                   <div class="w-full h-full bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end p-4">
                     <div class="flex items-end justify-between">
-                      <div>
+                      <div class="flex flex-col gap-1">
                         <h3 class="text-2xl font-bold text-white drop-shadow-lg">{selected().name}</h3>
                         <Show when={selected().description}>
-                          <p class="text-gray-200 text-sm mt-1">{selected().description}</p>
+                          <p class="text-gray-200 text-sm">{selected().description}</p>
                         </Show>
                       </div>
                       <div class="flex gap-1">
@@ -338,7 +338,7 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
 
                 {/* Install Button */}
                 <Show when={props.instance}>
-                  <div class="mb-4 p-3 bg-gray-800 rounded-xl">
+                  <div class="p-3 bg-gray-800 rounded-xl">
                     <div class="flex items-center justify-between">
                       <div>
                         <div class="font-medium">
@@ -397,7 +397,8 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
                 </Show>
 
                 {/* Mods List */}
-                <div class="text-sm font-medium text-gray-400 mb-2">
+                <div class="flex flex-col gap-2">
+                <div class="text-sm font-medium text-gray-400">
                   {t().collections?.modsInCollection ?? "Mods in collection"} ({selected().mods.length})
                 </div>
                 <div class="flex flex-col gap-1">
@@ -441,6 +442,7 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
                     )}
                   </For>
                 </div>
+                </div>
               </div>
             )}
           </Show>
@@ -450,15 +452,15 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
       {/* Create Dialog */}
       <Show when={showCreateDialog()}>
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div class="bg-gray-850 rounded-2xl p-6 w-96 border border-gray-700">
-            <h3 class="text-lg font-semibold mb-4">
+          <div class="bg-gray-850 rounded-2xl p-6 w-96 border border-gray-700 flex flex-col gap-4">
+            <h3 class="text-lg font-semibold">
               {t().collections?.createNew ?? "Create New Collection"}
             </h3>
 
             <div class="space-y-4">
               {/* Name */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.name ?? "Name"}
                 </label>
                 <input
@@ -471,8 +473,8 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
 
               {/* Description */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.description ?? "Description"}
                 </label>
                 <input
@@ -485,8 +487,8 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
 
               {/* Icon */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.icon ?? "Icon"}
                 </label>
                 <div class="flex flex-wrap gap-2">
@@ -495,7 +497,7 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
                       <button
                         class={`w-14 h-8 rounded-lg bg-cover bg-center transition-all ${
                           newIcon() === icon
-                            ? "ring-2 ring-blue-400 scale-110"
+                            ? "ring-2 ring-[var(--color-primary)] scale-110"
                             : "opacity-70 hover:opacity-100"
                         }`}
                         style={{
@@ -509,8 +511,8 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
 
               {/* Color */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.color ?? "Color"}
                 </label>
                 <div class="flex flex-wrap gap-2">
@@ -529,7 +531,7 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
             </div>
 
-            <div class="flex justify-end gap-2 mt-6">
+            <div class="flex justify-end gap-2 mt-2">
               <button
                 class="btn-secondary"
                 onClick={() => {
@@ -554,15 +556,15 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
       {/* Edit Dialog */}
       <Show when={showEditDialog()}>
         <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div class="bg-gray-850 rounded-2xl p-6 w-96 border border-gray-700">
-            <h3 class="text-lg font-semibold mb-4">
+          <div class="bg-gray-850 rounded-2xl p-6 w-96 border border-gray-700 flex flex-col gap-4">
+            <h3 class="text-lg font-semibold">
               {t().collections?.edit ?? "Edit Collection"}
             </h3>
 
             <div class="space-y-4">
               {/* Name */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.name ?? "Name"}
                 </label>
                 <input
@@ -574,8 +576,8 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
 
               {/* Description */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.description ?? "Description"}
                 </label>
                 <input
@@ -587,8 +589,8 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
 
               {/* Icon */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.icon ?? "Icon"}
                 </label>
                 <div class="flex flex-wrap gap-2">
@@ -597,7 +599,7 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
                       <button
                         class={`w-14 h-8 rounded-lg bg-cover bg-center transition-all ${
                           newIcon() === icon
-                            ? "ring-2 ring-blue-400 scale-110"
+                            ? "ring-2 ring-[var(--color-primary)] scale-110"
                             : "opacity-70 hover:opacity-100"
                         }`}
                         style={{
@@ -611,8 +613,8 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
 
               {/* Color */}
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">
+              <div class="flex flex-col gap-1">
+                <label class="block text-sm text-gray-400">
                   {t().collections?.color ?? "Color"}
                 </label>
                 <div class="flex flex-wrap gap-2">
@@ -631,7 +633,7 @@ export function CollectionsPanel(props: CollectionsPanelProps) {
               </div>
             </div>
 
-            <div class="flex justify-end gap-2 mt-6">
+            <div class="flex justify-end gap-2 mt-2">
               <button
                 class="btn-secondary"
                 onClick={() => setShowEditDialog(false)}

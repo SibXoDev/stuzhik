@@ -1,6 +1,7 @@
 import { Show, For, createSignal, createMemo } from "solid-js";
 import { useLiveCrashMonitor } from "../hooks/useLiveCrashMonitor";
 import { useI18n } from "../i18n";
+import { Tooltip } from "../ui";
 
 /**
  * Compact Live Crash Indicator for TitleBar
@@ -43,11 +44,11 @@ export function LiveCrashIndicator() {
     <Show when={shouldShow()}>
       <div>
         {/* Compact Indicator Button */}
-        <button
-          class={`p-1.5 flex items-center justify-center gap-1 rounded-2xl bg-transparent border-none outline-none cursor-pointer hover:bg-white/10 transition-colors duration-75 ${statusColor()}`}
-          onClick={() => setShowDropdown(!showDropdown())}
-          title={monitor.isMonitoring() ? t().liveCrash.monitoring : t().liveCrash.notMonitoring}
-        >
+        <Tooltip text={monitor.isMonitoring() ? t().liveCrash.monitoring : t().liveCrash.notMonitoring} position="bottom">
+          <button
+            class={`p-1.5 flex items-center justify-center gap-1 rounded-2xl bg-transparent border-none outline-none cursor-pointer hover:bg-white/10 transition-colors duration-75 ${statusColor()}`}
+            onClick={() => setShowDropdown(!showDropdown())}
+          >
           <i class={`${statusIcon()} w-4 h-4`} />
 
           {/* Error count badge */}
@@ -64,6 +65,7 @@ export function LiveCrashIndicator() {
             </span>
           </Show>
         </button>
+        </Tooltip>
 
         {/* Dropdown */}
         <Show when={showDropdown()}>
@@ -84,13 +86,14 @@ export function LiveCrashIndicator() {
               </span>
 
               <Show when={hasIssues()}>
-                <button
-                  class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
-                  onClick={() => monitor.clearEvents()}
-                  title={t().liveCrash.clear}
-                >
-                  <i class="i-hugeicons-delete-02 w-3.5 h-3.5" />
-                </button>
+                <Tooltip text={t().liveCrash.clear} position="bottom">
+                  <button
+                    class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200"
+                    onClick={() => monitor.clearEvents()}
+                  >
+                    <i class="i-hugeicons-delete-02 w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
               </Show>
             </div>
 

@@ -24,3 +24,4 @@ coverage/
 .DS_Store
 Thumbs.dbpackage-lock.json
 src/generated/source-code.ts
+/src/generated

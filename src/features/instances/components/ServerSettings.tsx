@@ -1,7 +1,9 @@
 import { Component, createSignal, For, Show, onMount, createMemo } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { Toggle, Select, Tabs } from "../../../shared/ui";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import ServerP2PPanel from "./ServerP2PPanel";
+import { useI18n } from "../../../shared/i18n";
 
 interface ServerProperties {
   [key: string]: string | number | boolean | object;
@@ -538,6 +540,7 @@ const GROUPS = [
 ];
 
 const ServerSettings: Component<Props> = (props) => {
+  const { t } = useI18n();
   const [mainTab, setMainTab] = createSignal<MainTab>("properties");
   const [selectedGroup, setSelectedGroup] = createSignal("network");
   const [properties, setProperties] = createSignal<ServerProperties>({});
@@ -822,7 +825,7 @@ const ServerSettings: Component<Props> = (props) => {
       <div class="flex-1 overflow-hidden min-h-0">
         <Show when={loading()}>
           <div class="flex items-center justify-center h-full">
-            <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-blue-400" />
+            <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-[var(--color-primary)]" />
           </div>
         </Show>
 
@@ -836,7 +839,7 @@ const ServerSettings: Component<Props> = (props) => {
                   <button
                     class={`w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-center justify-start gap-3 ${
                       selectedGroup() === group.id
-                        ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                        ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)] border border-[var(--color-primary-border)]"
                         : "hover:bg-gray-800 text-gray-400"
                     }`}
                     onClick={() => setSelectedGroup(group.id)}
@@ -896,7 +899,7 @@ const ServerSettings: Component<Props> = (props) => {
               <input
                 type="text"
                 class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300"
-                placeholder="Введите никнейм игрока..."
+                placeholder={t().ui?.placeholders?.enterPlayerNick ?? "Enter player nickname..."}
                 value={newPlayerName()}
                 onInput={(e) => setNewPlayerName(e.currentTarget.value)}
                 onKeyDown={(e) => e.key === "Enter" && addToWhitelist()}
@@ -935,13 +938,14 @@ const ServerSettings: Component<Props> = (props) => {
                     {(player) => (
                       <div class="flex items-center justify-between bg-gray-800/50 rounded-lg px-3 py-2">
                         <span class="text-sm text-gray-300">{player.name}</span>
-                        <button
-                          class="text-red-400 hover:text-red-300 p-1"
-                          onClick={() => removeFromWhitelist(player.name)}
-                          title="Удалить"
-                        >
-                          <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                        </button>
+                        <Tooltip text="Удалить" position="bottom">
+                          <button
+                            class="text-red-400 hover:text-red-300 p-1"
+                            onClick={() => removeFromWhitelist(player.name)}
+                          >
+                            <i class="i-hugeicons-cancel-01 w-4 h-4" />
+                          </button>
+                        </Tooltip>
                       </div>
                     )}
                   </For>
@@ -968,13 +972,14 @@ const ServerSettings: Component<Props> = (props) => {
                             Ур. {op.level}
                           </span>
                         </div>
-                        <button
-                          class="text-red-400 hover:text-red-300 p-1"
-                          onClick={() => removeOperator(op.name)}
-                          title="Снять OP"
-                        >
-                          <i class="i-hugeicons-cancel-01 w-4 h-4" />
-                        </button>
+                        <Tooltip text="Снять OP" position="bottom">
+                          <button
+                            class="text-red-400 hover:text-red-300 p-1"
+                            onClick={() => removeOperator(op.name)}
+                          >
+                            <i class="i-hugeicons-cancel-01 w-4 h-4" />
+                          </button>
+                        </Tooltip>
                       </div>
                     )}
                   </For>

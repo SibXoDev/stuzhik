@@ -86,25 +86,29 @@ pub async fn list_instances_from_launcher(
 /// List instances from a path (auto-detect launcher type)
 pub async fn list_instances_from_path(path: &Path) -> LauncherResult<Vec<LauncherInstance>> {
     // Try to detect launcher type
-    if path.join("instances").exists() {
+    if fs::try_exists(path.join("instances")).await.unwrap_or(false) {
         // MultiMC/Prism style
-        if path.join("prismlauncher.cfg").exists() || path.join("multimc.cfg").exists() {
+        if fs::try_exists(path.join("prismlauncher.cfg")).await.unwrap_or(false)
+            || fs::try_exists(path.join("multimc.cfg")).await.unwrap_or(false)
+        {
             return multimc::list_instances(path).await;
         }
     }
 
-    if path.join("Instances").exists() {
+    if fs::try_exists(path.join("Instances")).await.unwrap_or(false) {
         // CurseForge style
         return curseforge::list_instances(path).await;
     }
 
-    if path.join("profiles").exists() {
+    if fs::try_exists(path.join("profiles")).await.unwrap_or(false) {
         // Modrinth style
         return modrinth::list_instances(path).await;
     }
 
     // Try as generic .minecraft folder
-    if path.join("mods").exists() || path.join("config").exists() {
+    if fs::try_exists(path.join("mods")).await.unwrap_or(false)
+        || fs::try_exists(path.join("config")).await.unwrap_or(false)
+    {
         let instance = generic::parse_instance(path, None).await?;
         return Ok(vec![instance]);
     }
@@ -386,7 +390,7 @@ async fn scan_files_for_import(
         let src_dir = source.join(dir_name);
         let dst_dir = dest.join(dir_name);
 
-        if src_dir.exists() {
+        if fs::try_exists(&src_dir).await.unwrap_or(false) {
             let (dir_files, dir_size) = scan_directory(&src_dir, &dst_dir).await?;
             files.extend(dir_files);
             total_size += dir_size;
@@ -398,7 +402,7 @@ async fn scan_files_for_import(
         let src_file = source.join(file_name);
         let dst_file = dest.join(file_name);
 
-        if src_file.exists() {
+        if fs::try_exists(&src_file).await.unwrap_or(false) {
             if let Ok(metadata) = fs::metadata(&src_file).await {
                 total_size += metadata.len();
                 files.push((src_file, dst_file));
@@ -514,7 +518,7 @@ fn save_instance_to_db(
 
 /// Count mods in directory
 async fn count_mods(mods_dir: &Path) -> usize {
-    if !mods_dir.exists() {
+    if !fs::try_exists(mods_dir).await.unwrap_or(false) {
         return 0;
     }
 

@@ -2,6 +2,7 @@ import { Show, For, createSignal } from "solid-js";
 import type { Component } from "solid-js";
 import type { LaunchChanges, SnapshotHistory as SnapshotHistoryType } from "../../../shared/types";
 import { useI18n } from "../../../shared/i18n";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import SnapshotHistory from "./SnapshotHistory";
 
 interface Props {
@@ -106,13 +107,14 @@ const LaunchChangesAlert: Component<Props> = (props) => {
                     ? (t().launchChanges?.comparingWith || "Сравнение с прошлым снимком")
                     : (t().launchChanges?.title || "Изменения с последнего запуска")}
               </h3>
-              <button
-                class="text-gray-400 hover:text-white transition-colors"
-                onClick={props.onDismiss}
-                title={t().common?.close || "Закрыть"}
-              >
-                <i class="i-hugeicons-cancel-01 w-4 h-4" />
-              </button>
+              <Tooltip text={t().common?.close || "Закрыть"} position="bottom">
+                <button
+                  class="text-gray-400 hover:text-white transition-colors"
+                  onClick={props.onDismiss}
+                >
+                  <i class="i-hugeicons-cancel-01 w-4 h-4" />
+                </button>
+              </Tooltip>
             </div>
 
             <p class="text-sm text-gray-400 mt-1">
@@ -172,7 +174,7 @@ const LaunchChangesAlert: Component<Props> = (props) => {
             {/* Actions */}
             <div class="flex items-center gap-3 mt-2">
               <button
-                class="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                class="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-light)] flex items-center gap-1"
                 onClick={() => setExpanded(!expanded())}
               >
                 <i class={`w-4 h-4 transition-transform ${expanded() ? "i-hugeicons-arrow-up-01" : "i-hugeicons-arrow-down-01"}`} />
@@ -188,24 +190,26 @@ const LaunchChangesAlert: Component<Props> = (props) => {
                 </button>
               </Show>
               <Show when={props.onReset}>
-                <button
-                  class="text-sm text-gray-400 hover:text-gray-300 flex items-center gap-1"
-                  onClick={props.onReset}
-                  title={t().launchChanges?.resetHint || "Сбросить базовое состояние для отслеживания"}
-                >
-                  <i class="i-hugeicons-refresh w-4 h-4" />
-                  {t().launchChanges?.reset || "Сбросить"}
-                </button>
+                <Tooltip text={t().launchChanges?.resetHint || "Сбросить базовое состояние для отслеживания"} position="bottom">
+                  <button
+                    class="text-sm text-gray-400 hover:text-gray-300 flex items-center gap-1"
+                    onClick={props.onReset}
+                  >
+                    <i class="i-hugeicons-refresh w-4 h-4" />
+                    {t().launchChanges?.reset || "Сбросить"}
+                  </button>
+                </Tooltip>
               </Show>
               <Show when={props.onRollback}>
-                <button
-                  class="text-sm text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
-                  onClick={props.onRollback}
-                  title={t().launchChanges?.rollbackHint || "Откатить изменения через бэкапы"}
-                >
-                  <i class="i-hugeicons-arrow-turn-backward w-4 h-4" />
-                  {t().launchChanges?.rollback || "Откатить"}
-                </button>
+                <Tooltip text={t().launchChanges?.rollbackHint || "Откатить изменения через бэкапы"} position="bottom">
+                  <button
+                    class="text-sm text-yellow-400 hover:text-yellow-300 flex items-center gap-1"
+                    onClick={props.onRollback}
+                  >
+                    <i class="i-hugeicons-arrow-turn-backward w-4 h-4" />
+                    {t().launchChanges?.rollback || "Откатить"}
+                  </button>
+                </Tooltip>
               </Show>
             </div>
           </div>
@@ -230,8 +234,8 @@ const LaunchChangesAlert: Component<Props> = (props) => {
           <div class={`mt-4 pt-4 border-t ${borderColor()} space-y-3 max-h-64 overflow-y-auto`}>
             {/* Added mods */}
             <Show when={props.changes.mods_added.length > 0}>
-              <div>
-                <h4 class="text-xs font-medium text-green-400 mb-1 flex items-center gap-1">
+              <div class="flex flex-col gap-1">
+                <h4 class="text-xs font-medium text-green-400 flex items-center gap-1">
                   <i class="i-hugeicons-add-01 w-3 h-3" />
                   {t().launchChanges?.addedMods || "Добавленные моды"}
                 </h4>
@@ -245,8 +249,8 @@ const LaunchChangesAlert: Component<Props> = (props) => {
 
             {/* Removed mods */}
             <Show when={props.changes.mods_removed.length > 0}>
-              <div>
-                <h4 class="text-xs font-medium text-red-400 mb-1 flex items-center gap-1">
+              <div class="flex flex-col gap-1">
+                <h4 class="text-xs font-medium text-red-400 flex items-center gap-1">
                   <i class="i-hugeicons-delete-02 w-3 h-3" />
                   {t().launchChanges?.removedMods || "Удалённые моды"}
                 </h4>
@@ -260,8 +264,8 @@ const LaunchChangesAlert: Component<Props> = (props) => {
 
             {/* Updated mods */}
             <Show when={props.changes.mods_updated.length > 0}>
-              <div>
-                <h4 class="text-xs font-medium text-blue-400 mb-1 flex items-center gap-1">
+              <div class="flex flex-col gap-1">
+                <h4 class="text-xs font-medium text-blue-400 flex items-center gap-1">
                   <i class="i-hugeicons-arrow-up-02 w-3 h-3" />
                   {t().launchChanges?.updatedMods || "Обновлённые моды"}
                 </h4>
@@ -279,8 +283,8 @@ const LaunchChangesAlert: Component<Props> = (props) => {
 
             {/* Enabled/Disabled mods */}
             <Show when={props.changes.mods_enabled.length > 0}>
-              <div>
-                <h4 class="text-xs font-medium text-cyan-400 mb-1 flex items-center gap-1">
+              <div class="flex flex-col gap-1">
+                <h4 class="text-xs font-medium text-cyan-400 flex items-center gap-1">
                   <i class="i-hugeicons-checkmark-circle-02 w-3 h-3" />
                   {t().launchChanges?.enabledMods || "Включённые моды"}
                 </h4>

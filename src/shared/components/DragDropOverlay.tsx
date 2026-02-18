@@ -250,7 +250,7 @@ export function DragDropOverlay() {
           return updated;
         });
       } catch (err) {
-        console.error("Batch verification failed:", err);
+        if (import.meta.env.DEV) console.error("Batch verification failed:", err);
         // Mark all as error
         setVerifications(prev => {
           const updated = new Map(prev);
@@ -330,13 +330,13 @@ export function DragDropOverlay() {
     <Show when={isDragging()}>
       {/* Мод в detail view - специальный оверлей */}
       <Show when={showModDetailOverlay()}>
-        <div class="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-150">
-          <div class="border-2 border-dashed border-blue-500 rounded-2xl p-8 max-w-md bg-gray-800/95 shadow-2xl">
+        <div class="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-150">
+          <div class="border-2 border-dashed border-[var(--color-primary)] rounded-2xl p-8 max-w-md bg-[var(--color-bg-modal)] shadow-2xl">
             <div class="flex flex-col items-center gap-4">
-              <div class="w-20 h-20 rounded-full bg-blue-600/20 flex items-center justify-center">
-                <i class="i-hugeicons-package w-10 h-10 text-blue-400" />
+              <div class="w-20 h-20 rounded-full bg-[var(--color-primary-bg)] flex items-center justify-center">
+                <i class="i-hugeicons-package w-10 h-10 text-[var(--color-primary)]" />
               </div>
-              <h3 class="text-xl font-semibold text-white">
+              <h3 class="text-xl font-semibold text-[var(--color-text)]">
                 {fileInfo().title}
               </h3>
 
@@ -378,7 +378,7 @@ export function DragDropOverlay() {
               <p class="text-sm text-gray-400 text-center">
                 {t().dragDrop?.modWillBeInstalled ?? "Mod will be installed to current instance"}
               </p>
-              <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600/30 text-blue-300">
+              <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--color-primary-bg)] text-[var(--color-primary-light)]">
                 <i class="i-hugeicons-arrow-down-01 w-4 h-4 animate-bounce" />
                 <span class="text-sm">{t().dragDrop?.releaseToInstall ?? "Release to install"}</span>
               </div>
@@ -393,12 +393,12 @@ export function DragDropOverlay() {
         when={showModBanner()}
         fallback={
           // Полноэкранный оверлей для модпаков и прочих файлов (не для модов в detail view)
-          <div class="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center bg-black/70 backdrop-blur-sm transition-opacity duration-150">
+          <div class="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center bg-black/30 backdrop-blur-lg transition-opacity duration-150">
             <div
               class={`border-2 border-dashed rounded-2xl p-8 max-w-md shadow-2xl transition-all duration-150 ${
                 isSupported()
-                  ? `bg-gray-800 ${fileInfo().borderColor}`
-                  : "bg-gray-900 border-red-500/50"
+                  ? `bg-[var(--color-bg-modal)] ${fileInfo().borderColor}`
+                  : "bg-[var(--color-bg-modal)] border-red-500/50"
               }`}
             >
               <div class="flex flex-col items-center gap-4">
@@ -418,7 +418,7 @@ export function DragDropOverlay() {
                 {/* Title */}
                 <h3
                   class={`text-xl font-semibold ${
-                    isSupported() ? "text-white" : "text-red-400"
+                    isSupported() ? "text-[var(--color-text)]" : "text-red-400"
                   }`}
                 >
                   {fileInfo().title}
@@ -530,8 +530,8 @@ export function DragDropOverlay() {
         }
       >
         {/* Компактный баннер для модов - не закрывает экземпляры */}
-        <div class="fixed top-[var(--titlebar-height)] left-0 right-0 z-[9999] pointer-events-none px-4 py-3">
-          <div class="max-w-2xl mx-auto bg-blue-600/95 backdrop-blur-sm rounded-2xl shadow-2xl border border-blue-400/30 px-6 py-4">
+        <div class="fixed top-[var(--titlebar-height)] left-0 right-0 z-[200] pointer-events-none px-4 py-3">
+          <div class="max-w-2xl mx-auto backdrop-blur-sm rounded-2xl shadow-2xl border border-[var(--color-primary-border)] px-6 py-4" style={{ "background-color": "color-mix(in srgb, var(--color-primary) 95%, transparent)" }}>
             <div class="flex items-center gap-4">
               {/* Icon */}
               <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">

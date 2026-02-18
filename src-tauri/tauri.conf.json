@@ -1,7 +1,7 @@
 {
   "$schema": "./tauri-schema.json",
   "productName": "Stuzhik",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "identifier": "ru.sibxodev.stuzhik",
   "build": {
     "beforeDevCommand": "bun run dev",

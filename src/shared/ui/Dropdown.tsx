@@ -1,4 +1,11 @@
-import { JSX, Show, createSignal, onMount, onCleanup, createEffect } from "solid-js";
+import {
+  JSX,
+  Show,
+  createSignal,
+  onMount,
+  onCleanup,
+  createEffect,
+} from "solid-js";
 
 interface DropdownProps {
   trigger: JSX.Element;
@@ -11,12 +18,20 @@ interface DropdownProps {
   children?: JSX.Element;
   /** Custom max height for dropdown content */
   maxHeight?: string;
+  /** Accessible label for the dropdown menu */
+  "aria-label"?: string;
 }
 
 /**
  * Универсальный Dropdown компонент с адаптивным позиционированием
  * Автоматически определяет направление открытия (вверх/вниз)
  * Адаптирует высоту под доступное пространство
+ *
+ * Accessibility features:
+ * - role="menu" on dropdown content
+ * - aria-haspopup and aria-expanded on trigger
+ * - Escape key closes the dropdown
+ * - Focus management
  */
 function Dropdown(props: DropdownProps) {
   let triggerRef: HTMLDivElement | undefined;
@@ -110,9 +125,18 @@ function Dropdown(props: DropdownProps) {
       }
 
       if (translateX !== -50) {
-        setPosition(prev => prev ? { ...prev, translateX } : null);
+        setPosition((prev) => (prev ? { ...prev, translateX } : null));
       }
     });
+  };
+
+  // Handle Escape key to close dropdown
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape" && props.open) {
+      e.preventDefault();
+      e.stopPropagation();
+      props.onClose();
+    }
   };
 
   // Пересчитываем позицию при открытии
@@ -121,6 +145,10 @@ function Dropdown(props: DropdownProps) {
       requestAnimationFrame(() => {
         calculatePosition();
       });
+      // Add keyboard listener when open
+      window.addEventListener("keydown", handleKeyDown);
+    } else {
+      window.removeEventListener("keydown", handleKeyDown);
     }
   });
 
@@ -132,6 +160,7 @@ function Dropdown(props: DropdownProps) {
   onCleanup(() => {
     window.removeEventListener("resize", calculatePosition);
     window.removeEventListener("scroll", calculatePosition, true);
+    window.removeEventListener("keydown", handleKeyDown);
   });
 
   return (
@@ -139,19 +168,37 @@ function Dropdown(props: DropdownProps) {
       class={`${props.class || ""} ${props.open ? "relative" : ""}`}
       style={props.open ? { "z-index": 62 } : {}}
       ref={triggerRef}
-      onClick={(e) => {
-        if (props.disabled) return;
-        e.stopPropagation();
-        props.onToggle?.();
-      }}
     >
-      {props.trigger}
+      {/* Trigger wrapper with ARIA attributes */}
+      <div
+        role="button"
+        aria-haspopup="menu"
+        aria-expanded={props.open}
+        aria-disabled={props.disabled}
+        tabIndex={props.disabled ? -1 : 0}
+        onClick={(e) => {
+          if (props.disabled) return;
+          e.stopPropagation();
+          props.onToggle?.();
+        }}
+        onKeyDown={(e) => {
+          if (props.disabled) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            props.onToggle?.();
+          }
+        }}
+        class="cursor-pointer"
+      >
+        {props.trigger}
+      </div>
 
       {/* Overlay - BELOW content and trigger */}
       <Show when={props.open}>
         <div
           class="fixed inset-0"
           style={{ "z-index": 60 }}
+          aria-hidden="true"
           onClick={(e) => {
             e.stopPropagation();
             props.onClose();
@@ -163,13 +210,19 @@ function Dropdown(props: DropdownProps) {
       <Show when={props.open && position()}>
         <div
           ref={dropdownRef}
+          role="menu"
+          aria-label={props["aria-label"]}
           class={`fixed bg-[--color-bg-elevated] border border-gray-700 rounded-xl shadow-xl overflow-y-auto ${
             props.contentClass || ""
           }`}
           style={{
             "z-index": 61,
-            top: position()!.top !== undefined ? `${position()!.top}px` : "auto",
-            bottom: position()!.bottom !== undefined ? `${position()!.bottom}px` : "auto",
+            top:
+              position()!.top !== undefined ? `${position()!.top}px` : "auto",
+            bottom:
+              position()!.bottom !== undefined
+                ? `${position()!.bottom}px`
+                : "auto",
             left: `${position()!.left}px`,
             transform: `translateX(${position()!.translateX}%)`,
             "min-width": `${position()!.minWidth}px`,

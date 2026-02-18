@@ -3,8 +3,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LiveCrashIndicator } from "./LiveCrashIndicator";
 import DownloadsButton from "./DownloadsButton";
 import ConfirmDialog from "./ConfirmDialog";
+// GameSwitcher hidden until Hytale support is ready
+// import GameSwitcher from "./GameSwitcher";
 import { useI18n } from "../i18n";
 import { hasBlockingOperations, getCloseBlockReasons } from "../stores";
+import { isVisible } from "../stores/uiPreferences";
+import { Tooltip } from "../ui";
 
 interface TitleBarProps {
   onSettingsClick?: () => void;
@@ -71,6 +75,11 @@ const TitleBar = (props: TitleBarProps) => {
       {/* Logo */}
       <img src="/logo.png" alt="Stuzhik" class="w-6 h-6 rounded-md pointer-events-none" />
 
+      {/* Game Switcher - hidden until Hytale support is ready */}
+      {/* <div class="ml-3">
+        <GameSwitcher />
+      </div> */}
+
       {/* Center spacer for drag region */}
       <div class="flex-1" data-tauri-drag-region />
 
@@ -80,15 +89,17 @@ const TitleBar = (props: TitleBarProps) => {
         <LiveCrashIndicator />
 
         {/* Connect (Friends) button */}
-        <Show when={props.onConnectClick}>
-          <button
-            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-            onClick={props.onConnectClick}
-            title={t().titleBar.connect}
-            aria-label={t().titleBar.connect}
-          >
-            <div class="i-hugeicons-user-group w-4 h-4" />
-          </button>
+        <Show when={props.onConnectClick && isVisible("connectButton")}>
+          <Tooltip text={t().titleBar.connect} position="bottom">
+            <button
+              class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+              data-tour="connect"
+              onClick={props.onConnectClick}
+              aria-label={t().titleBar.connect}
+            >
+              <div class="i-hugeicons-user-group w-4 h-4" />
+            </button>
+          </Tooltip>
         </Show>
 
         {/* Downloads button */}
@@ -96,94 +107,104 @@ const TitleBar = (props: TitleBarProps) => {
 
         {/* Console button */}
         <Show when={props.onConsoleClick}>
-          <button
-            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-            onClick={props.onConsoleClick}
-            title={t().titleBar.devConsole}
-            aria-label={t().titleBar.devConsole}
-          >
-            <div class="i-hugeicons-command-line w-4 h-4" />
-          </button>
+          <Tooltip text={t().titleBar.devConsole} position="bottom">
+            <button
+              class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+              onClick={props.onConsoleClick}
+              aria-label={t().titleBar.devConsole}
+            >
+              <div class="i-hugeicons-command-line w-4 h-4" />
+            </button>
+          </Tooltip>
         </Show>
 
         {/* Documentation button */}
         <Show when={props.onDocsClick}>
-          <button
-            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-            onClick={props.onDocsClick}
-            title={t().titleBar.docs}
-            aria-label={t().titleBar.docs}
-          >
-            <div class="i-hugeicons-book-open-01 w-4 h-4" />
-          </button>
+          <Tooltip text={t().titleBar.docs} position="bottom">
+            <button
+              class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+              data-tour="docs"
+              onClick={props.onDocsClick}
+              aria-label={t().titleBar.docs}
+            >
+              <div class="i-hugeicons-book-open-01 w-4 h-4" />
+            </button>
+          </Tooltip>
         </Show>
 
         {/* Changelog button */}
         <Show when={props.onChangelogClick}>
-          <button
-            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-            onClick={props.onChangelogClick}
-            title={t().titleBar.changelog}
-            aria-label={t().titleBar.changelog}
-          >
-            <div class="i-hugeicons-git-branch w-4 h-4" />
-          </button>
+          <Tooltip text={t().titleBar.changelog} position="bottom">
+            <button
+              class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+              onClick={props.onChangelogClick}
+              aria-label={t().titleBar.changelog}
+            >
+              <div class="i-hugeicons-git-branch w-4 h-4" />
+            </button>
+          </Tooltip>
         </Show>
 
         {/* Source Code button */}
         <Show when={props.onSourceCodeClick}>
-          <button
-            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-            onClick={props.onSourceCodeClick}
-            title={t().titleBar.sourceCode}
-            aria-label={t().titleBar.sourceCode}
-          >
-            <div class="i-hugeicons-source-code w-4 h-4" />
-          </button>
+          <Tooltip text={t().titleBar.sourceCode} position="bottom">
+            <button
+              class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+              onClick={props.onSourceCodeClick}
+              aria-label={t().titleBar.sourceCode}
+            >
+              <div class="i-hugeicons-source-code w-4 h-4" />
+            </button>
+          </Tooltip>
         </Show>
 
         {/* Settings button */}
         <Show when={props.onSettingsClick}>
-          <button
-            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-            onClick={props.onSettingsClick}
-            title={t().titleBar.settings}
-            aria-label={t().titleBar.settings}
-          >
-            <div class="i-hugeicons-settings-02 w-4 h-4" />
-          </button>
+          <Tooltip text={t().titleBar.settings} position="bottom">
+            <button
+              class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+              data-tour="settings"
+              onClick={props.onSettingsClick}
+              aria-label={t().titleBar.settings}
+            >
+              <div class="i-hugeicons-settings-02 w-4 h-4" />
+            </button>
+          </Tooltip>
         </Show>
 
         {/* Separator */}
-        <div class="w-px h-4 bg-white/10 mx-1" />
+        <div class="w-px h-4 bg-[var(--color-border)] mx-1" />
 
         {/* Window Controls */}
-        <button
-          class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-          onClick={handleMinimize}
-          title={t().titleBar.minimize}
-          aria-label={t().titleBar.minimize}
-        >
-          <div class="i-fluent:minimize-24-regular w-4 h-4" />
-        </button>
+        <Tooltip text={t().titleBar.minimize} position="bottom">
+          <button
+            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+            onClick={handleMinimize}
+            aria-label={t().titleBar.minimize}
+          >
+            <div class="i-fluent:minimize-24-regular w-4 h-4" />
+          </button>
+        </Tooltip>
 
-        <button
-          class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-white/10 transition-colors duration-75"
-          onClick={handleMaximize}
-          title={isMaximized() ? t().titleBar.restore : t().titleBar.maximize}
-          aria-label={isMaximized() ? t().titleBar.restore : t().titleBar.maximize}
-        >
-          <div class={isMaximized() ? 'i-fluent:full-screen-minimize-16-filled w-4 h-4' : 'i-fluent:full-screen-maximize-16-filled w-4 h-4'} />
-        </button>
+        <Tooltip text={isMaximized() ? t().titleBar.restore : t().titleBar.maximize} position="bottom">
+          <button
+            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-hover)] transition-colors duration-75"
+            onClick={handleMaximize}
+            aria-label={isMaximized() ? t().titleBar.restore : t().titleBar.maximize}
+          >
+            <div class={isMaximized() ? 'i-fluent:full-screen-minimize-16-filled w-4 h-4' : 'i-fluent:full-screen-maximize-16-filled w-4 h-4'} />
+          </button>
+        </Tooltip>
 
-        <button
-          class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-gray-400 hover:text-white hover:bg-red-500/80 transition-colors duration-75"
-          onClick={handleClose}
-          title={t().titleBar.close}
-          aria-label={t().titleBar.close}
-        >
-          <div class="i-clarity:close-line w-4 h-4" />
-        </button>
+        <Tooltip text={t().titleBar.close} position="bottom">
+          <button
+            class="p-1.5 flex items-center justify-center rounded-2xl bg-transparent border-none outline-none cursor-pointer text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-red-500/80 transition-colors duration-75"
+            onClick={handleClose}
+            aria-label={t().titleBar.close}
+          >
+            <div class="i-clarity:close-line w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Close confirmation dialog */}

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
 use std::process::ChildStdin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::downloader::DownloadManager;
 use crate::error::{LauncherError, Result};
@@ -183,11 +183,15 @@ pub fn parse_spark_viewer_urls(instance_id: &str) -> Vec<SparkViewerInfo> {
 
     let mut results = Vec::new();
 
-    // Паттерн для Spark URL: https://spark.lucko.me/XXXXX
-    let url_regex = regex::Regex::new(r"https://spark\.lucko\.me/([a-zA-Z0-9]+)").unwrap();
-
-    // Паттерн для временной метки в логах: [HH:MM:SS]
-    let time_regex = regex::Regex::new(r"\[(\d{2}:\d{2}:\d{2})\]").unwrap();
+    // Статические regex — компилируются один раз
+    static SPARK_URL_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"https://spark\.lucko\.me/([a-zA-Z0-9]+)").expect("valid spark URL regex")
+    });
+    static LOG_TIME_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"\[(\d{2}:\d{2}:\d{2})\]").expect("valid log timestamp regex")
+    });
+    let url_regex = &*SPARK_URL_RE;
+    let time_regex = &*LOG_TIME_RE;
 
     for line in content.lines() {
         if let Some(url_match) = url_regex.find(line) {

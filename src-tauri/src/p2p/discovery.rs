@@ -287,6 +287,8 @@ impl Discovery {
     /// Подключиться к пиру по короткому коду
     /// NOTE: This function creates its own UDP socket and doesn't depend on
     /// the main discovery socket being active. Works even with Invisible visibility.
+    ///
+    /// Отправляет несколько broadcast попыток с интервалом для надёжности на VPN.
     pub async fn connect_by_code(&self, code: &str) -> Result<PeerInfo, String> {
         let normalized_code = normalize_short_code(code);
         log::info!("Attempting to connect by code: {}", normalized_code);
@@ -304,9 +306,6 @@ impl Discovery {
 
         let data = serialize_message(&msg)?;
 
-        // Отправляем broadcast - все пиры в сети проверят свой код
-        let broadcast_addr = SocketAddrV4::new(Ipv4Addr::BROADCAST, self.settings.discovery_port);
-
         // Создаём временный сокет для отправки
         let socket = UdpSocket::bind("0.0.0.0:0")
             .await
@@ -315,52 +314,111 @@ impl Discovery {
             .set_broadcast(true)
             .map_err(|e| format!("Failed to enable broadcast: {}", e))?;
 
-        socket
-            .send_to(&data, broadcast_addr)
-            .await
-            .map_err(|e| format!("Failed to send connect request: {}", e))?;
+        let broadcast_addr = SocketAddrV4::new(Ipv4Addr::BROADCAST, self.settings.discovery_port);
 
-        log::debug!("Sent connect by code request for {}", normalized_code);
-
-        // Ждём ответ (timeout 5 секунд)
+        // Отправляем несколько broadcast попыток с интервалом.
+        // На VPN (Radmin, ZeroTier) первый пакет может потеряться.
+        const MAX_ATTEMPTS: u32 = 3;
+        const ATTEMPT_TIMEOUT_SECS: u64 = 3;
         let mut buf = vec![0u8; UDP_BUFFER_SIZE];
-        let timeout =
-            tokio::time::timeout(Duration::from_secs(5), socket.recv_from(&mut buf)).await;
 
-        match timeout {
-            Ok(Ok((len, _addr))) => {
-                let response = deserialize_message(&buf[..len])?;
-                match response {
-                    Message::ConnectByCodeResponse {
-                        code: resp_code,
-                        success,
-                        peer_info,
-                        error,
-                    } => {
-                        if resp_code != normalized_code {
-                            return Err("Response code mismatch".to_string());
-                        }
-                        if success {
-                            if let Some(peer) = peer_info {
-                                // Добавляем пира в список
-                                self.peers
-                                    .write()
-                                    .await
-                                    .insert(peer.id.clone(), peer.clone());
-                                log::info!("Connected to peer by code: {:?}", peer.nickname);
-                                return Ok(peer);
+        for attempt in 1..=MAX_ATTEMPTS {
+            // Отправляем broadcast
+            if let Err(e) = socket.send_to(&data, broadcast_addr).await {
+                log::warn!("Failed to send connect request (attempt {}): {}", attempt, e);
+                if attempt == MAX_ATTEMPTS {
+                    return Err(format!("Failed to send connect request: {}", e));
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                continue;
+            }
+
+            log::debug!(
+                "Sent connect by code request for {} (attempt {}/{})",
+                normalized_code,
+                attempt,
+                MAX_ATTEMPTS
+            );
+
+            // Ждём ответ с таймаутом на каждую попытку
+            let timeout = tokio::time::timeout(
+                Duration::from_secs(ATTEMPT_TIMEOUT_SECS),
+                socket.recv_from(&mut buf),
+            )
+            .await;
+
+            match timeout {
+                Ok(Ok((len, _addr))) => {
+                    let response = deserialize_message(&buf[..len])?;
+                    match response {
+                        Message::ConnectByCodeResponse {
+                            code: resp_code,
+                            success,
+                            peer_info,
+                            error,
+                        } => {
+                            if resp_code != normalized_code {
+                                // Ответ на другой код — игнорируем и пробуем дальше
+                                log::debug!("Response code mismatch, retrying...");
+                                continue;
                             }
-                            return Err("Success but no peer info".to_string());
-                        } else {
-                            return Err(error.unwrap_or_else(|| "Connection refused".to_string()));
+                            if success {
+                                if let Some(peer) = peer_info {
+                                    self.peers
+                                        .write()
+                                        .await
+                                        .insert(peer.id.clone(), peer.clone());
+                                    log::info!(
+                                        "Connected to peer by code (attempt {}): {:?}",
+                                        attempt,
+                                        peer.nickname
+                                    );
+                                    return Ok(peer);
+                                }
+                                return Err("Success but no peer info".to_string());
+                            } else {
+                                return Err(
+                                    error.unwrap_or_else(|| "Connection refused".to_string())
+                                );
+                            }
+                        }
+                        _ => {
+                            // Получили не тот тип сообщения — пробуем дальше
+                            log::debug!("Unexpected response type, retrying...");
+                            continue;
                         }
                     }
-                    _ => return Err("Unexpected response type".to_string()),
+                }
+                Ok(Err(e)) => {
+                    // На Windows error 10054 (WSAECONNRESET) можно игнорировать — это
+                    // ICMP port unreachable от предыдущей отправки на несуществующий порт.
+                    let is_conn_reset = e.raw_os_error() == Some(10054);
+                    if is_conn_reset && attempt < MAX_ATTEMPTS {
+                        log::debug!(
+                            "UDP receive error 10054 (harmless on Windows), retrying..."
+                        );
+                        continue;
+                    }
+                    if attempt == MAX_ATTEMPTS {
+                        return Err(format!("Failed to receive response: {}", e));
+                    }
+                    log::debug!("UDP receive error (attempt {}): {}", attempt, e);
+                }
+                Err(_) => {
+                    // Таймаут — пробуем следующую попытку
+                    if attempt < MAX_ATTEMPTS {
+                        log::debug!(
+                            "No response within {}s (attempt {}/{}), retrying...",
+                            ATTEMPT_TIMEOUT_SECS,
+                            attempt,
+                            MAX_ATTEMPTS
+                        );
+                    }
                 }
             }
-            Ok(Err(e)) => Err(format!("Failed to receive response: {}", e)),
-            Err(_) => Err("Connection timeout - no peer with this code found".to_string()),
         }
+
+        Err("Connection timeout - no peer with this code found".to_string())
     }
 
     /// Получить настройки
@@ -440,17 +498,11 @@ async fn handle_incoming_message(
 
                 let response_data = serialize_message(&response)?;
 
-                // Отправляем напрямую отправителю
-                let response_addr = SocketAddrV4::new(
-                    match addr {
-                        SocketAddr::V4(v4) => *v4.ip(),
-                        SocketAddr::V6(_) => return Ok(()), // IPv6 не поддерживаем пока
-                    },
-                    discovery.listen_port,
-                );
-
+                // Отправляем ответ на ФАКТИЧЕСКИЙ UDP адрес отправителя (addr),
+                // а НЕ на discovery.listen_port (который является TCP портом).
+                // Это критично — иначе ответ улетит на TCP listener и будет потерян.
                 socket
-                    .send_to(&response_data, response_addr)
+                    .send_to(&response_data, addr)
                     .await
                     .map_err(|e| format!("Failed to send discovery response: {}", e))?;
             }

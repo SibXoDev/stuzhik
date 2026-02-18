@@ -194,13 +194,13 @@ pub async fn get_performance_report(instance_id: String) -> Result<PerformanceRe
 
     // Сканируем логи
     let log_path = instance_path.join("logs").join("latest.log");
-    if log_path.exists() {
+    if tokio::fs::try_exists(&log_path).await.unwrap_or(false) {
         let log_issues = log_scanner::scan_log_for_performance_issues(&log_path);
         bottlenecks.extend(log_issues);
         data_source = DataSource::SystemAndLogs;
 
         // Пробуем извлечь TPS/MSPT из логов
-        if let Ok(content) = std::fs::read_to_string(&log_path) {
+        if let Ok(content) = tokio::fs::read_to_string(&log_path).await {
             let tps = log_scanner::extract_tps_from_log(&content);
             let mspt = log_scanner::extract_mspt_from_log(&content);
 

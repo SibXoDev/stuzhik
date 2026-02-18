@@ -98,7 +98,9 @@ mod conflict_predictor;
 mod downloader; // Re-exports SmartDownloader as DownloadManager
 mod error_reporter;
 mod game_settings;
+mod games;
 mod gpu;
+mod hytale;
 mod instances;
 mod integrity;
 mod java;
@@ -121,6 +123,7 @@ mod settings;
 mod smart_downloader; // Must be before downloader (downloader re-exports from it)
 mod stzhk;
 mod sync;
+mod translations;
 mod tray;
 mod utils;
 mod wiki;
@@ -381,6 +384,7 @@ async fn install_mod(
     app_handle: tauri::AppHandle,
 ) -> Result<mods::InstalledMod> {
     // Emit "requesting" status immediately so user sees feedback
+    let download_source = Some(source.clone());
     let _ = app_handle.emit(
         "download-progress",
         downloader::DownloadProgress {
@@ -392,6 +396,7 @@ async fn install_mod(
             percentage: 0.0,
             status: "requesting".to_string(),
             operation_id: None,
+            source: download_source,
         },
     );
 
@@ -1463,7 +1468,7 @@ async fn rename_instance_file(
     }
 
     // Check if destination already exists
-    if new_path.exists() {
+    if tokio::fs::try_exists(&new_path).await.unwrap_or(false) {
         return Err(error::LauncherError::InvalidConfig(
             "File with this name already exists".to_string(),
         ));
@@ -1515,7 +1520,7 @@ async fn copy_instance_file(
     }
 
     // Check if destination already exists
-    if dest_path.exists() {
+    if tokio::fs::try_exists(&dest_path).await.unwrap_or(false) {
         return Err(error::LauncherError::InvalidConfig(
             "File with this name already exists".to_string(),
         ));
@@ -1983,6 +1988,25 @@ async fn preview_manifest_file(file_path: String) -> Result<serde_json::Value> {
             }))
         }
     }
+}
+
+/// Re-import manifest for an existing instance to download missing mods
+#[tauri::command]
+async fn reimport_manifest(
+    instance_id: String,
+    file_path: String,
+    app_handle: tauri::AppHandle,
+) -> Result<modpacks::install::ReimportResult> {
+    let download_manager = downloader::DownloadManager::new(app_handle.clone())?;
+    let path = std::path::PathBuf::from(file_path);
+
+    modpacks::ModpackManager::reimport_manifest(
+        instance_id,
+        path,
+        download_manager,
+        app_handle,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -3915,9 +3939,12 @@ fn get_firewall_explanation(udp_port: u16, tcp_port: u16) -> String {
 fn open_firewall_settings() {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         // Open "Allow an app through Windows Firewall" panel
         let _ = std::process::Command::new("control")
             .args(["firewall.cpl"])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn();
     }
 
@@ -4063,6 +4090,11 @@ pub fn run() {
             if let Err(e) = instances::cleanup_dead_processes() {
                 log::warn!("Failed to cleanup dead processes: {}", e);
             }
+
+            // Очищаем устаревшие .part файлы и кэш-файлы модпаков
+            tauri::async_runtime::spawn(async {
+                modpacks::install::cleanup_stale_cache_files().await;
+            });
 
             // Кешируем версии Minecraft при старте
             tauri::async_runtime::spawn(async move {
@@ -4258,6 +4290,7 @@ pub fn run() {
             instances::utilities::open_file_in_vscode,
             instances::utilities::open_folder_in_vscode,
             instances::lifecycle::reset_instance_version,
+            instances::lifecycle::convert_client_to_server,
             // Mods
             search_mods,
             install_mod,
@@ -4307,6 +4340,7 @@ pub fn run() {
             install_modpack,
             install_modpack_from_file,
             install_modpack_from_manifest,
+            reimport_manifest,
             preview_manifest_file,
             preview_modpack_file,
             preview_modpack_detailed,
@@ -4359,6 +4393,14 @@ pub fn run() {
             settings::get_settings,
             settings::save_settings,
             settings::reset_settings,
+            // Custom Translations
+            translations::get_custom_translations,
+            translations::save_custom_translations,
+            translations::delete_custom_translations,
+            translations::list_custom_translation_langs,
+            translations::export_custom_translations,
+            translations::import_custom_translations,
+            translations::import_translation_file,
             // Game Settings Templates
             game_settings::save_settings_template,
             game_settings::apply_settings_template,
@@ -4409,6 +4451,7 @@ pub fn run() {
             stzhk::export_stzhk,
             stzhk::verify_stzhk_instance,
             stzhk::export_mrpack,
+            stzhk::export_universal_zip,
             // Log Analyzer
             log_analyzer::analyze_log_file,
             log_analyzer::analyze_instance_log,
@@ -4742,6 +4785,26 @@ pub fn run() {
             delete_mod_profile,
             export_mod_profile,
             import_mod_profile,
+            // Games
+            games::get_supported_games,
+            games::detect_games,
+            // Hytale
+            hytale::get_hytale_info,
+            hytale::detect_hytale_installation,
+            hytale::get_hytale_data_directory,
+            hytale::launch_hytale_game,
+            hytale::check_hytale_running,
+            hytale::search_hytale_mods_cmd,
+            hytale::get_popular_hytale_mods_cmd,
+            hytale::install_hytale_mod_cmd,
+            hytale::list_hytale_mods,
+            hytale::remove_hytale_mod_cmd,
+            // Hytale Settings & Localization
+            hytale::get_hytale_settings,
+            hytale::save_hytale_settings,
+            hytale::get_hytale_languages,
+            hytale::install_hytale_language,
+            hytale::open_hytale_logs,
             // Launcher Import (MultiMC, Prism, CurseForge App, Modrinth App, generic .minecraft)
             launchers::detect_launchers,
             launchers::list_launcher_instances,

@@ -23,7 +23,7 @@ export function QuickPresetsPanel(props: QuickPresetsPanelProps) {
           onClick={() => setExpanded(!expanded())}
         >
           <div class="flex items-center gap-2">
-            <i class="i-hugeicons-sparkles w-5 h-5 text-blue-400" />
+            <i class="i-hugeicons-sparkles w-5 h-5 text-[var(--color-primary)]" />
             <h3 class="font-semibold">Быстрые настройки</h3>
             <span class="text-xs text-gray-500">{presets().length} шаблонов</span>
           </div>

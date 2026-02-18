@@ -66,6 +66,9 @@ export function useMods(instanceId: () => string) {
   // Verification progress - local state for UI feedback during verification
   const [verificationProgress, setVerificationProgress] = createSignal<VerificationProgress | null>(null);
 
+  // Flag to discard results from stale async operations after unmount or instance switch
+  let disposed = false;
+
   // Derive verification status directly from mod.source (data is persisted in DB by backend)
   // This is reactive: when mods() updates, these values update automatically
   const getVerificationStatus = (mod: Mod): "verified" | "modified" | "unknown" => {
@@ -87,18 +90,33 @@ export function useMods(instanceId: () => string) {
     return mods().filter(m => getVerificationStatus(m) === "unknown").length;
   });
 
-  // Listen for verification progress events
-  const unlistenPromise = listen<VerificationProgress>("verification-progress", (event) => {
+  // Listen for verification progress events.
+  // Store unlisten function synchronously to avoid race in cleanup.
+  let unlistenFn: (() => void) | null = null;
+  let unlistenReady = false;
+
+  listen<VerificationProgress>("verification-progress", (event) => {
     const progress = event.payload;
-    // Only update if event is for our instance
-    if (progress.instance_id === instanceId()) {
+    // Only update if event is for our instance and hook is still alive
+    if (!disposed && progress.instance_id === instanceId()) {
       setVerificationProgress(progress);
+    }
+  }).then(fn => {
+    if (disposed) {
+      // Hook already unmounted before listener was ready — clean up immediately
+      fn();
+    } else {
+      unlistenFn = fn;
+      unlistenReady = true;
     }
   });
 
   // Cleanup listener on unmount
   onCleanup(() => {
-    unlistenPromise.then(unlisten => unlisten());
+    disposed = true;
+    if (unlistenReady && unlistenFn) {
+      unlistenFn();
+    }
   });
 
   // ============================================================================
@@ -106,23 +124,30 @@ export function useMods(instanceId: () => string) {
   // ============================================================================
 
   /**
-   * Load mods from database (always runs, shows current state)
+   * Load mods from database (always runs, shows current state).
+   * Guards against stale results: if instanceId changed during await,
+   * the result is discarded to prevent showing wrong instance's mods.
    */
   async function loadMods(): Promise<void> {
     const id = instanceId();
-    if (!id) return;
+    if (!id || disposed) return;
 
     try {
       setLoading(true);
       setError(null);
       const items = await invoke<Mod[]>("list_mods", { instanceId: id });
+
+      // Stale response guard: if instance changed or hook disposed during await, discard
+      if (disposed || instanceId() !== id) return;
+
       setMods(items);
     } catch (e: unknown) {
+      if (disposed || instanceId() !== id) return;
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
       if (import.meta.env.DEV) console.error("Failed to load mods:", e);
     } finally {
-      setLoading(false);
+      if (!disposed) setLoading(false);
     }
   }
 
@@ -132,29 +157,33 @@ export function useMods(instanceId: () => string) {
    */
   async function syncMods(): Promise<SyncResult | null> {
     const id = instanceId();
-    if (!id) return null;
+    if (!id || disposed) return null;
 
     try {
       setSyncing(true);
       const result = await invoke<SyncResult>("sync_mods_folder", { instanceId: id });
+      if (disposed || instanceId() !== id) return null;
       return result;
     } catch (e: unknown) {
       if (import.meta.env.DEV) console.error("Failed to sync mods:", e);
       return null;
     } finally {
-      setSyncing(false);
+      if (!disposed) setSyncing(false);
     }
   }
 
   /**
    * Check dependencies (fast, uses data already in DB)
+   * Guards against stale results: discards if instance changed or hook disposed.
    */
   async function checkDependencies(): Promise<void> {
     const id = instanceId();
-    if (!id) return;
+    if (!id || disposed) return;
 
     try {
       const result = await invoke<ModConflict[]>("check_mod_dependencies", { instanceId: id });
+      // Stale response guard
+      if (disposed || instanceId() !== id) return;
       setConflicts(result);
     } catch (e: unknown) {
       if (import.meta.env.DEV) console.error("Failed to check dependencies:", e);
@@ -169,7 +198,7 @@ export function useMods(instanceId: () => string) {
    */
   async function enrichDependencies(showIndicator: boolean = false): Promise<boolean> {
     const id = instanceId();
-    if (!id) return false;
+    if (!id || disposed) return false;
 
     try {
       // Only show indicator if explicitly requested (e.g., force refresh)
@@ -178,9 +207,13 @@ export function useMods(instanceId: () => string) {
         setEnriching(true);
       }
       const result = await invoke<EnrichmentResult>("enrich_mod_dependencies", { instanceId: id });
+      // Stale response guard
+      if (disposed || instanceId() !== id) return false;
       // If enrichment ran (not skipped), reload mods to get updated data
       if (result.enriched_mods > 0) {
         await loadMods();
+        // Stale guard after async loadMods — prevent cross-instance data leak
+        if (disposed || instanceId() !== id) return false;
         return true; // Enrichment did work
       }
       return false; // Enrichment was skipped (hash unchanged)
@@ -189,7 +222,7 @@ export function useMods(instanceId: () => string) {
       if (import.meta.env.DEV) console.debug("Enrichment failed (non-critical):", e);
       return false;
     } finally {
-      if (showIndicator) {
+      if (showIndicator && !disposed) {
         setEnriching(false);
       }
     }
@@ -202,15 +235,19 @@ export function useMods(instanceId: () => string) {
    */
   async function verifyMods(showNotification: boolean = false): Promise<void> {
     const id = instanceId();
-    if (!id) return;
+    if (!id || disposed) return;
 
     try {
       setVerifying(true);
       setVerificationProgress(null); // Reset progress before starting
       const results = await invoke<ModVerifyResult[]>("verify_instance_mods", { instanceId: id });
 
+      // Stale response guard
+      if (disposed || instanceId() !== id) return;
+
       // Backend has updated mods table - reload to get fresh data with source/source_id
       await loadMods();
+      if (disposed || instanceId() !== id) return;
 
       // Show notification if requested (e.g., after force refresh)
       if (showNotification && results.length > 0) {
@@ -237,8 +274,10 @@ export function useMods(instanceId: () => string) {
     } catch (e: unknown) {
       if (import.meta.env.DEV) console.debug("Verification failed (non-critical):", e);
     } finally {
-      setVerifying(false);
-      setVerificationProgress(null); // Clear progress when done
+      if (!disposed) {
+        setVerifying(false);
+        setVerificationProgress(null); // Clear progress when done
+      }
     }
   }
 
@@ -254,7 +293,7 @@ export function useMods(instanceId: () => string) {
     showNotification: boolean = true
   ): Promise<UpdateCheckResult | null> {
     const id = instanceId();
-    if (!id) return null;
+    if (!id || disposed) return null;
 
     try {
       setCheckingUpdates(true);
@@ -264,10 +303,14 @@ export function useMods(instanceId: () => string) {
         loader,
       });
 
+      // Stale response guard
+      if (disposed || instanceId() !== id) return null;
+
       setLastUpdateCheck(result);
 
       // Reload mods to get updated update_available flags
       await loadMods();
+      if (disposed || instanceId() !== id) return null;
 
       // Show notification if requested
       if (showNotification) {
@@ -291,7 +334,7 @@ export function useMods(instanceId: () => string) {
       return result;
     } catch (e: unknown) {
       if (import.meta.env.DEV) console.error("Failed to check mod updates:", e);
-      if (showNotification) {
+      if (showNotification && !disposed) {
         addToast({
           type: "error",
           title: "Ошибка проверки",
@@ -301,7 +344,7 @@ export function useMods(instanceId: () => string) {
       }
       return null;
     } finally {
-      setCheckingUpdates(false);
+      if (!disposed) setCheckingUpdates(false);
     }
   }
 
@@ -416,10 +459,14 @@ export function useMods(instanceId: () => string) {
 
         // Step 4: Background tasks (don't block UI)
         // Backend handles caching - enrichment skips if hashes unchanged
+        // Capture the current instance ID to guard against stale results
+        const initId = id;
         Promise.all([
           enrichDependencies(),
           verifyMods(),
         ]).then(([enrichmentDidWork]) => {
+          // Guard: if instance changed or hook unmounted, discard
+          if (disposed || instanceId() !== initId) return;
           // Only re-check dependencies if enrichment actually did work
           // This avoids redundant DB queries when hash unchanged
           if (enrichmentDidWork) {
@@ -441,7 +488,7 @@ export function useMods(instanceId: () => string) {
    */
   async function forceSync(): Promise<void> {
     const id = instanceId();
-    if (!id) return;
+    if (!id || disposed) return;
 
     lastInitializedId = null;
 
@@ -450,28 +497,35 @@ export function useMods(instanceId: () => string) {
 
       // Step 1: Re-sync folder
       await syncMods();
+      if (disposed || instanceId() !== id) return;
       await loadMods();
+      if (disposed || instanceId() !== id) return;
 
-      setSyncing(false);
-      setEnriching(true);
+      if (!disposed) setSyncing(false);
+      if (!disposed) setEnriching(true);
 
       // Step 2: Force enrichment - clears hash cache and re-fetches from API
       await invoke<EnrichmentResult>("force_enrich_mod_dependencies", { instanceId: id });
+      if (disposed || instanceId() !== id) return;
       await loadMods(); // Reload after enrichment
+      if (disposed || instanceId() !== id) return;
 
-      setEnriching(false);
-      setVerifying(true);
+      if (!disposed) setEnriching(false);
+      if (!disposed) setVerifying(true);
 
       // Step 3: Verify and check dependencies (show notification for force refresh)
       await verifyMods(true);
+      if (disposed || instanceId() !== id) return;
       await checkDependencies();
     } catch (e) {
       if (import.meta.env.DEV) console.error("Force sync failed:", e);
     } finally {
-      setSyncing(false);
-      setEnriching(false);
-      setVerifying(false);
-      lastInitializedId = id;
+      if (!disposed) {
+        setSyncing(false);
+        setEnriching(false);
+        setVerifying(false);
+        lastInitializedId = id;
+      }
     }
   }
 
@@ -816,8 +870,10 @@ export function useMods(instanceId: () => string) {
   // REACTIVE INITIALIZATION + FILE WATCHER
   // ============================================================================
 
-  // Track watcher state
+  // Per-hook watcher state (NOT module-level — each hook instance manages its own watcher).
+  // This prevents cross-instance interference when multiple components use useMods simultaneously.
   let watcherStarted = false;
+  let watcherInstanceId: string | null = null;
   let folderChangeUnlisten: (() => void) | null = null;
 
   /**
@@ -825,7 +881,7 @@ export function useMods(instanceId: () => string) {
    */
   async function handleFolderChange(event: { payload: { instance_id: string; event_type: string; file_name: string } }): Promise<void> {
     const id = instanceId();
-    if (!id || event.payload.instance_id !== id) return;
+    if (!id || disposed || event.payload.instance_id !== id) return;
 
     // Skip if currently syncing or other operations in progress
     if (syncing() || enriching() || verifying() || loading()) return;
@@ -844,15 +900,34 @@ export function useMods(instanceId: () => string) {
    */
   async function startWatcher(): Promise<void> {
     const id = instanceId();
-    if (!id || watcherStarted) return;
+    if (!id || disposed) return;
+
+    // If watcher is already running for THIS instance, skip
+    if (watcherStarted && watcherInstanceId === id) return;
+
+    // If watcher is running for a DIFFERENT instance, stop it first
+    if (watcherStarted && watcherInstanceId !== id) {
+      await stopWatcher();
+    }
 
     try {
       // Start backend watcher
       await invoke("start_mods_watcher", { instanceId: id });
+
+      if (disposed) return; // Check after await
+
       watcherStarted = true;
+      watcherInstanceId = id;
 
       // Listen for folder change events
       const unlisten = await listen("mods_folder_changed", handleFolderChange);
+
+      if (disposed) {
+        // Hook unmounted during await — clean up immediately
+        unlisten();
+        return;
+      }
+
       folderChangeUnlisten = unlisten;
 
       if (import.meta.env.DEV) {
@@ -870,24 +945,25 @@ export function useMods(instanceId: () => string) {
    * Stop file watcher
    */
   async function stopWatcher(): Promise<void> {
-    const id = instanceId();
     if (!watcherStarted) return;
 
     try {
-      if (id) {
-        await invoke("stop_mods_watcher", { instanceId: id });
-      }
-      if (folderChangeUnlisten) {
-        folderChangeUnlisten();
-        folderChangeUnlisten = null;
-      }
-      watcherStarted = false;
-
-      if (import.meta.env.DEV) {
-        console.log(`[useMods] File watcher stopped`);
+      if (watcherInstanceId) {
+        await invoke("stop_mods_watcher", { instanceId: watcherInstanceId });
       }
     } catch {
       // Ignore stop errors
+    }
+
+    if (folderChangeUnlisten) {
+      folderChangeUnlisten();
+      folderChangeUnlisten = null;
+    }
+    watcherStarted = false;
+    watcherInstanceId = null;
+
+    if (import.meta.env.DEV) {
+      console.log(`[useMods] File watcher stopped`);
     }
   }
 
@@ -903,6 +979,7 @@ export function useMods(instanceId: () => string) {
 
   // Cleanup on unmount
   onCleanup(() => {
+    disposed = true;
     stopWatcher();
   });
 
@@ -954,129 +1031,6 @@ export function useMods(instanceId: () => string) {
   };
 }
 
-// ============================================================================
-// STANDALONE HOOKS
-// ============================================================================
-
-/**
- * Hook for searching mods (used in ModsBrowser)
- */
-export function useModSearch() {
-  const [results, setResults] = createSignal<ModSearchResult[]>([]);
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-  const [totalHits, setTotalHits] = createSignal(0);
-
-  async function search(
-    query: string,
-    minecraftVersion?: string,
-    loader?: string,
-    source?: ModSource,
-    limit?: number,
-    offset?: number,
-    mode?: string,
-    sort?: string
-  ): Promise<void> {
-    try {
-      setLoading(true);
-      setError(null);
-      // Backend expects individual parameters, not an object
-      const response = await invoke<ModSearchResponse>("search_mods", {
-        query,
-        minecraftVersion: minecraftVersion || null,
-        loader: loader || null,
-        source: source || "modrinth",
-        limit: limit || 20,
-        offset: offset || 0,
-        searchMode: mode || null,
-        index: sort || null,
-      });
-      setResults(response.hits);
-      setTotalHits(response.total_hits);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      setResults([]);
-      setTotalHits(0);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return {
-    results,
-    loading,
-    error,
-    totalHits,
-    search,
-  };
-}
-
-/**
- * Hook for mod recommendations (used in ModRecommendations)
- */
-export function useModRecommendations(
-  instanceId: () => string,
-  minecraftVersion?: () => string,
-  loader?: () => string
-) {
-  const [recommendations, setRecommendations] = createSignal<ModRecommendation[]>([]);
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-
-  async function loadRecommendations(limit: number = 10): Promise<void> {
-    const id = instanceId();
-    const mcVersion = minecraftVersion?.();
-    const loaderType = loader?.();
-
-    if (!id || !mcVersion || !loaderType) {
-      // Cannot get recommendations without version and loader info
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      const recs = await invoke<ModRecommendation[]>("get_mod_recommendations", {
-        instanceId: id,
-        minecraftVersion: mcVersion,
-        loader: loaderType,
-        limit,
-      });
-      setRecommendations(recs);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      setRecommendations([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function getReasonText(reason: ModRecommendation["reason"]): string {
-    switch (reason.type) {
-      case "same_category":
-        return `Категория: ${reason.category}`;
-      case "popular_with":
-        return `Популярно с ${reason.mod_names.slice(0, 2).join(", ")}`;
-      case "addon_for":
-        return `Аддон для ${reason.mod_name}`;
-      case "trending":
-        return "Популярное";
-      case "optimization":
-        return "Оптимизация";
-      case "common_dependency":
-        return "Часто используется";
-      default:
-        return "Рекомендуется";
-    }
-  }
-
-  return {
-    recommendations,
-    loading,
-    error,
-    loadRecommendations,
-    getReasonText,
-  };
-}
+// Re-export standalone hooks from their own modules
+export { useModSearch } from "./useModSearch";
+export { useModRecommendations } from "./useModRecommendations";

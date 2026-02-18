@@ -1,10 +1,11 @@
 import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
-import type { Component } from "solid-js";
+import type { Component, JSX } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import type { ModpackDetailedPreview, ImportOverrideInfo, ImportFileCategory, OptionalModGroup } from "../../../shared/types";
 import CodeViewer from "../../../shared/components/CodeViewer";
 import { formatSize } from "../../../shared/utils/format-size";
 import { useI18n } from "../../../shared/i18n";
+import { createFocusTrap } from "../../../shared/hooks";
 
 interface Props {
   filePath: string;
@@ -103,6 +104,78 @@ function buildFileTree(files: ImportOverrideInfo[]): TreeNode {
 
   return root;
 }
+
+/** Inner component for file preview modal — mounts/unmounts with Show for correct focus trap */
+const FilePreviewModal: Component<{
+  file: ImportOverrideInfo;
+  loading: boolean;
+  content: string | null;
+  fmtSize: (bytes: number) => string;
+  onClose: () => void;
+}> = (previewProps) => {
+  const { t } = useI18n();
+  let previewDialogRef: HTMLDivElement | undefined;
+  createFocusTrap(() => previewDialogRef);
+
+  return (
+    <div
+      class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={previewProps.onClose}
+    >
+      <div
+        ref={previewDialogRef}
+        tabIndex={-1}
+        class="card max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div class="flex items-center justify-between p-4 border-b border-gray-750 flex-shrink-0">
+          <div class="flex items-center gap-3 min-w-0">
+            <i class={`w-5 h-5 ${getCategoryIcon(previewProps.file.category)} ${getCategoryColor(previewProps.file.category)}`} />
+            <span class="font-medium truncate">{previewProps.file.dest_path}</span>
+            <span class="text-xs text-dimmer flex-shrink-0">{previewProps.fmtSize(previewProps.file.size)}</span>
+          </div>
+          <button
+            class="btn-close"
+            onClick={previewProps.onClose}
+            aria-label={t().ui?.tooltips?.close ?? "Close"}
+          >
+            <i class="i-hugeicons-cancel-01 w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div class="flex-1 overflow-hidden min-h-0">
+          <Show when={previewProps.loading}>
+            <div class="flex-center h-full">
+              <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-gray-500" />
+            </div>
+          </Show>
+
+          <Show when={!previewProps.loading && previewProps.content === null}>
+            <div class="flex-center flex-col gap-2 h-full text-muted">
+              <i class="i-hugeicons-file-01 w-12 h-12 opacity-50" />
+              <p>Не удалось загрузить содержимое файла</p>
+              <p class="text-xs text-dimmer">Файл может быть бинарным или слишком большим</p>
+            </div>
+          </Show>
+
+          <Show when={!previewProps.loading && previewProps.content !== null}>
+            <div class="h-full overflow-auto">
+              <CodeViewer
+                code={previewProps.content!}
+                filename={previewProps.file.dest_path}
+                showLineNumbers
+                showHeader={false}
+                maxHeight="calc(85vh - 8rem)"
+              />
+            </div>
+          </Show>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ModpackImportPreview: Component<Props> = (props) => {
   const { t } = useI18n();
@@ -451,6 +524,9 @@ const ModpackImportPreview: Component<Props> = (props) => {
     props.onImport(name, getExcludedMods(), getExcludedOverrides());
   };
 
+  let mainDialogRef: HTMLDivElement | undefined;
+  createFocusTrap(() => mainDialogRef);
+
   // Format badge for format type
   const formatBadge = createMemo(() => {
     const p = preview();
@@ -470,7 +546,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
 
   return (
     <div class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div class="card max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div ref={mainDialogRef} tabIndex={-1} class="card max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div class="flex items-center justify-between p-4 border-b border-gray-750 flex-shrink-0">
           <h2 class="text-xl font-bold">Предпросмотр модпака</h2>
@@ -546,14 +622,14 @@ const ModpackImportPreview: Component<Props> = (props) => {
             </div>
 
             {/* Instance name */}
-            <div>
-              <label class="text-sm text-muted mb-1 block">Название экземпляра</label>
+            <div class="flex flex-col gap-1">
+              <label class="text-sm text-muted block">{t().modpacks.browser.confirm.instanceName ?? "Instance name"}</label>
               <input
                 type="text"
                 value={instanceName()}
                 onInput={(e) => setInstanceName(e.currentTarget.value)}
                 class="w-full"
-                placeholder="Введите название"
+                placeholder={t().ui?.placeholders?.enterName ?? "Enter name"}
                 disabled={props.importing}
               />
             </div>
@@ -563,7 +639,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
               <button
                 class={`flex-1 min-w-fit px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
                   activeTab() === "mods"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[var(--color-primary)] text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                 }`}
                 onClick={() => setActiveTab("mods")}
@@ -587,7 +663,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
               <button
                 class={`flex-1 min-w-fit px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
                   activeTab() === "files"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[var(--color-primary)] text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                 }`}
                 onClick={() => setActiveTab("files")}
@@ -598,7 +674,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
               <button
                 class={`flex-1 min-w-fit px-4 py-2 rounded-2xl font-medium transition-colors duration-100 inline-flex items-center justify-center gap-2 ${
                   activeTab() === "tree"
-                    ? "bg-blue-600 text-white"
+                    ? "bg-[var(--color-primary)] text-white"
                     : "bg-gray-800 text-gray-300 hover:bg-gray-750"
                 }`}
                 onClick={() => setActiveTab("tree")}
@@ -616,7 +692,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                   <span class="text-sm text-muted">Выбрано: {enabledModsCount()} из {preview()!.mods.length}</span>
                   <div class="flex gap-2">
                     <button
-                      class="text-xs text-blue-400 hover:underline"
+                      class="text-xs text-[var(--color-primary)] hover:underline"
                       onClick={() => toggleAllMods(true)}
                     >
                       Выбрать все
@@ -645,7 +721,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                         <input
                           type="checkbox"
                           checked={modsEnabled()[mod.path]}
-                          class="w-4 h-4 accent-blue-600"
+                          class="w-4 h-4"
                           onChange={() => {}}
                         />
                         <i class="i-hugeicons-package w-4 h-4 text-blue-400 flex-shrink-0" />
@@ -689,10 +765,10 @@ const ModpackImportPreview: Component<Props> = (props) => {
             <Show when={activeTab() === "optional" && hasOptionalMods()}>
               <div class="space-y-3">
                 <div class="card bg-purple-600/10 border-purple-600/30">
-                  <p class="text-sm text-purple-300">
-                    <i class="i-hugeicons-information-circle w-4 h-4 inline-block mr-1" />
-                    Опциональные моды можно включить или выключить по желанию.
-                    Автор модпака сгруппировал их для удобства выбора.
+                  <p class="text-sm text-purple-300 inline-flex items-start gap-1">
+                    <i class="i-hugeicons-information-circle w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>Опциональные моды можно включить или выключить по желанию.
+                    Автор модпака сгруппировал их для удобства выбора.</span>
                   </p>
                 </div>
 
@@ -701,13 +777,13 @@ const ModpackImportPreview: Component<Props> = (props) => {
                     const selection = () => optionalModsSelection();
 
                     return (
-                      <div class="card bg-gray-alpha-50">
+                      <div class="card bg-gray-alpha-50 flex flex-col gap-3">
                         {/* Group header */}
-                        <div class="flex items-center gap-3 mb-3">
+                        <div class="flex items-center gap-3">
                           <i class={`w-5 h-5 ${
                             group.selection_type === "single"
                               ? "i-hugeicons-radio text-purple-400"
-                              : "i-hugeicons-checkbox-check text-purple-400"
+                              : "i-hugeicons-checkmark-circle-02 text-purple-400"
                           }`} />
                           <div class="flex-1 min-w-0">
                             <h4 class="font-medium">{group.name}</h4>
@@ -822,7 +898,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                           <span class="text-sm text-muted">{enabledCount()}/{files.length}</span>
                           <div class="flex gap-2" onClick={(e) => e.stopPropagation()}>
                             <button
-                              class="text-xs text-blue-400 hover:underline px-2"
+                              class="text-xs text-[var(--color-primary)] hover:underline px-2"
                               onClick={() => toggleCategory(category, true)}
                             >
                               Все
@@ -858,7 +934,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                                     <input
                                       type="checkbox"
                                       checked={overridesEnabled()[file.archive_path]}
-                                      class="w-4 h-4 accent-blue-600"
+                                      class="w-4 h-4"
                                       onChange={() => {}}
                                     />
                                     <span class="text-sm flex-1 truncate">{file.dest_path}</span>
@@ -903,7 +979,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                     {/* Recursive tree rendering */}
                     <For each={fileTree()!.children}>
                       {(node) => {
-                        const renderNode = (node: TreeNode, depth: number): any => {
+                        const renderNode = (node: TreeNode, depth: number): JSX.Element => {
                           const isExpanded = () => expandedFolders().has(node.path);
                           const status = () => getFolderEnabledStatus(node);
                           const paddingLeft = `${depth * 1.25}rem`;
@@ -930,7 +1006,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                                     ref={(el) => {
                                       createEffect(() => { el.indeterminate = status() === "some"; });
                                     }}
-                                    class="w-4 h-4 accent-blue-600"
+                                    class="w-4 h-4"
                                     onChange={(e) => toggleFolderFiles(node, e.currentTarget.checked)}
                                     onClick={(e) => e.stopPropagation()}
                                   />
@@ -970,7 +1046,7 @@ const ModpackImportPreview: Component<Props> = (props) => {
                                 <input
                                   type="checkbox"
                                   checked={isEnabled()}
-                                  class="w-4 h-4 accent-blue-600"
+                                  class="w-4 h-4"
                                   onChange={() => {}}
                                 />
                                 <i class={`w-4 h-4 ${fileIcon} ${fileColor}`} />
@@ -1045,60 +1121,13 @@ const ModpackImportPreview: Component<Props> = (props) => {
 
       {/* File Preview Modal */}
       <Show when={previewFile()}>
-        <div
-          class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
-          onClick={() => setPreviewFile(null)}
-        >
-          <div
-            class="card max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div class="flex items-center justify-between p-4 border-b border-gray-750 flex-shrink-0">
-              <div class="flex items-center gap-3 min-w-0">
-                <i class={`w-5 h-5 ${getCategoryIcon(previewFile()!.category)} ${getCategoryColor(previewFile()!.category)}`} />
-                <span class="font-medium truncate">{previewFile()!.dest_path}</span>
-                <span class="text-xs text-dimmer flex-shrink-0">{fmtSize(previewFile()!.size)}</span>
-              </div>
-              <button
-                class="btn-close"
-                onClick={() => setPreviewFile(null)}
-                aria-label={t().ui?.tooltips?.close ?? "Close"}
-              >
-                <i class="i-hugeicons-cancel-01 w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div class="flex-1 overflow-hidden min-h-0">
-              <Show when={previewLoading()}>
-                <div class="flex-center h-full">
-                  <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-gray-500" />
-                </div>
-              </Show>
-
-              <Show when={!previewLoading() && previewContent() === null}>
-                <div class="flex-center flex-col gap-2 h-full text-muted">
-                  <i class="i-hugeicons-file-01 w-12 h-12 opacity-50" />
-                  <p>Не удалось загрузить содержимое файла</p>
-                  <p class="text-xs text-dimmer">Файл может быть бинарным или слишком большим</p>
-                </div>
-              </Show>
-
-              <Show when={!previewLoading() && previewContent() !== null}>
-                <div class="h-full overflow-auto">
-                  <CodeViewer
-                    code={previewContent()!}
-                    filename={previewFile()!.dest_path}
-                    showLineNumbers
-                    showHeader={false}
-                    maxHeight="calc(85vh - 8rem)"
-                  />
-                </div>
-              </Show>
-            </div>
-          </div>
-        </div>
+        <FilePreviewModal
+          file={previewFile()!}
+          loading={previewLoading()}
+          content={previewContent()}
+          fmtSize={fmtSize}
+          onClose={() => setPreviewFile(null)}
+        />
       </Show>
     </div>
   );

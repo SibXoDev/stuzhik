@@ -5,6 +5,7 @@ import type { DocContentItem } from "../data/types";
 import DocContent from "./DocContent";
 import DocSearch from "./DocSearch";
 import { useI18n } from "../../../shared/i18n";
+import { Tooltip } from "../../../shared/ui";
 
 interface Props {
   onClose: () => void;
@@ -202,9 +203,11 @@ const DocumentationPage: Component<Props> = (props) => {
                   <p class="text-xs text-gray-500">v{appVersion()}</p>
                 </div>
               </div>
-              <button class="btn-ghost p-1.5" onClick={props.onClose} title="Закрыть">
-                <i class="i-hugeicons-cancel-01 w-5 h-5" />
-              </button>
+              <Tooltip text="Закрыть" position="bottom">
+                <button class="btn-ghost p-1.5" onClick={props.onClose}>
+                  <i class="i-hugeicons-cancel-01 w-5 h-5" />
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -220,18 +223,19 @@ const DocumentationPage: Component<Props> = (props) => {
               class="flex-1 bg-transparent text-sm outline-none min-w-0"
             />
             <Show when={searchQuery()}>
-              <button
-                class="p-1 rounded text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
-                onClick={() => setSearchQuery("")}
-                title="Очистить"
-              >
-                <i class="i-hugeicons-cancel-01 w-3.5 h-3.5" />
-              </button>
+              <Tooltip text="Очистить" position="bottom">
+                <button
+                  class="p-1 rounded text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <i class="i-hugeicons-cancel-01 w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
             </Show>
           </div>
 
           {/* Navigation */}
-          <nav class="flex-1 overflow-y-auto p-3">
+          <nav class="flex-1 overflow-y-auto p-3 flex flex-col gap-1">
             <For each={docSections}>
               {(section) => {
                 const isActive = () => activeSectionId() === section.id;
@@ -239,12 +243,12 @@ const DocumentationPage: Component<Props> = (props) => {
                 const hasSubsections = section.subsections && section.subsections.length > 0;
 
                 return (
-                  <div class="mb-1">
+                  <div>
                     {/* Section Header */}
                     <div
                       class={`w-full px-3 py-2 rounded-xl text-left flex items-center gap-2 transition-colors cursor-pointer ${
                         isActive()
-                          ? "bg-blue-600/20 text-blue-400"
+                          ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]"
                           : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                       }`}
                       onClick={() => navigateTo(section.id)}
@@ -267,7 +271,7 @@ const DocumentationPage: Component<Props> = (props) => {
 
                     {/* Subsections */}
                     <Show when={hasSubsections && isExpanded()}>
-                      <div class="ml-6 mt-1 space-y-0.5 border-l border-gray-800 pl-3">
+                      <div class="ml-6 space-y-0.5 border-l border-gray-800 pl-3">
                         <For each={section.subsections}>
                           {(subsection) => {
                             const isSubActive = () =>
@@ -277,7 +281,7 @@ const DocumentationPage: Component<Props> = (props) => {
                               <button
                                 class={`w-full px-2 py-1.5 rounded-lg text-left text-sm transition-colors ${
                                   isSubActive()
-                                    ? "text-blue-400 bg-blue-600/10"
+                                    ? "text-[var(--color-primary)] bg-[var(--color-primary-bg)]"
                                     : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
                                 }`}
                                 onClick={() => navigateTo(section.id, subsection.id)}
@@ -323,17 +327,17 @@ const DocumentationPage: Component<Props> = (props) => {
 
           {/* Content Area */}
           <div ref={contentRef} class="flex-1 overflow-y-auto p-6">
-            <div class="max-w-3xl mx-auto">
+            <div class="max-w-3xl mx-auto flex flex-col gap-6">
               {/* Section Title (for sections without subsections) */}
               <Show when={!activeSubsection() && activeSection()?.content}>
-                <h2 class="text-2xl font-bold mb-6">
+                <h2 class="text-2xl font-bold">
                   {getLocalizedText(t, activeSection()?.titleKey)}
                 </h2>
               </Show>
 
               {/* Subsection Title */}
               <Show when={activeSubsection()}>
-                <h2 class="text-2xl font-bold mb-6">
+                <h2 class="text-2xl font-bold">
                   {getLocalizedText(t, activeSubsection()?.titleKey)}
                 </h2>
               </Show>
@@ -345,7 +349,7 @@ const DocumentationPage: Component<Props> = (props) => {
                 activeSection()!.subsections!.length > 0 &&
                 !activeSection()?.content
               }>
-                <h2 class="text-2xl font-bold mb-6">
+                <h2 class="text-2xl font-bold">
                   {getLocalizedText(t, activeSection()?.subsections?.[0]?.titleKey)}
                 </h2>
               </Show>
@@ -369,10 +373,10 @@ const DocumentationPage: Component<Props> = (props) => {
                   const nextSub = currentIdx < subsections.length - 1 ? subsections[currentIdx + 1] : null;
 
                   return (
-                    <div class="flex items-center justify-between mt-12 pt-6 border-t border-gray-800">
+                    <div class="flex items-center justify-between mt-6 pt-6 border-t border-gray-800">
                       <Show when={prevSub} fallback={<div />}>
                         <button
-                          class="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-800/50 transition-colors text-gray-400 hover:text-white"
+                          class="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-800/50 transition-colors text-gray-400 hover:text-gray-200"
                           onClick={() => navigateTo(section.id, prevSub!.id)}
                         >
                           <i class="i-hugeicons-arrow-left-01 w-4 h-4" />
@@ -383,7 +387,7 @@ const DocumentationPage: Component<Props> = (props) => {
                       </Show>
                       <Show when={nextSub}>
                         <button
-                          class="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-800/50 transition-colors text-gray-400 hover:text-white"
+                          class="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-gray-800/50 transition-colors text-gray-400 hover:text-gray-200"
                           onClick={() => navigateTo(section.id, nextSub!.id)}
                         >
                           <span class="text-sm">
@@ -404,7 +408,7 @@ const DocumentationPage: Component<Props> = (props) => {
       {/* Search Modal */}
       <Show when={showSearch()}>
         <div
-          class="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-20"
+          class="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-sm pt-[calc(var(--titlebar-height)+2rem)]"
           onClick={(e) => {
             if (e.target === e.currentTarget) setShowSearch(false);
           }}

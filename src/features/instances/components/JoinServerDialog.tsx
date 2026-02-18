@@ -3,6 +3,7 @@ import type { Component } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ModalWrapper } from "../../../shared/ui/ModalWrapper";
+import { useI18n, getSafeLocale } from "../../../shared/i18n";
 
 interface ServerInvite {
   id: string;
@@ -34,6 +35,7 @@ interface Props {
 }
 
 const JoinServerDialog: Component<Props> = (props) => {
+  const { t, language } = useI18n();
   const [inviteCode, setInviteCode] = createSignal(props.initialCode ?? "");
   const [validating, setValidating] = createSignal(false);
   const [joining, setJoining] = createSignal(false);
@@ -88,9 +90,11 @@ const JoinServerDialog: Component<Props> = (props) => {
     setError(null);
   };
 
+  let validateInProgress = false;
   const validateInvite = async () => {
     const code = inviteCode().trim();
-    if (!code) return;
+    if (!code || validateInProgress) return;
+    validateInProgress = true;
 
     setValidating(true);
     setError(null);
@@ -103,12 +107,15 @@ const JoinServerDialog: Component<Props> = (props) => {
       setInvite(null);
     } finally {
       setValidating(false);
+      validateInProgress = false;
     }
   };
 
+  let joinInProgress = false;
   const joinServer = async () => {
     const inv = invite();
-    if (!inv) return;
+    if (!inv || joinInProgress) return;
+    joinInProgress = true;
 
     setJoining(true);
     setError(null);
@@ -128,12 +135,13 @@ const JoinServerDialog: Component<Props> = (props) => {
     } catch (e) {
       setError(String(e));
       setJoining(false);
+      joinInProgress = false;
     }
   };
 
   const formatDate = (timestamp: number) => {
-    if (timestamp === 0) return "Бессрочно";
-    return new Date(timestamp * 1000).toLocaleDateString("ru-RU", {
+    if (timestamp === 0) return t().server.p2p.expiryNever;
+    return new Date(timestamp * 1000).toLocaleDateString(getSafeLocale(language()), {
       day: "numeric",
       month: "short",
       year: "numeric",

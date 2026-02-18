@@ -85,7 +85,7 @@ export const PROJECT_ICONS: Record<EditorProjectType, string> = {
 
 /** Category icon mapping */
 export const CATEGORY_ICONS: Record<string, string> = {
-  server: "i-hugeicons-server",
+  server: "i-hugeicons-hard-drive",
   client: "i-hugeicons-laptop",
   startup: "i-hugeicons-rocket-01",
   assets: "i-hugeicons-image-01",

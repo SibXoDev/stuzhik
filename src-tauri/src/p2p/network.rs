@@ -69,6 +69,24 @@ pub struct NetworkInterface {
     pub is_vpn: bool,
 }
 
+/// Port status code for frontend localization
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PortStatusCode {
+    /// Port is available
+    Available,
+    /// Fallback port is available
+    AvailableFallback,
+    /// Port is used by Stuzhik Connect
+    StuzhikUsing,
+    /// Fallback port is used by Stuzhik Connect
+    StuzhikUsingFallback,
+    /// All ports are busy
+    AllBusy,
+    /// Port is closed/blocked
+    Closed,
+}
+
 /// Port status info
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PortStatus {
@@ -76,8 +94,10 @@ pub struct PortStatus {
     pub port: u16,
     /// Whether port is available or working
     pub open: bool,
-    /// Status description
-    pub status: String,
+    /// Status code for frontend localization
+    pub status_code: PortStatusCode,
+    /// Fallback port if using non-default
+    pub fallback_port: Option<u16>,
 }
 
 /// Network diagnostics result
@@ -386,15 +406,16 @@ async fn check_port_with_fallbacks(
     for &port in ports {
         // Try to bind
         if check_port_available(port) {
-            let status = if port == base_port {
-                "Свободен".to_string()
-            } else {
-                format!("Свободен (резервный: {})", port)
-            };
+            let is_fallback = port != base_port;
             return PortStatus {
                 port,
                 open: true,
-                status,
+                status_code: if is_fallback {
+                    PortStatusCode::AvailableFallback
+                } else {
+                    PortStatusCode::Available
+                },
+                fallback_port: if is_fallback { Some(port) } else { None },
             };
         }
 
@@ -407,15 +428,16 @@ async fn check_port_with_fallbacks(
             };
 
             if is_ours {
-                let status = if port == base_port {
-                    "Используется Stuzhik".to_string()
-                } else {
-                    format!("Используется Stuzhik (резервный: {})", port)
-                };
+                let is_fallback = port != base_port;
                 return PortStatus {
                     port,
                     open: true,
-                    status,
+                    status_code: if is_fallback {
+                        PortStatusCode::StuzhikUsingFallback
+                    } else {
+                        PortStatusCode::StuzhikUsing
+                    },
+                    fallback_port: if is_fallback { Some(port) } else { None },
                 };
             }
         }
@@ -425,7 +447,8 @@ async fn check_port_with_fallbacks(
     PortStatus {
         port: base_port,
         open: false,
-        status: format!("Все порты заняты ({}, +10, +20, +30)", base_port),
+        status_code: PortStatusCode::AllBusy,
+        fallback_port: None,
     }
 }
 

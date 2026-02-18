@@ -88,7 +88,7 @@ export default function ImportServerDialog(props: Props) {
         await detectServer(selected);
       }
     } catch (e) {
-      console.error("Failed to select folder:", e);
+      if (import.meta.env.DEV) console.error("Failed to select folder:", e);
     }
   };
 
@@ -182,9 +182,9 @@ export default function ImportServerDialog(props: Props) {
 
   return (
     <ModalWrapper maxWidth="max-w-2xl">
-      <div class="p-6">
+      <div class="p-6 flex flex-col gap-6">
         {/* Header */}
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center justify-between">
           <h2 class="text-xl font-bold text-white flex items-center gap-2">
             <i class="i-hugeicons-upload-02 w-6 h-6 text-blue-400" />
             {t().server.import.title}
@@ -201,8 +201,8 @@ export default function ImportServerDialog(props: Props) {
         <Show when={importResult()}>
           {(result) => (
             <div class="space-y-4">
-              <div class="p-4 bg-green-900/30 border border-green-700/50 rounded-lg">
-                <div class="flex items-center gap-3 mb-3">
+              <div class="p-4 bg-green-900/30 border border-green-700/50 rounded-lg flex flex-col gap-3">
+                <div class="flex items-center gap-3">
                   <i class="i-hugeicons-checkmark-circle-02 w-8 h-8 text-green-400" />
                   <div>
                     <div class="text-lg font-medium text-green-300">{t().server.import.success}</div>
@@ -232,15 +232,15 @@ export default function ImportServerDialog(props: Props) {
         <Show when={!importResult()}>
           <div class="space-y-4">
             {/* Folder selection */}
-            <div>
-              <label class="block text-sm text-gray-400 mb-2">{t().server.import.serverFolder}</label>
+            <div class="flex flex-col gap-2">
+              <label class="block text-sm text-gray-400">{t().server.import.serverFolder}</label>
               <div class="flex gap-2">
                 <input
                   type="text"
                   value={serverPath() || ""}
                   readonly
                   placeholder={t().server.import.selectFolder}
-                  class="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500"
+                  class="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500"
                 />
                 <button
                   class="btn-secondary px-4"
@@ -256,7 +256,7 @@ export default function ImportServerDialog(props: Props) {
             {/* Detecting spinner */}
             <Show when={detecting()}>
               <div class="p-4 bg-gray-800 rounded-lg flex items-center justify-center gap-3">
-                <i class="i-svg-spinners-ring-resize w-5 h-5 text-blue-400" />
+                <i class="i-svg-spinners-ring-resize w-5 h-5 text-[var(--color-primary)]" />
                 <span class="text-gray-300">{t().server.import.detecting}</span>
               </div>
             </Show>
@@ -265,10 +265,10 @@ export default function ImportServerDialog(props: Props) {
             <Show when={detectError()}>
               <div class="p-4 bg-red-900/30 border border-red-700/50 rounded-lg">
                 <div class="flex items-start gap-2">
-                  <i class="i-hugeicons-alert-02 w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <div>
+                  <i class="i-hugeicons-alert-02 w-5 h-5 text-red-400 flex-shrink-0 pt-0.5" />
+                  <div class="flex flex-col gap-1">
                     <div class="text-sm font-medium text-red-300">{t().server.import.detectError}</div>
-                    <div class="text-xs text-red-400/70 mt-1">{detectError()}</div>
+                    <div class="text-xs text-red-400/70">{detectError()}</div>
                   </div>
                 </div>
               </div>
@@ -334,12 +334,12 @@ export default function ImportServerDialog(props: Props) {
 
                   {/* Evidence details (collapsible) */}
                   <Show when={server().evidence.length > 0}>
-                    <details class="group">
+                    <details class="group flex flex-col gap-2">
                       <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-400 flex items-center gap-1">
                         <i class="i-hugeicons-arrow-right-01 w-3 h-3 group-open:rotate-90 transition-transform" />
                         {t().server.import.detectionDetails} ({server().evidence.length})
                       </summary>
-                      <div class="mt-2 p-3 bg-gray-800/50 rounded-lg text-xs text-gray-400 space-y-1">
+                      <div class="p-3 bg-gray-800/50 rounded-lg text-xs text-gray-400 space-y-1">
                         <For each={server().evidence}>
                           {(item) => (
                             <div class="flex items-start gap-2">
@@ -360,7 +360,7 @@ export default function ImportServerDialog(props: Props) {
                       value={instanceName()}
                       onInput={(e) => setInstanceName(e.currentTarget.value)}
                       placeholder={t().server.import.namePlaceholder}
-                      class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                      class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:border-[var(--color-primary)] focus:outline-none"
                     />
                   </div>
 
@@ -376,7 +376,7 @@ export default function ImportServerDialog(props: Props) {
                     {(progress) => (
                       <div class="p-4 bg-gray-800 rounded-lg space-y-3">
                         <div class="flex items-center gap-3">
-                          <i class="i-svg-spinners-ring-resize w-5 h-5 text-blue-400" />
+                          <i class="i-svg-spinners-ring-resize w-5 h-5 text-[var(--color-primary)]" />
                           <span class="text-gray-300">{getPhaseLabel(progress().phase)}</span>
                         </div>
 
@@ -384,7 +384,7 @@ export default function ImportServerDialog(props: Props) {
                           {/* Progress bar */}
                           <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
                             <div
-                              class="h-full bg-blue-500 transition-all duration-150"
+                              class="h-full bg-[var(--color-primary)] transition-all duration-150"
                               style={{
                                 width: `${Math.round((progress().current / Math.max(progress().total, 1)) * 100)}%`
                               }}

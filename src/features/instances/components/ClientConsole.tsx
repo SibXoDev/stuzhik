@@ -2,6 +2,7 @@ import { Component, createSignal, createEffect, onMount, onCleanup, For, Show } 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { Select } from "../../../shared/ui/Select";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import { useI18n } from "../../../shared/i18n";
 
 interface LogEntry {
@@ -180,7 +181,7 @@ const ClientConsole: Component<Props> = (props) => {
           {/* Search */}
           <input
             type="text"
-            class="w-40 bg-gray-800/50 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+            class="w-40 bg-gray-800/50 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100 placeholder-gray-500 focus:border-[var(--color-primary)] focus:outline-none"
             placeholder={t().console?.search ?? "Search..."}
             value={searchTerm()}
             onInput={(e) => setSearchTerm(e.currentTarget.value)}
@@ -201,31 +202,34 @@ const ClientConsole: Component<Props> = (props) => {
           />
 
           {/* Copy logs */}
-          <button
-            class="p-1.5 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800"
-            onClick={copyLogs}
-            title={t().console?.copy ?? "Copy logs"}
-          >
-            <i class="i-hugeicons-copy-01 w-4 h-4" />
-          </button>
+          <Tooltip text={t().console?.copy ?? "Copy logs"} position="bottom">
+            <button
+              class="p-1.5 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+              onClick={copyLogs}
+            >
+              <i class="i-hugeicons-copy-01 w-4 h-4" />
+            </button>
+          </Tooltip>
 
           {/* Clear logs */}
-          <button
-            class="p-1.5 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800"
-            onClick={clearLogs}
-            title={t().server?.console?.clearLogs ?? "Clear"}
-          >
-            <i class="i-hugeicons-delete-02 w-4 h-4" />
-          </button>
+          <Tooltip text={t().server?.console?.clearLogs ?? "Clear"} position="bottom">
+            <button
+              class="p-1.5 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-800"
+              onClick={clearLogs}
+            >
+              <i class="i-hugeicons-delete-02 w-4 h-4" />
+            </button>
+          </Tooltip>
 
           {/* Auto-scroll toggle */}
-          <button
-            class={`p-1.5 rounded ${autoScroll() ? "text-blue-400 bg-blue-500/10" : "text-gray-500 hover:text-gray-300"}`}
-            onClick={() => setAutoScroll(!autoScroll())}
-            title={autoScroll() ? t().server?.console?.autoScrollOn ?? "Auto-scroll: ON" : t().server?.console?.autoScrollOff ?? "Auto-scroll: OFF"}
-          >
-            <i class="i-hugeicons-arrow-down-01 w-4 h-4" />
-          </button>
+          <Tooltip text={autoScroll() ? t().server?.console?.autoScrollOn ?? "Auto-scroll: ON" : t().server?.console?.autoScrollOff ?? "Auto-scroll: OFF"} position="bottom">
+            <button
+              class={`p-1.5 rounded ${autoScroll() ? "text-[var(--color-primary)] bg-[var(--color-primary-bg)]" : "text-gray-500 hover:text-gray-300"}`}
+              onClick={() => setAutoScroll(!autoScroll())}
+            >
+              <i class="i-hugeicons-arrow-down-01 w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 

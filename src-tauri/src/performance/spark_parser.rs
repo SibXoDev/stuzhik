@@ -87,7 +87,8 @@ fn find_latest_spark_report(instance_path: &Path) -> (Option<PathBuf>, Option<St
                     if ext_str == "sparkprofile" || ext_str == "json" {
                         if let Ok(metadata) = entry.metadata() {
                             if let Ok(modified) = metadata.modified() {
-                                if latest_time.is_none() || modified > latest_time.unwrap() {
+                                // map_or(true, ...) возвращает true если None, иначе применяет предикат
+                                if latest_time.map_or(true, |t| modified > t) {
                                     latest_time = Some(modified);
                                     latest_path = Some(path);
                                 }

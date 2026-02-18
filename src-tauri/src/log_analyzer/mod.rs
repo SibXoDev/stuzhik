@@ -1533,21 +1533,19 @@ impl LogAnalyzer {
 
     /// Анализ производительности из лога
     fn analyze_performance(lines: &[&str]) -> Option<PerformanceAnalysis> {
-        use lazy_static::lazy_static;
+        use std::sync::LazyLock;
 
-        lazy_static! {
-            // Кешированные regex для производительности
-            static ref TPS_RE: Regex = Regex::new(r"(?i)(?:TPS|ticks per second)[:\s]+(\d+\.?\d*)").unwrap();
-            static ref MEMORY_RE: Regex = Regex::new(r"(?i)(?:Memory|Mem)[:\s]+(\d+)(?:MB|M)?/(\d+)(?:MB|M)?").unwrap();
-            static ref GC_RE: Regex = Regex::new(r"(?i)GC.*?(\d+)ms").unwrap();
-            static ref LAG_RE: Regex = Regex::new(r"(?i)(?:server|tick)\s+(?:overloaded|lagging|running)\s+(\d+)ms\s+behind").unwrap();
-            static ref TICK_TIME_RE: Regex = Regex::new(r"(?i)\[(\w+)\].*?tick.*?(\d+\.?\d*)ms").unwrap();
-            // Дополнительные паттерны
-            static ref SPARK_PROFILE_RE: Regex = Regex::new(r"(?i)(?:Spark|profiler).*?(\w+).*?(\d+\.?\d*)%").unwrap();
-            static ref CHUNK_LOAD_RE: Regex = Regex::new(r"(?i)chunk.*?load.*?(\d+)ms").unwrap();
-            static ref ENTITY_COUNT_RE: Regex = Regex::new(r"(?i)entities[:\s]+(\d+)").unwrap();
-            static ref LOADED_CHUNKS_RE: Regex = Regex::new(r"(?i)chunks[:\s]+(\d+)").unwrap();
-        }
+        // Кешированные regex для производительности
+        static TPS_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(?:TPS|ticks per second)[:\s]+(\d+\.?\d*)").unwrap());
+        static MEMORY_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(?:Memory|Mem)[:\s]+(\d+)(?:MB|M)?/(\d+)(?:MB|M)?").unwrap());
+        static GC_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)GC.*?(\d+)ms").unwrap());
+        static LAG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(?:server|tick)\s+(?:overloaded|lagging|running)\s+(\d+)ms\s+behind").unwrap());
+        static TICK_TIME_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\[(\w+)\].*?tick.*?(\d+\.?\d*)ms").unwrap());
+        // Дополнительные паттерны
+        static SPARK_PROFILE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(?:Spark|profiler).*?(\w+).*?(\d+\.?\d*)%").unwrap());
+        static CHUNK_LOAD_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)chunk.*?load.*?(\d+)ms").unwrap());
+        static ENTITY_COUNT_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)entities[:\s]+(\d+)").unwrap());
+        static LOADED_CHUNKS_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)chunks[:\s]+(\d+)").unwrap());
 
         let mut tps_issues = Vec::new();
         let mut memory_issues = Vec::new();
@@ -2087,7 +2085,7 @@ impl LogAnalyzer {
 
         // 2. Проверяем файлы в папке mods
         let mods_path = instances_dir().join(instance_id).join("mods");
-        if mods_path.exists() {
+        if tokio::fs::try_exists(&mods_path).await.unwrap_or(false) {
             if let Ok(mut entries) = tokio::fs::read_dir(&mods_path).await {
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     if let Some(name) = entry.file_name().to_str() {

@@ -19,6 +19,7 @@ import {
 } from "../constants";
 import { useSafeTimers } from "../hooks";
 import { FeedbackDialog } from "./FeedbackDialog";
+import { Tooltip } from "../ui";
 
 // Компонент для отображения кода с кнопкой копирования
 function CodeBlock(props: { code: string; maxHeight?: string; class?: string }) {
@@ -31,7 +32,7 @@ function CodeBlock(props: { code: string; maxHeight?: string; class?: string }) 
       setCopied(true);
       safeTimeout(() => setCopied(false), COPY_FEEDBACK_DURATION_MS);
     } catch (e) {
-      console.error("Failed to copy:", e);
+      if (import.meta.env.DEV) console.error("Failed to copy:", e);
     }
   };
 
@@ -465,10 +466,10 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
     <div class="flex flex-col gap-4">
       {/* View mode indicator */}
       <Show when={viewMode() === "view" && reportInfo()}>
-        <div class="bg-blue-500/10 border border-blue-500/30 rounded-2xl px-3 py-2 flex items-center justify-between">
+        <div class="bg-[var(--color-primary-bg)] border border-[var(--color-primary-border)] rounded-2xl px-3 py-2 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm">
-            <i class="i-hugeicons-file-01 w-4 h-4 text-blue-400" />
-            <span class="text-blue-400">{t().logAnalyzer.viewMode}</span>
+            <i class="i-hugeicons-file-01 w-4 h-4 text-[var(--color-primary)]" />
+            <span class="text-[var(--color-primary)]">{t().logAnalyzer.viewMode}</span>
             <span class="text-white">{reportInfo()?.name || t().logAnalyzer.report}</span>
             <span class="text-muted">({reportInfo()?.date})</span>
           </div>
@@ -516,33 +517,35 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
           </button>
         </Show>
         <Show when={result()}>
-          <button
-            onClick={exportReport}
-            class="btn-ghost"
-            data-size="sm"
-            title={t().logAnalyzer.export}
-          >
-            <i class="i-hugeicons-file-01 w-4 h-4" />
-            {t().logAnalyzer.export}
-          </button>
+          <Tooltip text={t().logAnalyzer.export} position="bottom">
+            <button
+              onClick={exportReport}
+              class="btn-ghost"
+              data-size="sm"
+            >
+              <i class="i-hugeicons-file-01 w-4 h-4" />
+              {t().logAnalyzer.export}
+            </button>
+          </Tooltip>
         </Show>
         <Show when={result() && props.instanceId}>
-          <button
-            onClick={exportArchive}
-            class="btn-ghost"
-            data-size="sm"
-            disabled={loading()}
-            title={t().logAnalyzer.archive}
-          >
-            <i class="i-hugeicons-file-download w-4 h-4" />
-            {t().logAnalyzer.archive}
-          </button>
+          <Tooltip text={t().logAnalyzer.archive} position="bottom">
+            <button
+              onClick={exportArchive}
+              class="btn-ghost"
+              data-size="sm"
+              disabled={loading()}
+            >
+              <i class="i-hugeicons-file-download w-4 h-4" />
+              {t().logAnalyzer.archive}
+            </button>
+          </Tooltip>
         </Show>
       </div>
 
       <Show when={loading()}>
-        <div class="flex-col-center py-12">
-          <i class="i-svg-spinners-6-dots-scale w-8 h-8 mb-3" />
+        <div class="flex-col-center gap-3 py-12">
+          <i class="i-svg-spinners-6-dots-scale w-8 h-8" />
           <span class="text-muted">{t().logAnalyzer.analyzing}</span>
         </div>
       </Show>
@@ -570,15 +573,15 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                   : "i-hugeicons-alert-02 text-red-400"
               }`}
             />
-            <div class="flex-1 min-w-0">
+            <div class="flex-1 min-w-0 flex flex-col gap-1">
               <p class={`font-medium ${result().success ? "text-green-400" : "text-red-400"}`}>
                 {result().message}
               </p>
               <Show when={result().details}>
-                <p class="text-sm text-muted mt-1">{result().details}</p>
+                <p class="text-sm text-muted">{result().details}</p>
               </Show>
               <Show when={result().requires_restart}>
-                <p class="text-sm text-yellow-400 mt-1 flex items-center gap-1">
+                <p class="text-sm text-yellow-400 flex items-center gap-1">
                   <i class="i-hugeicons-refresh w-4 h-4" />
                   {t().autoFix.requiresRestart}
                 </p>
@@ -631,16 +634,16 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
             {(crash) => (
               <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 flex items-start gap-3">
                 <i class="i-hugeicons-alert-02 w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <div class="flex-1 min-w-0">
-                  <h3 class="font-bold text-red-400 mb-2">{t().logAnalyzer.crashDetected}</h3>
-                  <p class="text-white mb-2">{crash().main_cause}</p>
+                <div class="flex-1 min-w-0 flex flex-col gap-2">
+                  <h3 class="font-bold text-red-400">{t().logAnalyzer.crashDetected}</h3>
+                  <p class="text-white">{crash().main_cause}</p>
                   <Show when={crash().culprit_mod}>
                     <p class="text-yellow-400 text-sm">
                       {t().logAnalyzer.possibleCulprit}: <strong>{crash().culprit_mod}</strong>
                     </p>
                   </Show>
                   <Show when={crash().stack_trace.length > 0}>
-                    <details class="mt-3">
+                    <details>
                       <summary class="text-muted cursor-pointer text-sm hover:text-white transition-colors">
                         {t().logAnalyzer.stackTrace} ({crash().stack_trace.length} {t().logAnalyzer.lines.toLowerCase()})
                       </summary>
@@ -654,8 +657,8 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
 
           {/* Problems List */}
           <Show when={result()!.problems.length > 0}>
-            <div>
-              <div class="flex items-center justify-between mb-3">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between">
                 <h3 class="font-semibold text-white">
                   {t().logAnalyzer.detectedProblems} ({result()!.problems.length})
                 </h3>
@@ -682,11 +685,11 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
 
                       return (
                         <div
-                          class={`border rounded-2xl p-3 cursor-pointer transition-colors duration-100 ${
+                          class={`border rounded-2xl p-3 cursor-pointer transition-colors duration-100 flex flex-col gap-2 ${
                             isFixed() ? getStatusColor(status()) : getSeverityBorder(problem.severity)
                           } ${
                             selectedProblem()?.id === problem.id
-                              ? "ring-2 ring-blue-500"
+                              ? "ring-2 ring-[var(--color-primary)]"
                               : "hover:border-gray-500"
                           }`}
                           onClick={() => setSelectedProblem(problem)}
@@ -697,7 +700,7 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                             >
                               {getSeverityLabel(problem.severity)}
                             </span>
-                            <div class="flex-1 min-w-0">
+                            <div class="flex-1 min-w-0 flex flex-col gap-0.5">
                               <div class="flex items-center gap-2">
                                 <span class="font-medium text-white truncate">
                                   {problem.title}
@@ -717,14 +720,14 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                                   </span>
                                 </Show>
                               </div>
-                              <div class="text-sm text-muted line-clamp-2 mt-0.5">
+                              <div class="text-sm text-muted line-clamp-2">
                                 {problem.description}
                               </div>
                             </div>
                           </div>
 
                           <Show when={problem.solutions.length > 0 && viewMode() === "analyze" && !isFixed()}>
-                            <div class="mt-2 flex gap-2 flex-wrap">
+                            <div class="flex gap-2 flex-wrap">
                               <For each={problem.solutions.slice(0, 2)}>
                                 {(solution) => (
                                   <Show when={solution.auto_fix}>
@@ -775,17 +778,17 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
 
           {/* Optimizations */}
           <Show when={result()!.optimizations.length > 0}>
-            <div>
-              <h3 class="font-semibold text-white mb-3">{t().logAnalyzer.optimizations}</h3>
+            <div class="flex flex-col gap-3">
+              <h3 class="font-semibold text-white">{t().logAnalyzer.optimizations}</h3>
               <div class="flex flex-col gap-2">
                 <For each={result()!.optimizations}>
                   {(opt) => (
                     <div class="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-3">
                       <div class="flex items-center justify-between gap-3">
-                        <div class="flex-1 min-w-0">
+                        <div class="flex-1 min-w-0 flex flex-col gap-1">
                           <div class="font-medium text-white">{opt.title}</div>
-                          <div class="text-sm text-muted mt-0.5">{opt.description}</div>
-                          <div class="text-xs text-blue-400 mt-1">
+                          <div class="text-sm text-muted">{opt.description}</div>
+                          <div class="text-xs text-blue-400">
                             {opt.impact}
                           </div>
                         </div>
@@ -814,8 +817,8 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
       </Show>
 
       <Show when={!result() && !loading() && !error()}>
-        <div class="flex-col-center py-12 text-muted">
-          <i class="i-hugeicons-file-view w-12 h-12 mb-3 text-gray-600" />
+        <div class="flex-col-center gap-3 py-12 text-muted">
+          <i class="i-hugeicons-file-view w-12 h-12 text-gray-600" />
           <p>{t().logAnalyzer.clickToAnalyze}</p>
         </div>
       </Show>
@@ -824,14 +827,14 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
       <Show when={selectedProblem()}>
         {(problem) => (
           <div
-            class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+            class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => setSelectedProblem(null)}
           >
             <div
-              class="card max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+              class="card max-w-2xl w-full max-h-[80vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-4"
               onClick={(e) => e.stopPropagation()}
             >
-              <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <span
                     class={`${getSeverityColor(problem().severity)} px-2 py-0.5 rounded text-xs font-medium text-white`}
@@ -850,14 +853,14 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
               </div>
 
               <div class="space-y-4">
-                <div>
-                  <h4 class="text-sm font-medium text-muted mb-1">{t().logAnalyzer.description}</h4>
+                <div class="flex flex-col gap-1">
+                  <h4 class="text-sm font-medium text-muted">{t().logAnalyzer.description}</h4>
                   <p class="text-white">{problem().description}</p>
                 </div>
 
                 <Show when={problem().log_line}>
-                  <div>
-                    <h4 class="text-sm font-medium text-muted mb-1">
+                  <div class="flex flex-col gap-1">
+                    <h4 class="text-sm font-medium text-muted">
                       {t().logAnalyzer.logLine} {problem().line_number ? `(#${problem().line_number})` : ""}
                     </h4>
                     <CodeBlock code={problem().log_line!} />
@@ -865,8 +868,8 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                 </Show>
 
                 <Show when={problem().related_mods.length > 0}>
-                  <div>
-                    <h4 class="text-sm font-medium text-muted mb-1">{t().logAnalyzer.relatedMods}</h4>
+                  <div class="flex flex-col gap-1">
+                    <h4 class="text-sm font-medium text-muted">{t().logAnalyzer.relatedMods}</h4>
                     <div class="flex gap-2 flex-wrap">
                       <For each={problem().related_mods}>
                         {(mod) => (
@@ -879,17 +882,17 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                   </div>
                 </Show>
 
-                <div>
-                  <h4 class="text-sm font-medium text-muted mb-2">{t().logAnalyzer.solutions}</h4>
+                <div class="flex flex-col gap-2">
+                  <h4 class="text-sm font-medium text-muted">{t().logAnalyzer.solutions}</h4>
                   <div class="flex flex-col gap-2">
                     <For each={problem().solutions}>
                       {(solution) => (
                         <div class="bg-gray-850 border border-gray-750 rounded-2xl p-3">
                           <div class="flex items-start justify-between gap-2">
-                            <div class="flex-1">
+                            <div class="flex-1 flex flex-col gap-1">
                               <div class="font-medium text-white">{solution.title}</div>
-                              <div class="text-sm text-muted mt-0.5">{solution.description}</div>
-                              <div class="flex items-center gap-3 mt-2 text-xs">
+                              <div class="text-sm text-muted">{solution.description}</div>
+                              <div class="flex items-center gap-3 text-xs">
                                 <span class={getDifficultyColor(solution.difficulty)}>
                                   {getDifficultyLabel(solution.difficulty)}
                                 </span>
@@ -916,8 +919,8 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                 </div>
 
                 <Show when={problem().docs_links.length > 0}>
-                  <div>
-                    <h4 class="text-sm font-medium text-muted mb-1">{t().logAnalyzer.documentation}</h4>
+                  <div class="flex flex-col gap-1">
+                    <h4 class="text-sm font-medium text-muted">{t().logAnalyzer.documentation}</h4>
                     <div class="space-y-1">
                       <For each={problem().docs_links}>
                         {(link) => (
@@ -953,11 +956,11 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
           <div class="bg-gray-850 border border-gray-750 rounded-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col pointer-events-auto">
             {/* Header */}
             <div class="flex items-center justify-between p-4 border-b border-gray-750">
-              <div>
+              <div class="flex flex-col gap-1">
                 <h2 class="text-lg font-semibold text-white">
                   {t().logAnalyzer.fixPreview}
                 </h2>
-                <p class="text-sm text-gray-400 mt-1">
+                <p class="text-sm text-gray-400">
                   {t().logAnalyzer.selectFixesToApply}
                 </p>
               </div>
@@ -991,7 +994,7 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                     <div
                       class={`border rounded-2xl p-3 cursor-pointer transition-colors duration-100 ${
                         isSelected()
-                          ? "border-blue-500/50 bg-blue-500/5"
+                          ? "border-[var(--color-primary-border)] bg-[var(--color-primary-bg)]"
                           : "border-gray-700 hover:border-gray-600"
                       }`}
                       onClick={toggleFix}
@@ -1002,7 +1005,7 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                           <div
                             class={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                               isSelected()
-                                ? "border-blue-500 bg-blue-500"
+                                ? "border-[var(--color-primary)] bg-[var(--color-primary)]"
                                 : "border-gray-600"
                             }`}
                           >
@@ -1013,10 +1016,10 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                         </div>
 
                         {/* Problem + Solution Info */}
-                        <div class="flex-1 min-w-0">
+                        <div class="flex-1 min-w-0 flex flex-col gap-2">
                           {/* Problem */}
-                          <div class="mb-2">
-                            <div class="flex items-center gap-2 mb-1">
+                          <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2">
                               <span class={`${getSeverityColor(preview.problem.severity)} px-1.5 py-0.5 rounded text-xs font-medium text-white`}>
                                 {getSeverityLabel(preview.problem.severity)}
                               </span>
@@ -1030,7 +1033,7 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                           </div>
 
                           {/* Arrow */}
-                          <div class="flex items-center gap-2 my-2">
+                          <div class="flex items-center gap-2">
                             <div class="h-px flex-1 bg-gray-700" />
                             <i class="i-hugeicons-arrow-down-01 w-4 h-4 text-gray-500" />
                             <div class="h-px flex-1 bg-gray-700" />
@@ -1039,8 +1042,8 @@ export function LogAnalyzer(props: LogAnalyzerProps) {
                           {/* Solution */}
                           <div class="bg-green-500/10 border border-green-500/30 rounded-2xl p-2 flex items-start gap-2">
                             <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400 flex-shrink-0" />
-                            <div class="flex-1 min-w-0">
-                              <span class="font-medium text-green-400 text-sm block mb-1">
+                            <div class="flex-1 min-w-0 flex flex-col gap-1">
+                              <span class="font-medium text-green-400 text-sm block">
                                 {preview.solution.title}
                               </span>
                               <p class="text-xs text-gray-300">

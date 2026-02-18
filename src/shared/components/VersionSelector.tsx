@@ -2,7 +2,7 @@ import { createSignal, createEffect, For, Show, onMount, createMemo } from "soli
 import { invoke } from "@tauri-apps/api/core";
 import type { MinecraftVersion } from "../types";
 import Dropdown from "../ui/Dropdown";
-import { useI18n } from "../i18n";
+import { useI18n, getSafeLocale } from "../i18n";
 
 interface Props {
   value: string;
@@ -18,7 +18,7 @@ interface LoaderCompatibility {
 }
 
 function VersionSelector(props: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [versions, setVersions] = createSignal<MinecraftVersion[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
@@ -48,7 +48,7 @@ function VersionSelector(props: Props) {
         }
       }
     } catch (e) {
-      console.error("Failed to load versions:", e);
+      if (import.meta.env.DEV) console.error("Failed to load versions:", e);
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,7 @@ function VersionSelector(props: Props) {
         });
       }
     } catch (e) {
-      console.error("Failed to check loader compatibility:", e);
+      if (import.meta.env.DEV) console.error("Failed to check loader compatibility:", e);
       const msg = (t().versions?.compatibilityCheckFailed ?? "Failed to check compatibility: {error}")
         .replace("{error}", String(e));
       setCompatibility({
@@ -161,7 +161,7 @@ function VersionSelector(props: Props) {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("ru-RU", {
+    return date.toLocaleDateString(getSafeLocale(language()), {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -223,7 +223,7 @@ function VersionSelector(props: Props) {
                 type="checkbox"
                 checked={showSnapshots()}
                 onChange={(e) => setShowSnapshots(e.currentTarget.checked)}
-                class="w-3.5 h-3.5 rounded-md accent-blue-600"
+                class="w-3.5 h-3.5 rounded-md"
               />
               <span class="text-gray-400">{t().versions?.filters?.snapshots ?? "Snapshots"}</span>
             </label>
@@ -233,7 +233,7 @@ function VersionSelector(props: Props) {
                 type="checkbox"
                 checked={showOldBeta()}
                 onChange={(e) => setShowOldBeta(e.currentTarget.checked)}
-                class="w-3.5 h-3.5 rounded-md accent-blue-600"
+                class="w-3.5 h-3.5 rounded-md"
               />
               <span class="text-gray-400">{t().versions?.filters?.oldBeta ?? "Old beta"}</span>
             </label>
@@ -243,7 +243,7 @@ function VersionSelector(props: Props) {
                 type="checkbox"
                 checked={showOldAlpha()}
                 onChange={(e) => setShowOldAlpha(e.currentTarget.checked)}
-                class="w-3.5 h-3.5 rounded-md accent-blue-600"
+                class="w-3.5 h-3.5 rounded-md"
               />
               <span class="text-gray-400">{t().versions?.filters?.oldAlpha ?? "Old alpha"}</span>
             </label>
@@ -269,7 +269,7 @@ function VersionSelector(props: Props) {
                     <button
                       type="button"
                       class={`w-full px-3 py-2.5 flex items-center justify-between hover:bg-gray-700/50 transition-colors text-left rounded-2xl ${
-                        props.value === version.id ? "bg-blue-600/20 hover:bg-blue-600/30" : ""
+                        props.value === version.id ? "bg-[var(--color-primary-bg)] hover:bg-[var(--color-primary-bg)]" : ""
                       }`}
                       onClick={() => handleSelect(version.id)}
                     >
@@ -292,7 +292,7 @@ function VersionSelector(props: Props) {
                         </div>
                       </div>
                       <Show when={props.value === version.id}>
-                        <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-blue-400 flex-shrink-0" />
+                        <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-[var(--color-primary)] flex-shrink-0" />
                       </Show>
                     </button>
                   );

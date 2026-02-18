@@ -55,40 +55,49 @@ impl SyncExecutor {
                 instance_dir.join(dir)
             };
 
-            if !scan_dir.exists() {
+            if !fs::try_exists(&scan_dir).await.unwrap_or(false) {
                 continue;
             }
 
-            for entry in WalkDir::new(&scan_dir)
-                .max_depth(if dir.is_empty() { 1 } else { 10 })
-                .into_iter()
-                .filter_map(|e| e.ok())
-            {
-                let path = entry.path();
+            // WalkDir is blocking I/O — wrap in spawn_blocking to avoid blocking tokio runtime
+            let scan_dir_clone = scan_dir.clone();
+            let instance_dir_clone = instance_dir.clone();
+            let is_root = dir.is_empty();
+            let max_depth = if is_root { 1 } else { 10 };
 
-                // Пропускаем директории
-                if path.is_dir() {
-                    continue;
-                }
-
-                // Пропускаем не-настройки в корне
-                if dir.is_empty() {
-                    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                    if !Self::is_root_settings_file(file_name) {
+            let entries: Vec<(String, u64)> = tokio::task::spawn_blocking(move || {
+                let mut result = Vec::new();
+                for entry in WalkDir::new(&scan_dir_clone)
+                    .max_depth(max_depth)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                {
+                    let path = entry.path();
+                    if path.is_dir() {
                         continue;
                     }
+
+                    if is_root {
+                        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                        if !Self::is_root_settings_file(file_name) {
+                            continue;
+                        }
+                    }
+
+                    let relative = path
+                        .strip_prefix(&instance_dir_clone)
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    result.push((relative, size));
                 }
+                result
+            })
+            .await
+            .unwrap_or_default();
 
-                // Получаем относительный путь
-                let relative = path
-                    .strip_prefix(&instance_dir)
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default();
-
-                // Получаем размер файла
-                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-
-                // Классифицируем
+            for (relative, size) in entries {
                 let classified = self.kb.classify_file(&relative, size);
                 files.push(classified);
             }
@@ -287,7 +296,7 @@ impl SyncExecutor {
     async fn sync_options_txt(&self, source: &Path, target: &Path) -> Result<()> {
         let source_content = fs::read_to_string(source).await?;
 
-        let target_content = if target.exists() {
+        let target_content = if fs::try_exists(target).await.unwrap_or(false) {
             fs::read_to_string(target).await?
         } else {
             String::new()
@@ -306,7 +315,7 @@ impl SyncExecutor {
 
     /// Копирует файл с созданием директорий
     async fn copy_file(&self, source: &Path, target: &Path) -> Result<()> {
-        if !source.exists() {
+        if !fs::try_exists(source).await.unwrap_or(false) {
             return Err(crate::error::LauncherError::NotFound(format!(
                 "Source file not found: {}",
                 source.display()

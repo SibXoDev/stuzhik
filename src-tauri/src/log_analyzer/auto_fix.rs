@@ -541,16 +541,16 @@ async fn reinstall_mod_fix(
     filename: &str,
     app_handle: AppHandle,
 ) -> Result<AutoFixResult> {
-    // Получаем информацию о моде из БД
-    let conn = get_db_conn()?;
-
-    let mod_info: Option<(String, String, String)> = conn
-        .query_row(
+    // Получаем информацию о моде из БД (scoped to drop conn before async)
+    let mod_info: Option<(String, String, String)> = {
+        let conn = get_db_conn()?;
+        conn.query_row(
             "SELECT slug, source, project_id FROM mods WHERE instance_id = ?1 AND file_name = ?2",
             params![instance_id, filename],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
-        .ok();
+        .ok()
+    };
 
     // Удаляем текущий файл
     let mods_dir = instances_dir().join(instance_id).join("mods");
@@ -742,10 +742,10 @@ async fn update_loader_fix(
         });
     }
 
-    // Получаем информацию об экземпляре из БД
-    let conn = get_db_conn()?;
-    let instance_info: Option<(String, String, String)> = conn
-        .query_row(
+    // Получаем информацию об экземпляре из БД (scoped to drop conn before async)
+    let instance_info: Option<(String, String, String)> = {
+        let conn = get_db_conn()?;
+        conn.query_row(
             "SELECT version, loader_version, instance_type FROM instances WHERE id = ?1",
             [instance_id],
             |row| {
@@ -755,7 +755,8 @@ async fn update_loader_fix(
                 Ok((version, loader_version.unwrap_or_default(), instance_type))
             },
         )
-        .ok();
+        .ok()
+    };
 
     let (mc_version, current_loader_version, instance_type) = match instance_info {
         Some(info) => info,
@@ -838,7 +839,8 @@ async fn update_loader_fix(
     .await
     {
         Ok(_) => {
-            // Обновляем версию в БД
+            // Обновляем версию в БД (re-acquire conn after async operations)
+            let conn = get_db_conn()?;
             conn.execute(
                 "UPDATE instances SET loader_version = ?1 WHERE id = ?2",
                 params![latest_version, instance_id],

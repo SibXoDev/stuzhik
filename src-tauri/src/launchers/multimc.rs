@@ -19,7 +19,7 @@ use tokio::fs;
 pub async fn parse_instance_cfg(instance_dir: &Path) -> LauncherResult<MultiMCInstanceCfg> {
     let cfg_path = instance_dir.join("instance.cfg");
 
-    if !cfg_path.exists() {
+    if !fs::try_exists(&cfg_path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "instance.cfg not found in {}",
             instance_dir.display()
@@ -85,7 +85,7 @@ pub async fn parse_instance_cfg(instance_dir: &Path) -> LauncherResult<MultiMCIn
 pub async fn parse_mmc_pack(instance_dir: &Path) -> LauncherResult<MMCPack> {
     let pack_path = instance_dir.join("mmc-pack.json");
 
-    if !pack_path.exists() {
+    if !fs::try_exists(&pack_path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "mmc-pack.json not found in {}",
             instance_dir.display()
@@ -122,7 +122,7 @@ async fn count_mods(instance_dir: &Path) -> usize {
     let minecraft_dir = get_minecraft_dir(instance_dir);
     let mods_dir = minecraft_dir.join("mods");
 
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return 0;
     }
 
@@ -244,7 +244,7 @@ pub async fn list_instances(launcher_root: &Path) -> LauncherResult<Vec<Launcher
 
     // Find instances directory
     let instances_dir = launcher_root.join("instances");
-    if !instances_dir.exists() {
+    if !fs::try_exists(&instances_dir).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "Instances directory not found in {}",
             launcher_root.display()
@@ -269,7 +269,7 @@ pub async fn list_instances(launcher_root: &Path) -> LauncherResult<Vec<Launcher
         }
 
         // Check if it's a valid instance (has instance.cfg)
-        if !path.join("instance.cfg").exists() {
+        if !fs::try_exists(path.join("instance.cfg")).await.unwrap_or(false) {
             continue;
         }
 
@@ -295,12 +295,12 @@ pub async fn list_instances(launcher_root: &Path) -> LauncherResult<Vec<Launcher
 /// Detect if this is MultiMC or Prism based on launcher files
 async fn detect_launcher_type(launcher_root: &Path) -> LauncherType {
     // Check for Prism-specific files
-    if launcher_root.join("prismlauncher.cfg").exists() {
+    if fs::try_exists(launcher_root.join("prismlauncher.cfg")).await.unwrap_or(false) {
         return LauncherType::Prism;
     }
 
     // Check for MultiMC-specific files
-    if launcher_root.join("multimc.cfg").exists() {
+    if fs::try_exists(launcher_root.join("multimc.cfg")).await.unwrap_or(false) {
         return LauncherType::MultiMC;
     }
 
@@ -308,7 +308,9 @@ async fn detect_launcher_type(launcher_root: &Path) -> LauncherType {
     let prism_exe = launcher_root.join("prismlauncher.exe");
     let prism_exe_linux = launcher_root.join("prismlauncher");
 
-    if prism_exe.exists() || prism_exe_linux.exists() {
+    if fs::try_exists(&prism_exe).await.unwrap_or(false)
+        || fs::try_exists(&prism_exe_linux).await.unwrap_or(false)
+    {
         return LauncherType::Prism;
     }
 
@@ -378,9 +380,9 @@ pub async fn detect_installations() -> Vec<DetectedLauncher> {
 
     for path_opt in search_paths {
         if let Some(path) = path_opt {
-            if path.exists() {
+            if fs::try_exists(&path).await.unwrap_or(false) {
                 let instances_path = path.join("instances");
-                if instances_path.exists() {
+                if fs::try_exists(&instances_path).await.unwrap_or(false) {
                     // Count instances
                     let instance_count = count_instances(&instances_path).await;
 
@@ -410,7 +412,9 @@ async fn count_instances(instances_dir: &Path) -> usize {
     if let Ok(mut entries) = fs::read_dir(instances_dir).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
-            if path.is_dir() && path.join("instance.cfg").exists() {
+            if path.is_dir()
+                && fs::try_exists(path.join("instance.cfg")).await.unwrap_or(false)
+            {
                 count += 1;
             }
         }

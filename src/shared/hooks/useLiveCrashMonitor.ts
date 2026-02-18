@@ -96,7 +96,7 @@ export function useLiveCrashMonitor(instanceId?: Accessor<string | null>) {
                 logPath: log_path,
               });
             } catch (e) {
-              console.error(`Failed to start monitoring for ${id}:`, e);
+              if (import.meta.env.DEV) console.error(`Failed to start monitoring for ${id}:`, e);
             }
           } else if (status === "stopped" || status === "error") {
             // Auto-stop monitoring when instance stops
@@ -123,16 +123,16 @@ export function useLiveCrashMonitor(instanceId?: Accessor<string | null>) {
                   logPath,
                 });
               } catch (e) {
-                console.error(`Failed to start monitoring for running instance ${instance.id}:`, e);
+                if (import.meta.env.DEV) console.error(`Failed to start monitoring for running instance ${instance.id}:`, e);
               }
             }
           }
         }
       } catch (e) {
-        console.error("Failed to check running instances:", e);
+        if (import.meta.env.DEV) console.error("Failed to check running instances:", e);
       }
     } catch (e) {
-      console.error("Failed to initialize live crash monitor:", e);
+      if (import.meta.env.DEV) console.error("Failed to initialize live crash monitor:", e);
       setState((prev) => ({
         ...prev,
         monitorError: e instanceof Error ? e.message : String(e),
@@ -148,7 +148,7 @@ export function useLiveCrashMonitor(instanceId?: Accessor<string | null>) {
         return `${instance.dir}/logs/latest.log`;
       }
     } catch (e) {
-      console.error(`Failed to get instance ${instanceId}:`, e);
+      if (import.meta.env.DEV) console.error(`Failed to get instance ${instanceId}:`, e);
     }
     return null;
   }
@@ -231,7 +231,7 @@ export function useLiveCrashMonitor(instanceId?: Accessor<string | null>) {
         logPath,
       });
     } catch (e) {
-      console.error("Failed to start live monitoring:", e);
+      if (import.meta.env.DEV) console.error("Failed to start live monitoring:", e);
       setState((prev) => ({
         ...prev,
         monitorError: e instanceof Error ? e.message : String(e),
@@ -249,7 +249,7 @@ export function useLiveCrashMonitor(instanceId?: Accessor<string | null>) {
       setLoading(true);
       await invoke("stop_live_monitoring", { instanceId: id });
     } catch (e) {
-      console.error("Failed to stop live monitoring:", e);
+      if (import.meta.env.DEV) console.error("Failed to stop live monitoring:", e);
     } finally {
       setLoading(false);
     }
@@ -261,7 +261,9 @@ export function useLiveCrashMonitor(instanceId?: Accessor<string | null>) {
       const instances = Array.from(state().monitoredInstances.keys());
       await Promise.all(
         instances.map((id) =>
-          invoke("stop_live_monitoring", { instanceId: id }).catch(console.error)
+          invoke("stop_live_monitoring", { instanceId: id }).catch((e) => {
+            if (import.meta.env.DEV) console.error("Failed to stop monitoring:", e);
+          })
         )
       );
     } finally {

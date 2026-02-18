@@ -4,7 +4,7 @@ import type { ModpackProject } from "../../../shared/types";
 import { createConfirmDialog } from "../../../shared/components/ConfirmDialog";
 import { LoaderIcon } from "../../../shared/components/LoaderSelector";
 import { Select } from "../../../shared/ui/Select";
-import { useI18n } from "../../../shared/i18n";
+import { useI18n, getSafeLocale } from "../../../shared/i18n";
 
 interface Props {
   onSelect: (project: ModpackProject) => void;
@@ -13,7 +13,7 @@ interface Props {
 
 export default function ModpackProjectList(props: Props) {
   const { confirm, ConfirmDialogComponent } = createConfirmDialog();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [projects, setProjects] = createSignal<ModpackProject[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
@@ -110,7 +110,7 @@ export default function ModpackProjectList(props: Props) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("ru-RU", {
+    return date.toLocaleDateString(getSafeLocale(language()), {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -121,9 +121,9 @@ export default function ModpackProjectList(props: Props) {
     <div class="flex flex-col h-full max-h-[calc(100vh-8rem)]">
       {/* Header */}
       <div class="flex items-center justify-between p-4 border-b border-gray-750 flex-shrink-0">
-        <div>
+        <div class="flex flex-col gap-1">
           <h2 class="text-xl font-bold text-white">Редактор модпаков</h2>
-          <p class="text-sm text-gray-400 mt-1">
+          <p class="text-sm text-gray-400">
             Создавайте и редактируйте собственные модпаки
           </p>
         </div>
@@ -146,19 +146,19 @@ export default function ModpackProjectList(props: Props) {
       </div>
 
       {/* Content */}
-      <div class="flex-1 overflow-y-auto p-4">
+      <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
 
       {/* Create Form */}
       <Show when={showCreateForm()}>
-        <div class="card mb-4 p-4 border-2 border-blue-500/30 bg-blue-500/5">
-          <h3 class="font-medium mb-4">Новый проект модпака</h3>
+        <div class="card p-4 border-2 border-[var(--color-primary-border)] bg-[var(--color-primary-bg)] flex flex-col gap-4">
+          <h3 class="font-medium">Новый проект модпака</h3>
 
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">Название</label>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="block text-sm text-gray-400">Название</label>
               <input
                 type="text"
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 focus:border-[var(--color-primary)] focus:outline-none"
                 placeholder="Мой модпак"
                 value={newName()}
                 onInput={(e) => setNewName(e.currentTarget.value)}
@@ -166,21 +166,21 @@ export default function ModpackProjectList(props: Props) {
               />
             </div>
 
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">
+            <div class="flex flex-col gap-1">
+              <label class="block text-sm text-gray-400">
                 Версия Minecraft
               </label>
               <input
                 type="text"
-                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-white focus:border-blue-500 focus:outline-none"
+                class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-2xl text-gray-200 focus:border-[var(--color-primary)] focus:outline-none"
                 placeholder="1.20.1"
                 value={newMcVersion()}
                 onInput={(e) => setNewMcVersion(e.currentTarget.value)}
               />
             </div>
 
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">Загрузчик</label>
+            <div class="flex flex-col gap-1">
+              <label class="block text-sm text-gray-400">Загрузчик</label>
               <Select
                 value={newLoader()}
                 onChange={setNewLoader}
@@ -221,7 +221,7 @@ export default function ModpackProjectList(props: Props) {
 
       {/* Error */}
       <Show when={error()}>
-        <div class="card mb-4 p-3 bg-red-500/10 border-red-500/30">
+        <div class="card p-3 bg-red-500/10 border-red-500/30">
           <div class="flex items-center gap-2 text-red-400">
             <div class="i-hugeicons-alert-02 w-5 h-5" />
             <span>{error()}</span>
@@ -232,18 +232,20 @@ export default function ModpackProjectList(props: Props) {
       {/* Loading */}
       <Show when={loading()}>
         <div class="flex-1 flex items-center justify-center">
-          <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-blue-500" />
+          <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-[var(--color-primary)]" />
         </div>
       </Show>
 
       {/* Empty State */}
       <Show when={!loading() && projects().length === 0}>
-        <div class="flex-1 flex flex-col items-center justify-center text-gray-400">
-          <div class="i-hugeicons-file-02 w-16 h-16 mb-4 opacity-50" />
-          <p class="text-lg mb-2">Нет проектов модпаков</p>
-          <p class="text-sm mb-4">
-            Создайте свой первый модпак, нажав кнопку выше
-          </p>
+        <div class="flex-1 flex flex-col items-center justify-center text-gray-400 gap-4">
+          <div class="i-hugeicons-file-02 w-16 h-16 opacity-50" />
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-lg">Нет проектов модпаков</p>
+            <p class="text-sm">
+              Создайте свой первый модпак, нажав кнопку выше
+            </p>
+          </div>
           <button
             class="btn-primary"
             onClick={() => setShowCreateForm(true)}
@@ -270,8 +272,8 @@ export default function ModpackProjectList(props: Props) {
                   </div>
 
                   {/* Info */}
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-1">
+                  <div class="flex-1 min-w-0 flex flex-col gap-1">
+                    <div class="flex items-center gap-2">
                       <h3 class="font-medium text-white truncate">
                         {project.name}
                       </h3>
@@ -280,7 +282,7 @@ export default function ModpackProjectList(props: Props) {
                       </span>
                     </div>
 
-                    <div class="flex items-center gap-3 text-sm text-gray-400 mb-2">
+                    <div class="flex items-center gap-3 text-sm text-gray-400">
                       <span class="flex items-center gap-1">
                         <div class="i-hugeicons-game-controller-03 w-4 h-4" />
                         {project.minecraft_version}

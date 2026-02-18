@@ -215,10 +215,10 @@ export function ToastProvider() {
                 ? "opacity-0 translate-x-full scale-95"
                 : "opacity-100 translate-x-0 scale-100 animate-toast-in"
             } ${
-              toast.type === "success" ? "bg-green-900/90 border-green-700" :
-              toast.type === "error" ? "bg-red-900/90 border-red-700" :
-              toast.type === "warning" ? "bg-amber-900/90 border-amber-700" :
-              "bg-gray-850/90 border-gray-700"
+              toast.type === "success" ? "bg-gray-850/95 border-green-500/50" :
+              toast.type === "error" ? "bg-gray-850/95 border-red-500/50" :
+              toast.type === "warning" ? "bg-gray-850/95 border-amber-500/50" :
+              "bg-gray-850/95 border-blue-500/50"
             }`}
           >
             <div class="flex items-start gap-3">
@@ -232,13 +232,13 @@ export function ToastProvider() {
 
               {/* Content */}
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-white">{toast.title}</p>
+                <p class="text-sm font-medium text-gray-200">{toast.title}</p>
                 <Show when={toast.message}>
                   <p class="text-xs text-gray-400 mt-0.5 break-words">{toast.message}</p>
                 </Show>
                 <Show when={toast.action}>
                   <button
-                    class="btn-ghost btn-sm mt-2 text-blue-400"
+                    class="btn-ghost btn-sm mt-2 text-[var(--color-primary)]"
                     onClick={toast.action!.onClick}
                   >
                     {toast.action!.label}

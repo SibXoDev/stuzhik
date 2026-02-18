@@ -90,7 +90,7 @@ impl PeerGroupManager {
 
     /// Загрузить группы из файла
     pub async fn load(&self) -> Result<(), String> {
-        if !self.storage_path.exists() {
+        if !tokio::fs::try_exists(&self.storage_path).await.unwrap_or(false) {
             return Ok(());
         }
 

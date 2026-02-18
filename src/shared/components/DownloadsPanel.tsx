@@ -37,7 +37,7 @@ export default function DownloadsPanel() {
       {/* Header */}
       <div class="flex items-center justify-between px-5 py-4 border-b border-gray-800">
         <div class="flex items-center gap-3">
-          <div class="flex items-center justify-center w-9 h-9 bg-blue-600 rounded-2xl">
+          <div class="flex items-center justify-center w-9 h-9 bg-[var(--color-primary)] rounded-2xl">
             <i class="i-hugeicons-download-02 w-5 h-5 text-white" />
           </div>
           <div>
@@ -120,8 +120,10 @@ function DownloadItem(props: DownloadItemProps) {
   const isCancelled = download.status === "cancelled";
   const isFailed = download.status === "failed";
   const isStalled = download.status === "stalled";
-  const canCancel = !isCompleted && !isCancelled && !isFailed && !isRequesting && download.operation_id;
-  const cancelling = () => isCancelling(download.operation_id);
+  // Используем download.id для индивидуальной отмены (child token на backend)
+  const cancelId = download.id || download.operation_id;
+  const canCancel = !isCompleted && !isCancelled && !isFailed && !isRequesting && cancelId;
+  const cancelling = () => isCancelling(cancelId ?? null);
 
   return (
     <div
@@ -189,11 +191,19 @@ function DownloadItem(props: DownloadItemProps) {
 
         <div class="flex-1 min-w-0">
           <div class="flex items-center justify-between mb-1">
-            <p class="text-sm font-medium truncate">{download.name}</p>
+            <div class="flex items-center gap-1.5 min-w-0">
+              <Show when={download.source === "modrinth"}>
+                <i class="i-simple-icons-modrinth w-3.5 h-3.5 flex-shrink-0 text-green-400" />
+              </Show>
+              <Show when={download.source === "curseforge"}>
+                <i class="i-simple-icons-curseforge w-3.5 h-3.5 flex-shrink-0 text-orange-400" />
+              </Show>
+              <p class="text-sm font-medium truncate">{download.name}</p>
+            </div>
             <Show when={canCancel}>
               <button
                 class="btn-ghost btn-sm p-1 hover:bg-red-600/20 text-gray-400 hover:text-red-400"
-                onClick={() => download.operation_id && onCancel(download.operation_id)}
+                onClick={() => cancelId && onCancel(cancelId)}
                 disabled={cancelling()}
               >
                 <Show when={cancelling()} fallback={<i class="i-hugeicons-cancel-01 w-4 h-4" />}>

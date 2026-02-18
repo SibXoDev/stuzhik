@@ -1,8 +1,8 @@
 import { For, Show, createSignal, onMount } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import type { MetadataFile, PackMcmeta, PackFormatInfo } from "../../../shared/types";
+import type { MetadataFile, PackMcmeta, PackFormatInfo, ModsToml, FabricModJson } from "../../../shared/types";
 import { PACK_FORMATS } from "../../../shared/types";
-import { ModalWrapper } from "../../../shared/ui";
+import { ModalWrapper, Select } from "../../../shared/ui";
 import { addToast } from "../../../shared/components/Toast";
 import { useI18n } from "../../../shared/i18n";
 
@@ -135,8 +135,8 @@ export function MetadataEditor(props: MetadataEditorProps) {
       </div>
       <div class="flex gap-4 min-h-[400px]">
         {/* Sidebar - File list */}
-        <div class="w-56 flex-shrink-0 border-r border-gray-700 pr-4">
-          <div class="flex items-center justify-between mb-3">
+        <div class="w-56 flex-shrink-0 border-r border-gray-700 pr-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
             <span class="text-sm font-medium">{t().editor?.metadataEditor?.metadataFiles || "Metadata Files"}</span>
             <button
               class="p-1 rounded hover:bg-gray-700"
@@ -154,11 +154,11 @@ export function MetadataEditor(props: MetadataEditorProps) {
           </Show>
 
           <Show when={!loading() && metadataFiles().length === 0}>
-            <div class="text-center py-8 text-gray-500 text-sm">
-              <i class="i-hugeicons-file-search w-8 h-8 mx-auto mb-2" />
+            <div class="flex flex-col items-center py-8 text-gray-500 text-sm gap-2">
+              <i class="i-hugeicons-file-search w-8 h-8" />
               <p>{t().editor?.metadataEditor?.noFilesFound || "No metadata files found"}</p>
               <button
-                class="btn-primary btn-sm mt-4"
+                class="btn-primary btn-sm mt-2"
                 onClick={() => setShowCreatePack(true)}
               >
                 {t().editor?.metadataEditor?.createPackMcmeta || "Create pack.mcmeta"}
@@ -172,7 +172,7 @@ export function MetadataEditor(props: MetadataEditorProps) {
                 <button
                   class={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                     selectedFile()?.path === file.path
-                      ? "bg-blue-600/20 border border-blue-500/50"
+                      ? "bg-[var(--color-primary-bg)] border border-[var(--color-primary-border)]"
                       : "hover:bg-gray-800"
                   }`}
                   onClick={() => selectFile(file)}
@@ -204,8 +204,8 @@ export function MetadataEditor(props: MetadataEditorProps) {
             when={selectedFile()}
             fallback={
               <div class="flex-center h-full text-gray-500">
-                <div class="text-center">
-                  <i class="i-hugeicons-file-edit w-12 h-12 mx-auto mb-3" />
+                <div class="flex flex-col items-center gap-3">
+                  <i class="i-hugeicons-file-edit w-12 h-12" />
                   <p>{t().editor?.metadataEditor?.selectFileToEdit || "Select a file to edit"}</p>
                 </div>
               </div>
@@ -303,54 +303,54 @@ function PackMcmetaEditor(props: PackMcmetaEditorProps) {
       </div>
 
       {/* Pack Format */}
-      <div>
-        <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.packFormat || "Pack Format"}</label>
-        <select
-          value={props.packFormat}
-          onChange={(e) => props.onPackFormatChange(parseInt(e.currentTarget.value))}
-          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
-        >
-          <option value="4">4 (1.13 - 1.14.4)</option>
-          <option value="5">5 (1.15 - 1.16.1)</option>
-          <option value="6">6 (1.16.2 - 1.16.5)</option>
-          <option value="7">7 (1.17 - 1.17.1)</option>
-          <option value="8">8 (1.18 - 1.18.2)</option>
-          <option value="9">9 (1.19 - 1.19.2)</option>
-          <option value="10">10 (1.19.3)</option>
-          <option value="12">12 (1.19.4)</option>
-          <option value="15">15 (1.20.1 - 1.20.2)</option>
-          <option value="18">18 (1.20.3 - 1.20.4)</option>
-          <option value="26">26 (1.20.5 - 1.20.6)</option>
-          <option value="34">34 (1.21 - 1.21.1)</option>
-          <option value="42">42 (1.21.2 - 1.21.3)</option>
-          <option value="46">46 (1.21.4+)</option>
-        </select>
+      <div class="flex flex-col gap-2">
+        <label class="block text-sm font-medium">{t().editor?.metadataEditor?.packFormat || "Pack Format"}</label>
+        <Select
+          value={String(props.packFormat)}
+          onChange={(v) => props.onPackFormatChange(parseInt(v))}
+          options={[
+            { value: "4", label: "4 (1.13 - 1.14.4)" },
+            { value: "5", label: "5 (1.15 - 1.16.1)" },
+            { value: "6", label: "6 (1.16.2 - 1.16.5)" },
+            { value: "7", label: "7 (1.17 - 1.17.1)" },
+            { value: "8", label: "8 (1.18 - 1.18.2)" },
+            { value: "9", label: "9 (1.19 - 1.19.2)" },
+            { value: "10", label: "10 (1.19.3)" },
+            { value: "12", label: "12 (1.19.4)" },
+            { value: "15", label: "15 (1.20.1 - 1.20.2)" },
+            { value: "18", label: "18 (1.20.3 - 1.20.4)" },
+            { value: "26", label: "26 (1.20.5 - 1.20.6)" },
+            { value: "34", label: "34 (1.21 - 1.21.1)" },
+            { value: "42", label: "42 (1.21.2 - 1.21.3)" },
+            { value: "46", label: "46 (1.21.4+)" },
+          ]}
+        />
         <Show when={formatInfo()}>
-          <p class="text-xs text-gray-500 mt-1">
+          <p class="text-xs text-gray-500">
             {(t().editor?.metadataEditor?.compatibleWith || "Compatible with Minecraft {versions}").replace("{versions}", formatInfo()?.versions || "")}
           </p>
         </Show>
       </div>
 
       {/* Description */}
-      <div>
-        <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.description || "Description"}</label>
+      <div class="flex flex-col gap-2">
+        <label class="block text-sm font-medium">{t().editor?.metadataEditor?.description || "Description"}</label>
         <textarea
           value={props.description}
           onInput={(e) => props.onDescriptionChange(e.currentTarget.value)}
           rows={3}
-          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
+          class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-[var(--color-primary)] resize-none"
           placeholder={t().editor?.metadataEditor?.descriptionPlaceholder || "Pack description..."}
         />
-        <p class="text-xs text-gray-500 mt-1">
+        <p class="text-xs text-gray-500">
           {t().editor?.metadataEditor?.formattingHint || "Supports Minecraft formatting codes (e.g., §c for red)"}
         </p>
       </div>
 
       {/* Supported Formats */}
       <Show when={props.data.pack.supported_formats}>
-        <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.supportedFormats || "Supported Formats"}</div>
+        <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-2">
+          <div class="text-sm font-medium">{t().editor?.metadataEditor?.supportedFormats || "Supported Formats"}</div>
           <code class="text-xs text-blue-400">
             {JSON.stringify(props.data.pack.supported_formats)}
           </code>
@@ -359,8 +359,8 @@ function PackMcmetaEditor(props: PackMcmetaEditorProps) {
 
       {/* Filter */}
       <Show when={props.data.filter}>
-        <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.filters || "Filters"}</div>
+        <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-2">
+          <div class="text-sm font-medium">{t().editor?.metadataEditor?.filters || "Filters"}</div>
           <code class="text-xs text-gray-400">
             {JSON.stringify(props.data.filter, null, 2)}
           </code>
@@ -370,9 +370,9 @@ function PackMcmetaEditor(props: PackMcmetaEditorProps) {
   );
 }
 
-// Mods.toml viewer (read-only for now)
+// Mods.toml viewer (read-only)
 interface ModsTomlViewerProps {
-  data: any;
+  data: ModsToml;
 }
 
 function ModsTomlViewer(props: ModsTomlViewerProps) {
@@ -388,27 +388,27 @@ function ModsTomlViewer(props: ModsTomlViewerProps) {
       </div>
 
       <div class="grid gap-4">
-        <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.modLoader || "Mod Loader"}</div>
+        <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-2">
+          <div class="text-sm font-medium">{t().editor?.metadataEditor?.modLoader || "Mod Loader"}</div>
           <div class="text-gray-300">{props.data.mod_loader}</div>
         </div>
 
-        <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.loaderVersion || "Loader Version"}</div>
+        <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-2">
+          <div class="text-sm font-medium">{t().editor?.metadataEditor?.loaderVersion || "Loader Version"}</div>
           <div class="text-gray-300">{props.data.loader_version}</div>
         </div>
 
-        <div class="p-3 bg-gray-800 rounded-lg">
-          <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.license || "License"}</div>
+        <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-2">
+          <div class="text-sm font-medium">{t().editor?.metadataEditor?.license || "License"}</div>
           <div class="text-gray-300">{props.data.license}</div>
         </div>
 
         <Show when={props.data.mods?.length > 0}>
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.mods || "Mods"} ({props.data.mods.length})</div>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-2">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.mods || "Mods"} ({props.data.mods.length})</div>
             <For each={props.data.mods}>
-              {(mod: any) => (
-                <div class="p-2 bg-gray-750 rounded mt-2">
+              {(mod) => (
+                <div class="p-2 bg-gray-750 rounded">
                   <div class="font-medium">{mod.display_name}</div>
                   <div class="text-xs text-gray-400">{mod.mod_id} v{mod.version}</div>
                   <Show when={mod.description}>
@@ -421,17 +421,17 @@ function ModsTomlViewer(props: ModsTomlViewerProps) {
         </Show>
       </div>
 
-      <div class="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-lg text-sm text-yellow-300">
-        <i class="i-hugeicons-information-circle w-4 h-4 inline mr-1" />
-        {t().editor?.metadataEditor?.modsTomlReadOnly || "mods.toml editing is read-only. Use the source editor for changes."}
+      <div class="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-lg text-sm text-yellow-300 flex items-center gap-1">
+        <i class="i-hugeicons-information-circle w-4 h-4 flex-shrink-0" />
+        <span>{t().editor?.metadataEditor?.modsTomlReadOnly || "mods.toml editing is read-only. Use the source editor for changes."}</span>
       </div>
     </div>
   );
 }
 
-// Fabric mod.json viewer (read-only for now)
+// Fabric mod.json viewer (read-only)
 interface FabricModJsonViewerProps {
-  data: any;
+  data: FabricModJson;
 }
 
 function FabricModJsonViewer(props: FabricModJsonViewerProps) {
@@ -448,36 +448,36 @@ function FabricModJsonViewer(props: FabricModJsonViewerProps) {
 
       <div class="grid gap-4">
         <div class="grid grid-cols-2 gap-4">
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.modId || "Mod ID"}</div>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-1">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.modId || "Mod ID"}</div>
             <div class="text-gray-300 font-mono">{props.data.id}</div>
           </div>
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.version || "Version"}</div>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-1">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.version || "Version"}</div>
             <div class="text-gray-300">{props.data.version}</div>
           </div>
         </div>
 
         <Show when={props.data.name}>
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.name || "Name"}</div>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-1">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.name || "Name"}</div>
             <div class="text-gray-300">{props.data.name}</div>
           </div>
         </Show>
 
         <Show when={props.data.description}>
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.description || "Description"}</div>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-1">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.description || "Description"}</div>
             <div class="text-gray-300">{props.data.description}</div>
           </div>
         </Show>
 
-        <Show when={props.data.authors?.length > 0}>
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.authors || "Authors"}</div>
+        <Show when={props.data.authors && props.data.authors.length > 0}>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-1">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.authors || "Authors"}</div>
             <div class="flex flex-wrap gap-2">
               <For each={props.data.authors}>
-                {(author: any) => (
+                {(author) => (
                   <span class="px-2 py-1 bg-gray-700 rounded text-sm">
                     {typeof author === "string" ? author : author.name}
                   </span>
@@ -488,8 +488,8 @@ function FabricModJsonViewer(props: FabricModJsonViewerProps) {
         </Show>
 
         <Show when={props.data.depends && Object.keys(props.data.depends).length > 0}>
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-2">{t().editor?.metadataEditor?.dependencies || "Dependencies"}</div>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-2">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.dependencies || "Dependencies"}</div>
             <div class="space-y-1">
               <For each={Object.entries(props.data.depends || {})}>
                 {([id, version]) => (
@@ -504,16 +504,16 @@ function FabricModJsonViewer(props: FabricModJsonViewerProps) {
         </Show>
 
         <Show when={props.data.environment}>
-          <div class="p-3 bg-gray-800 rounded-lg">
-            <div class="text-sm font-medium mb-1">{t().editor?.metadataEditor?.environment || "Environment"}</div>
+          <div class="p-3 bg-gray-800 rounded-lg flex flex-col gap-1">
+            <div class="text-sm font-medium">{t().editor?.metadataEditor?.environment || "Environment"}</div>
             <div class="text-gray-300 capitalize">{props.data.environment}</div>
           </div>
         </Show>
       </div>
 
-      <div class="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-lg text-sm text-yellow-300">
-        <i class="i-hugeicons-information-circle w-4 h-4 inline mr-1" />
-        {t().editor?.metadataEditor?.fabricReadOnly || "fabric.mod.json editing is read-only. Use the source editor for changes."}
+      <div class="p-3 bg-yellow-900/20 border border-yellow-500/30 rounded-lg text-sm text-yellow-300 flex items-center gap-1">
+        <i class="i-hugeicons-information-circle w-4 h-4 flex-shrink-0" />
+        <span>{t().editor?.metadataEditor?.fabricReadOnly || "fabric.mod.json editing is read-only. Use the source editor for changes."}</span>
       </div>
     </div>
   );
@@ -530,7 +530,7 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
   const { t } = useI18n();
   const [packPath, setPackPath] = createSignal("kubejs");
   const [packFormat, setPackFormat] = createSignal(15);
-  const [description, setDescription] = createSignal(t().editor?.metadataEditor?.defaultDescription || "A custom pack");
+  const [description, setDescription] = createSignal("");
   const [creating, setCreating] = createSignal(false);
 
   const handleCreate = async () => {
@@ -540,7 +540,7 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
         instanceId: props.instanceId,
         packPath: packPath(),
         packFormat: packFormat(),
-        description: description(),
+        description: description().trim() || t().editor?.metadataEditor?.defaultDescription || "A custom pack",
       });
 
       addToast({
@@ -581,31 +581,31 @@ function CreatePackMcmetaDialog(props: CreatePackMcmetaDialogProps) {
       <div class="p-4 space-y-4">
         <div>
           <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.location || "Location"}</label>
-          <select
+          <Select
             value={packPath()}
-            onChange={(e) => setPackPath(e.currentTarget.value)}
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-          >
-            <option value="kubejs">kubejs/</option>
-            <option value="resourcepacks/custom">resourcepacks/custom/</option>
-            <option value="datapacks/custom">datapacks/custom/</option>
-          </select>
+            onChange={setPackPath}
+            options={[
+              { value: "kubejs", label: "kubejs/" },
+              { value: "resourcepacks/custom", label: "resourcepacks/custom/" },
+              { value: "datapacks/custom", label: "datapacks/custom/" },
+            ]}
+          />
         </div>
 
         <div>
           <label class="block text-sm font-medium mb-2">{t().editor?.metadataEditor?.packFormat || "Pack Format"}</label>
-          <select
-            value={packFormat()}
-            onChange={(e) => setPackFormat(parseInt(e.currentTarget.value))}
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-          >
-            <option value="15">15 (1.20.1 - 1.20.2)</option>
-            <option value="18">18 (1.20.3 - 1.20.4)</option>
-            <option value="26">26 (1.20.5 - 1.20.6)</option>
-            <option value="34">34 (1.21 - 1.21.1)</option>
-            <option value="42">42 (1.21.2 - 1.21.3)</option>
-            <option value="46">46 (1.21.4+)</option>
-          </select>
+          <Select
+            value={String(packFormat())}
+            onChange={(v) => setPackFormat(parseInt(v))}
+            options={[
+              { value: "15", label: "15 (1.20.1 - 1.20.2)" },
+              { value: "18", label: "18 (1.20.3 - 1.20.4)" },
+              { value: "26", label: "26 (1.20.5 - 1.20.6)" },
+              { value: "34", label: "34 (1.21 - 1.21.1)" },
+              { value: "42", label: "42 (1.21.2 - 1.21.3)" },
+              { value: "46", label: "46 (1.21.4+)" },
+            ]}
+          />
         </div>
 
         <div>

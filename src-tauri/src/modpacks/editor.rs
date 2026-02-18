@@ -777,21 +777,15 @@ impl ModpackManager {
             }
         }
 
-        let http_client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .default_headers({
-                let mut headers = reqwest::header::HeaderMap::new();
-                headers.insert(
-                    "x-api-key",
-                    "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
-                        .parse()
-                        .expect("valid API key header value"),
-                );
-                headers
-            })
-            .build()?;
-
-        let response: serde_json::Value = http_client.get(&url).send().await?.json().await?;
+        let url_clone = url.clone();
+        let response: serde_json::Value =
+            crate::api::curseforge::cf_api_retry("search_mods", || {
+                let u = url_clone.clone();
+                async move {
+                    crate::api::curseforge::shared_client()
+                        .get(&u).send().await?.json().await
+                }
+            }).await?;
         let data = response
             .get("data")
             .and_then(|d| d.as_array())
@@ -915,20 +909,6 @@ impl ModpackManager {
                     .parse()
                     .map_err(|_| LauncherError::InvalidConfig("Invalid project ID".to_string()))?;
 
-                let http_client = reqwest::Client::builder()
-                    .user_agent(crate::USER_AGENT)
-                    .default_headers({
-                        let mut headers = reqwest::header::HeaderMap::new();
-                        headers.insert(
-                            "x-api-key",
-                            "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
-                                .parse()
-                                .unwrap(),
-                        );
-                        headers
-                    })
-                    .build()?;
-
                 let file_url = if let Some(fid) = version_id {
                     format!(
                         "https://api.curseforge.com/v1/mods/{}/files/{}",
@@ -941,8 +921,15 @@ impl ModpackManager {
                     )
                 };
 
+                let file_url_clone = file_url.clone();
                 let response: serde_json::Value =
-                    http_client.get(&file_url).send().await?.json().await?;
+                    crate::api::curseforge::cf_api_retry("get_mod_file", || {
+                        let u = file_url_clone.clone();
+                        async move {
+                            crate::api::curseforge::shared_client()
+                                .get(&u).send().await?.json().await
+                        }
+                    }).await?;
 
                 let file_data = if version_id.is_some() {
                     response.get("data").cloned()
@@ -1025,11 +1012,7 @@ impl ModpackManager {
                 let temp_path =
                     cache_dir.join(format!("temp_modpack_{}.mrpack", uuid::Uuid::new_v4()));
 
-                let client = reqwest::Client::builder()
-                    .user_agent(crate::USER_AGENT)
-                    .build()?;
-
-                let response = client.get(download_url).send().await?;
+                let response = crate::utils::SHARED_HTTP_CLIENT.get(download_url).send().await?;
                 let bytes = response.bytes().await?;
 
                 // ИСПРАВЛЕНО: Используем tokio::fs::write для async записи
@@ -1087,20 +1070,6 @@ impl ModpackManager {
                     .parse()
                     .map_err(|_| LauncherError::InvalidConfig("Invalid project ID".to_string()))?;
 
-                let http_client = reqwest::Client::builder()
-                    .user_agent(crate::USER_AGENT)
-                    .default_headers({
-                        let mut headers = reqwest::header::HeaderMap::new();
-                        headers.insert(
-                            "x-api-key",
-                            "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
-                                .parse()
-                                .unwrap(),
-                        );
-                        headers
-                    })
-                    .build()?;
-
                 // Получаем файл модпака
                 let file_url = if let Some(fid) = version_id {
                     format!("https://api.curseforge.com/v1/mods/{}/files/{}", pid, fid)
@@ -1111,8 +1080,15 @@ impl ModpackManager {
                     )
                 };
 
+                let file_url_clone = file_url.clone();
                 let response: serde_json::Value =
-                    http_client.get(&file_url).send().await?.json().await?;
+                    crate::api::curseforge::cf_api_retry("get_modpack_file", || {
+                        let u = file_url_clone.clone();
+                        async move {
+                            crate::api::curseforge::shared_client()
+                                .get(&u).send().await?.json().await
+                        }
+                    }).await?;
 
                 let file_data = if version_id.is_some() {
                     response.get("data").cloned()
@@ -1147,8 +1123,16 @@ impl ModpackManager {
                 let temp_path =
                     cache_dir.join(format!("temp_modpack_{}.zip", uuid::Uuid::new_v4()));
 
-                let response = http_client.get(&url).send().await?;
-                let bytes = response.bytes().await?;
+                let url_for_download = url.clone();
+                let bytes =
+                    crate::api::curseforge::cf_api_retry("download_modpack_zip", || {
+                        let u = url_for_download.clone();
+                        async move {
+                            let resp = crate::api::curseforge::shared_client()
+                                .get(&u).send().await?;
+                            resp.bytes().await
+                        }
+                    }).await?;
 
                 // ИСПРАВЛЕНО: Используем tokio::fs::write для async записи
                 tokio::fs::write(&temp_path, &bytes).await?;
@@ -1179,13 +1163,20 @@ impl ModpackManager {
                 .map_err(|e| LauncherError::Join(e.to_string()))??;
 
                 let mods = if !file_ids.is_empty() {
-                    let batch_response: serde_json::Value = http_client
-                        .post("https://api.curseforge.com/v1/mods/files")
-                        .json(&serde_json::json!({ "fileIds": file_ids }))
-                        .send()
-                        .await?
-                        .json()
-                        .await?;
+                    let batch_body = serde_json::json!({ "fileIds": file_ids });
+                    let batch_response: serde_json::Value =
+                        crate::api::curseforge::cf_api_retry("batch_mod_files_editor", || {
+                            let body = batch_body.clone();
+                            async move {
+                                crate::api::curseforge::shared_client()
+                                    .post("https://api.curseforge.com/v1/mods/files")
+                                    .json(&body)
+                                    .send()
+                                    .await?
+                                    .json()
+                                    .await
+                            }
+                        }).await?;
 
                     let data = batch_response
                         .get("data")

@@ -11,13 +11,13 @@ use crate::java::JavaManager;
 use crate::loaders::LoaderManager;
 use crate::minecraft::MinecraftInstaller;
 use crate::modpacks;
-use crate::types::{Instance, InstanceStatus, InstanceType, LoaderType};
+use crate::types::{GameType, Instance, InstanceStatus, InstanceType, LoaderType};
 
 use super::lifecycle::{get_instance, ChildMap};
 
 /// Проверяет существование Forge version JSON (spawn_blocking для directory iteration)
 async fn check_forge_version_exists(versions_dir: &std::path::Path, mc_version: &str) -> bool {
-    if !tokio::fs::try_exists(&versions_dir).await.unwrap_or(false) {
+    if !versions_dir.exists() {  // sync .exists() is fine here — called before spawn_blocking
         return false;
     }
     let versions_dir = versions_dir.to_owned();
@@ -113,6 +113,16 @@ async fn install_instance_async(instance: &Instance, app_handle: tauri::AppHandl
 
         log::info!("Loader installed");
     }
+
+    // Notify frontend that instance installation (Java/MC/Loader) is done
+    let _ = app_handle.emit(
+        "instance-install-progress",
+        serde_json::json!({
+            "id": instance.id,
+            "step": "complete",
+            "message": ""
+        }),
+    );
 
     log::info!("Instance {} installation completed", instance.id);
 
@@ -240,11 +250,8 @@ pub(super) async fn install_instance_async_cancellable(
     };
 
     // Ждём завершения Java и Minecraft параллельно
-    let (java_result, mc_result) = tokio::join!(java_task, minecraft_task);
-
-    // Проверяем результаты
-    let _java_path = java_result?;
-    mc_result?;
+    // try_join! aborts the second task early if the first fails
+    let (_java_path, _) = tokio::try_join!(java_task, minecraft_task)?;
 
     // Проверка отмены после параллельной загрузки
     if cancel_token.is_cancelled() {
@@ -291,6 +298,18 @@ pub(super) async fn install_instance_async_cancellable(
         log::info!("Loader installed");
     }
 
+    // Notify frontend that instance installation (Java/MC/Loader) is done
+    // This clears the "Загрузка библиотек Forge (29/29)..." message
+    // so that modpack mod download progress becomes visible
+    let _ = app_handle.emit(
+        "instance-install-progress",
+        serde_json::json!({
+            "id": instance.id,
+            "step": "complete",
+            "message": ""
+        }),
+    );
+
     log::info!("Instance {} installation completed", instance.id);
 
     Ok(())
@@ -329,42 +348,77 @@ pub async fn reinstall_instance(
         }),
     );
 
+    let operation_id = format!("instance-reinstall-{}", id);
+    let cancel_token = cancellation::create_token(&operation_id);
+
     let instance_clone = instance.clone();
     let app_handle_clone = app_handle.clone();
+    let operation_id_clone = operation_id.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = install_instance_async(&instance_clone, app_handle_clone.clone()).await {
-            log::error!("Failed to reinstall instance {}: {}", instance_clone.id, e);
+        let result = install_instance_async_cancellable(
+            &instance_clone,
+            app_handle_clone.clone(),
+            &cancel_token,
+        )
+        .await;
 
-            if let Ok(conn) = get_db_conn() {
-                let _ = conn.execute(
-                    "UPDATE instances SET status = 'error', updated_at = ?1 WHERE id = ?2",
-                    params![Utc::now().to_rfc3339(), instance_clone.id],
+        // Clean up cancellation token
+        cancellation::remove_token(&operation_id_clone);
+
+        match result {
+            Ok(()) => {
+                if let Ok(conn) = get_db_conn() {
+                    let _ = conn.execute(
+                        "UPDATE instances SET status = 'stopped', updated_at = ?1 WHERE id = ?2",
+                        params![Utc::now().to_rfc3339(), instance_clone.id],
+                    );
+                }
+
+                let _ = app_handle_clone.emit(
+                    "instance-reinstalled",
+                    serde_json::json!({
+                        "id": instance_clone.id,
+                        "name": instance_clone.name
+                    }),
                 );
             }
+            Err(LauncherError::OperationCancelled) => {
+                log::info!("Reinstallation cancelled for instance {}", instance_clone.id);
 
-            let _ = app_handle_clone.emit(
-                "instance-reinstall-failed",
-                serde_json::json!({
-                    "id": instance_clone.id,
-                    "error": e.to_string()
-                }),
-            );
-        } else {
-            if let Ok(conn) = get_db_conn() {
-                let _ = conn.execute(
-                    "UPDATE instances SET status = 'stopped', updated_at = ?1 WHERE id = ?2",
-                    params![Utc::now().to_rfc3339(), instance_clone.id],
+                if let Ok(conn) = get_db_conn() {
+                    let _ = conn.execute(
+                        "UPDATE instances SET status = 'stopped', updated_at = ?1 WHERE id = ?2",
+                        params![Utc::now().to_rfc3339(), instance_clone.id],
+                    );
+                }
+
+                let _ = app_handle_clone.emit(
+                    "instance-reinstall-failed",
+                    serde_json::json!({
+                        "id": instance_clone.id,
+                        "error": "Переустановка отменена"
+                    }),
                 );
             }
+            Err(e) => {
+                log::error!("Failed to reinstall instance {}: {}", instance_clone.id, e);
 
-            let _ = app_handle_clone.emit(
-                "instance-reinstalled",
-                serde_json::json!({
-                    "id": instance_clone.id,
-                    "name": instance_clone.name
-                }),
-            );
+                if let Ok(conn) = get_db_conn() {
+                    let _ = conn.execute(
+                        "UPDATE instances SET status = 'error', updated_at = ?1 WHERE id = ?2",
+                        params![Utc::now().to_rfc3339(), instance_clone.id],
+                    );
+                }
+
+                let _ = app_handle_clone.emit(
+                    "instance-reinstall-failed",
+                    serde_json::json!({
+                        "id": instance_clone.id,
+                        "error": e.to_string()
+                    }),
+                );
+            }
         }
     });
 
@@ -404,52 +458,90 @@ pub async fn repair_instance(
         }),
     );
 
+    let operation_id = format!("instance-repair-{}", id);
+    let cancel_token = cancellation::create_token(&operation_id);
+
     let instance_clone = instance.clone();
     let app_handle_clone = app_handle.clone();
+    let operation_id_clone = operation_id.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = repair_instance_async(&instance_clone, app_handle_clone.clone()).await {
-            log::error!("Failed to repair instance {}: {}", instance_clone.id, e);
+        let result =
+            repair_instance_async(&instance_clone, app_handle_clone.clone(), &cancel_token).await;
 
-            if let Ok(conn) = get_db_conn() {
-                let _ = conn.execute(
-                    "UPDATE instances SET status = 'error', installation_error = ?1, installation_step = 'repair', updated_at = ?2 WHERE id = ?3",
-                    params![e.to_string(), Utc::now().to_rfc3339(), instance_clone.id],
+        // Clean up cancellation token
+        cancellation::remove_token(&operation_id_clone);
+
+        match result {
+            Ok(()) => {
+                if let Ok(conn) = get_db_conn() {
+                    let _ = conn.execute(
+                        "UPDATE instances SET status = 'stopped', updated_at = ?1 WHERE id = ?2",
+                        params![Utc::now().to_rfc3339(), instance_clone.id],
+                    );
+                }
+
+                let _ = app_handle_clone.emit(
+                    "instance-repaired",
+                    serde_json::json!({
+                        "id": instance_clone.id,
+                        "name": instance_clone.name
+                    }),
                 );
             }
+            Err(LauncherError::OperationCancelled) => {
+                log::info!("Repair cancelled for instance {}", instance_clone.id);
 
-            let _ = app_handle_clone.emit(
-                "instance-repair-failed",
-                serde_json::json!({
-                    "id": instance_clone.id,
-                    "error": e.to_string()
-                }),
-            );
-        } else {
-            if let Ok(conn) = get_db_conn() {
-                let _ = conn.execute(
-                    "UPDATE instances SET status = 'stopped', updated_at = ?1 WHERE id = ?2",
-                    params![Utc::now().to_rfc3339(), instance_clone.id],
+                if let Ok(conn) = get_db_conn() {
+                    let _ = conn.execute(
+                        "UPDATE instances SET status = 'stopped', updated_at = ?1 WHERE id = ?2",
+                        params![Utc::now().to_rfc3339(), instance_clone.id],
+                    );
+                }
+
+                let _ = app_handle_clone.emit(
+                    "instance-repair-failed",
+                    serde_json::json!({
+                        "id": instance_clone.id,
+                        "error": "Восстановление отменено"
+                    }),
                 );
             }
+            Err(e) => {
+                log::error!("Failed to repair instance {}: {}", instance_clone.id, e);
 
-            let _ = app_handle_clone.emit(
-                "instance-repaired",
-                serde_json::json!({
-                    "id": instance_clone.id,
-                    "name": instance_clone.name
-                }),
-            );
+                if let Ok(conn) = get_db_conn() {
+                    let _ = conn.execute(
+                        "UPDATE instances SET status = 'error', installation_error = ?1, installation_step = 'repair', updated_at = ?2 WHERE id = ?3",
+                        params![e.to_string(), Utc::now().to_rfc3339(), instance_clone.id],
+                    );
+                }
+
+                let _ = app_handle_clone.emit(
+                    "instance-repair-failed",
+                    serde_json::json!({
+                        "id": instance_clone.id,
+                        "error": e.to_string()
+                    }),
+                );
+            }
         }
     });
 
     Ok(())
 }
 
-async fn repair_instance_async(instance: &Instance, app_handle: tauri::AppHandle) -> Result<()> {
+async fn repair_instance_async(
+    instance: &Instance,
+    app_handle: tauri::AppHandle,
+    cancel_token: &tokio_util::sync::CancellationToken,
+) -> Result<()> {
     let download_manager = DownloadManager::new(app_handle.clone())?;
-    // Создаём токен отмены для repair операций
-    let cancel_token = tokio_util::sync::CancellationToken::new();
+
+    // Проверка отмены в начале
+    if cancel_token.is_cancelled() {
+        return Err(LauncherError::OperationCancelled);
+    }
 
     let _ = app_handle.emit(
         "instance-install-progress",
@@ -486,6 +578,11 @@ async fn repair_instance_async(instance: &Instance, app_handle: tauri::AppHandle
 
     log::info!("Java verified at: {:?}", java_path);
 
+    // Проверка отмены после Java
+    if cancel_token.is_cancelled() {
+        return Err(LauncherError::OperationCancelled);
+    }
+
     // Проверяем и восстанавливаем Minecraft файлы
     let _ = app_handle.emit(
         "instance-install-progress",
@@ -505,9 +602,7 @@ async fn repair_instance_async(instance: &Instance, app_handle: tauri::AppHandle
         .join(&instance.version)
         .join(format!("{}.json", &instance.version));
 
-    let needs_minecraft_repair = !tokio::fs::try_exists(&version_json_path)
-        .await
-        .unwrap_or(false);
+    let needs_minecraft_repair = !version_json_path.exists();
 
     if needs_minecraft_repair {
         log::info!("Minecraft files missing, repairing...");
@@ -516,6 +611,11 @@ async fn repair_instance_async(instance: &Instance, app_handle: tauri::AppHandle
         log::info!("Minecraft {} repaired", instance.version);
     } else {
         log::info!("Minecraft files OK");
+    }
+
+    // Проверка отмены после Minecraft
+    if cancel_token.is_cancelled() {
+        return Err(LauncherError::OperationCancelled);
     }
 
     // Проверяем и восстанавливаем загрузчик, если он не Vanilla
@@ -531,16 +631,10 @@ async fn repair_instance_async(instance: &Instance, app_handle: tauri::AppHandle
 
         // Проверяем наличие профиля загрузчика
         let loader_profile_exists = match instance.loader {
-            LoaderType::Fabric => tokio::fs::try_exists(instance_path.join("fabric-profile.json"))
-                .await
-                .unwrap_or(false),
-            LoaderType::Quilt => tokio::fs::try_exists(instance_path.join("quilt-profile.json"))
-                .await
-                .unwrap_or(false),
+            LoaderType::Fabric => instance_path.join("fabric-profile.json").exists(),
+            LoaderType::Quilt => instance_path.join("quilt-profile.json").exists(),
             LoaderType::NeoForge => {
-                tokio::fs::try_exists(instance_path.join("neoforge-profile.json"))
-                    .await
-                    .unwrap_or(false)
+                instance_path.join("neoforge-profile.json").exists()
             }
             LoaderType::Forge => {
                 // Для Forge ищем version JSON (spawn_blocking для directory iteration)
@@ -587,7 +681,7 @@ pub async fn retry_instance_installation(
     // Получаем данные экземпляра
     let instance: Instance = conn.query_row(
         r#"SELECT
-            id, name, version, loader, loader_version, instance_type,
+            id, name, game_type, version, loader, loader_version, instance_type,
             java_version, java_path, memory_min, memory_max, java_args, game_args,
             dir, port, rcon_enabled, rcon_port, rcon_password, username,
             status, pid, auto_restart, last_played, total_playtime, notes,
@@ -596,43 +690,45 @@ pub async fn retry_instance_installation(
          FROM instances WHERE id = ?1"#,
         params![instance_id],
         |row| {
-            let loader_str: String = row.get(3)?;
-            let instance_type_str: String = row.get(5)?;
-            let status_str: String = row.get(18)?;
+            let game_type_str: String = row.get(2)?;
+            let loader_str: String = row.get(4)?;
+            let instance_type_str: String = row.get(6)?;
+            let status_str: String = row.get(19)?;
 
             Ok(Instance {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                version: row.get(2)?,
+                game_type: GameType::parse(&game_type_str).unwrap_or(GameType::Minecraft),
+                version: row.get(3)?,
                 loader: LoaderType::parse(&loader_str).unwrap_or(LoaderType::Vanilla),
-                loader_version: row.get(4)?,
+                loader_version: row.get(5)?,
                 instance_type: if instance_type_str == "server" {
                     InstanceType::Server
                 } else {
                     InstanceType::Client
                 },
-                java_version: row.get(6)?,
-                java_path: row.get(7)?,
-                memory_min: row.get(8)?,
-                memory_max: row.get(9)?,
-                java_args: row.get(10)?,
-                game_args: row.get(11)?,
-                dir: row.get(12)?,
-                port: row.get(13)?,
-                rcon_enabled: row.get::<_, i32>(14)? != 0,
-                rcon_port: row.get(15)?,
-                rcon_password: row.get(16)?,
-                username: row.get(17)?,
+                java_version: row.get(7)?,
+                java_path: row.get(8)?,
+                memory_min: row.get(9)?,
+                memory_max: row.get(10)?,
+                java_args: row.get(11)?,
+                game_args: row.get(12)?,
+                dir: row.get(13)?,
+                port: row.get(14)?,
+                rcon_enabled: row.get::<_, i32>(15)? != 0,
+                rcon_port: row.get(16)?,
+                rcon_password: row.get(17)?,
+                username: row.get(18)?,
                 status: InstanceStatus::parse(&status_str),
-                auto_restart: row.get::<_, i32>(20)? != 0,
-                last_played: row.get(21)?,
-                total_playtime: row.get::<_, Option<i64>>(22)?.unwrap_or(0),
-                notes: row.get(23)?,
-                installation_step: row.get(24)?,
-                installation_error: row.get(25)?,
-                backup_enabled: row.get::<_, Option<i32>>(26)?.map(|v| v != 0),
-                created_at: row.get(27)?,
-                updated_at: row.get(28)?,
+                auto_restart: row.get::<_, i32>(21)? != 0,
+                last_played: row.get(22)?,
+                total_playtime: row.get::<_, Option<i64>>(23)?.unwrap_or(0),
+                notes: row.get(24)?,
+                installation_step: row.get(25)?,
+                installation_error: row.get(26)?,
+                backup_enabled: row.get::<_, Option<i32>>(27)?.map(|v| v != 0),
+                created_at: row.get(28)?,
+                updated_at: row.get(29)?,
             })
         },
     )?;

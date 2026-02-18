@@ -684,9 +684,20 @@ impl TransferServer {
         modpack_name: &str,
         local_manifest: &ModpackManifest,
     ) -> Result<String, String> {
-        let mut stream = TcpStream::connect(peer_addr)
-            .await
-            .map_err(|e| format!("Failed to connect to peer: {}", e))?;
+        // TCP connect с явным таймаутом (10 секунд).
+        // Без этого OS default timeout может быть 20-120 секунд.
+        let mut stream = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            TcpStream::connect(peer_addr),
+        )
+        .await
+        .map_err(|_| {
+            format!(
+                "TCP connection timeout after 10s to {} — проверьте firewall и что Stuzhik Connect включён у друга",
+                peer_addr
+            )
+        })?
+        .map_err(|e| format!("Failed to connect to peer {}: {}", peer_addr, e))?;
 
         // Генерируем ID сессии
         let session_id = uuid::Uuid::new_v4().to_string();
@@ -816,7 +827,7 @@ impl TransferServer {
                 // Удаляем файлы которые больше не нужны
                 for path in &diff.to_delete {
                     let full_path = self.instances_path.join(modpack_name).join(path);
-                    if full_path.exists() {
+                    if tokio::fs::try_exists(&full_path).await.unwrap_or(false) {
                         let _ = tokio::fs::remove_file(&full_path).await;
                     }
                 }
@@ -898,7 +909,7 @@ impl TransferServer {
 
             // Проверяем существующий частично скачанный файл для resume
             let file_path = base_path.join(modpack_name).join(&file.path);
-            let resume_offset = if file_path.exists() {
+            let resume_offset = if tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
                 tokio::fs::metadata(&file_path)
                     .await
                     .map(|m| m.len())
@@ -1138,7 +1149,7 @@ impl TransferServer {
         let mut verification_errors = Vec::new();
         for file in files {
             let file_path = base_path.join(modpack_name).join(&file.path);
-            if file_path.exists() {
+            if tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
                 match TransferManager::compute_file_hash_static(&file_path).await {
                     Ok(computed_hash) => {
                         if computed_hash != file.hash {
@@ -1184,9 +1195,13 @@ impl TransferServer {
         our_nickname: &str,
         our_public_key: &str,
     ) -> Result<(), String> {
-        let mut stream = TcpStream::connect(peer_addr)
-            .await
-            .map_err(|e| format!("Failed to connect to peer: {}", e))?;
+        let mut stream = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            TcpStream::connect(peer_addr),
+        )
+        .await
+        .map_err(|_| format!("TCP connection timeout to {}", peer_addr))?
+        .map_err(|e| format!("Failed to connect to peer: {}", e))?;
 
         // Отправляем приветствие
         let hello = TransferProtocol::Hello {
@@ -1411,7 +1426,7 @@ async fn handle_connection(
                     }
                 };
 
-                if !instance_path.exists() {
+                if !tokio::fs::try_exists(&instance_path).await.unwrap_or(false) {
                     let error = TransferProtocol::Error {
                         message: format!("Instance '{}' not found", modpack_name),
                     };
@@ -1577,7 +1592,7 @@ async fn handle_connection(
                     }
                 };
 
-                if !file_path.exists() {
+                if !tokio::fs::try_exists(&file_path).await.unwrap_or(false) {
                     let error = TransferProtocol::Error {
                         message: "File not found".to_string(), // Не раскрываем путь
                     };
@@ -1658,7 +1673,7 @@ async fn handle_connection(
                                 // Send modpack file directly
                                 if let Some(ref modpack_path) = cfg.linked_modpack_path {
                                     let path = std::path::Path::new(modpack_path);
-                                    if path.exists() {
+                                    if tokio::fs::try_exists(path).await.unwrap_or(false) {
                                         // Calculate hash and size
                                         match tokio::fs::metadata(path).await {
                                             Ok(metadata) => {
@@ -1787,7 +1802,7 @@ async fn handle_connection(
                 if let Some(cfg) = config {
                     if let Some(ref modpack_path) = cfg.linked_modpack_path {
                         let path = std::path::Path::new(modpack_path);
-                        if path.exists() {
+                        if tokio::fs::try_exists(path).await.unwrap_or(false) {
                             // Send modpack file in chunks
                             match send_modpack_file(
                                 &mut stream,

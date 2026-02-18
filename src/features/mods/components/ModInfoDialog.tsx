@@ -101,7 +101,7 @@ function ModInfoDialog(props: ModInfoDialogProps) {
         });
         setFilePath(path);
       } catch (e) {
-        console.error("Failed to get mod file path:", e);
+        if (import.meta.env.DEV) console.error("Failed to get mod file path:", e);
       }
     }
   };
@@ -128,7 +128,7 @@ function ModInfoDialog(props: ModInfoDialogProps) {
       });
       setWiki(result);
     } catch (e) {
-      console.error("Failed to fetch mod wiki:", e);
+      if (import.meta.env.DEV) console.error("Failed to fetch mod wiki:", e);
     } finally {
       setLoadingWiki(false);
     }
@@ -147,7 +147,7 @@ function ModInfoDialog(props: ModInfoDialogProps) {
       <Show when={loadingWiki()}>
         <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
           <div class="bg-gray-850 border border-gray-750 rounded-2xl p-8 flex items-center gap-3">
-            <i class="i-svg-spinners-6-dots-scale w-6 h-6 text-blue-400" />
+            <i class="i-svg-spinners-6-dots-scale w-6 h-6 text-[var(--color-primary)]" />
             <span class="text-gray-300">Loading...</span>
           </div>
         </div>

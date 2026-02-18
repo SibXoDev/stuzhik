@@ -31,7 +31,7 @@ function GameSettingsDialog(props: Props) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(`Не удалось загрузить шаблоны: ${msg}`);
-      console.error("Failed to load templates:", e);
+      if (import.meta.env.DEV) console.error("Failed to load templates:", e);
     }
   };
 
@@ -58,7 +58,7 @@ function GameSettingsDialog(props: Props) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(`Не удалось сохранить шаблон: ${msg}`);
-      console.error("Failed to save template:", e);
+      if (import.meta.env.DEV) console.error("Failed to save template:", e);
     } finally {
       setLoading(false);
     }
@@ -93,7 +93,7 @@ function GameSettingsDialog(props: Props) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(`Не удалось применить шаблон: ${msg}`);
-      console.error("Failed to apply template:", e);
+      if (import.meta.env.DEV) console.error("Failed to apply template:", e);
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ function GameSettingsDialog(props: Props) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(`Не удалось удалить шаблон: ${msg}`);
-      console.error("Failed to delete template:", e);
+      if (import.meta.env.DEV) console.error("Failed to delete template:", e);
     } finally {
       setLoading(false);
     }
@@ -133,11 +133,11 @@ function GameSettingsDialog(props: Props) {
 
   return (
     <ModalWrapper maxWidth="max-w-4xl" backdrop>
-      <div class="p-6 max-h-[90vh] overflow-y-auto">
-        <div class="flex items-center justify-between mb-6">
-          <div>
+      <div class="p-6 max-h-[90vh] overflow-y-auto flex flex-col gap-6">
+        <div class="flex items-center justify-between">
+          <div class="flex flex-col gap-1">
             <h2 class="text-2xl font-bold">Шаблоны настроек игры</h2>
-            <p class="text-sm text-gray-400 mt-1">Экземпляр: {props.instanceName}</p>
+            <p class="text-sm text-gray-400">Экземпляр: {props.instanceName}</p>
           </div>
           <button
             type="button"
@@ -151,7 +151,7 @@ function GameSettingsDialog(props: Props) {
 
         {/* Alerts */}
         <Show when={error()}>
-          <div class="mb-4 bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
+          <div class="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
             <div class="flex items-start gap-3">
               <div class="i-hugeicons-alert-02 text-red-400 w-5 h-5 flex-shrink-0" />
               <div class="flex-1">
@@ -169,7 +169,7 @@ function GameSettingsDialog(props: Props) {
         </Show>
 
         <Show when={success()}>
-          <div class="mb-4 bg-green-500/10 border border-green-500/30 rounded-2xl p-4">
+          <div class="bg-green-500/10 border border-green-500/30 rounded-2xl p-4">
             <div class="flex items-start gap-3">
               <div class="i-hugeicons-checkmark-circle-02 text-green-400 w-5 h-5 flex-shrink-0" />
               <div class="flex-1">
@@ -187,26 +187,26 @@ function GameSettingsDialog(props: Props) {
         </Show>
 
         {/* Info */}
-        <div class="mb-6 bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 text-sm text-blue-300">
+        <div class="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 text-sm text-blue-300">
           <div class="flex items-start gap-2">
             <div class="i-hugeicons-information-circle text-blue-400 w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div>
+            <div class="flex flex-col gap-2">
               <p>
                 <strong>Шаблоны настроек</strong> позволяют сохранять и применять настройки игры (options.txt),
                 конфиги модов и другие файлы настроек между экземплярами.
               </p>
-              <p class="mt-2">
+              <p>
                 <strong>Что сохраняется:</strong> options.txt, optionsof.txt, optionsshaders.txt, config/
               </p>
             </div>
           </div>
         </div>
 
-        <div class="space-y-6">
+        <div class="flex flex-col gap-6">
           {/* Сохранить текущие настройки как шаблон */}
-          <div class="border border-gray-750 rounded-2xl p-4">
-            <h3 class="text-lg font-semibold mb-3">Сохранить настройки</h3>
-            <p class="text-sm text-gray-400 mb-3">
+          <div class="border border-gray-750 rounded-2xl p-4 flex flex-col gap-3">
+            <h3 class="text-lg font-semibold">Сохранить настройки</h3>
+            <p class="text-sm text-gray-400">
               Сохраните текущие настройки этого экземпляра как шаблон для применения к другим экземплярам
             </p>
             <div class="flex gap-2">
@@ -215,12 +215,12 @@ function GameSettingsDialog(props: Props) {
                 value={newTemplateName()}
                 onInput={(e) => setNewTemplateName(e.currentTarget.value)}
                 placeholder="Название шаблона..."
-                class="flex-1 px-3.5 py-2.5 focus:outline-none focus:border-blue-500"
+                class="flex-1 px-3.5 py-2.5 focus:outline-none focus:border-[var(--color-primary)]"
                 disabled={loading()}
               />
               <button
                 type="button"
-                class="px-4 py-2.5 font-medium rounded-2xl bg-blue-600 text-white hover:bg-blue-400 disabled:opacity-40"
+                class="btn-primary disabled:opacity-40"
                 onClick={handleSaveTemplate}
                 disabled={loading() || !newTemplateName().trim()}
               >
@@ -233,8 +233,8 @@ function GameSettingsDialog(props: Props) {
           </div>
 
           {/* Применить шаблон */}
-          <div class="border border-gray-750 rounded-2xl p-4">
-            <h3 class="text-lg font-semibold mb-3">Применить шаблон</h3>
+          <div class="border border-gray-750 rounded-2xl p-4 flex flex-col gap-3">
+            <h3 class="text-lg font-semibold">Применить шаблон</h3>
             <Show
               when={templates().length > 0}
               fallback={
@@ -243,7 +243,7 @@ function GameSettingsDialog(props: Props) {
                 </p>
               }
             >
-              <div class="space-y-3">
+              <div class="flex flex-col gap-3">
                 <For each={templates()}>
                   {(template) => (
                     <div class="flex items-center justify-between p-3 bg-gray-700/30 rounded-2xl border border-gray-700">
@@ -286,7 +286,7 @@ function GameSettingsDialog(props: Props) {
         </div>
 
         {/* Close button */}
-        <div class="mt-6 flex justify-end">
+        <div class="flex justify-end">
           <button
             type="button"
             class="px-4 py-2.5 font-medium rounded-2xl bg-gray-700 text-gray-100 hover:bg-gray-600"

@@ -127,7 +127,7 @@ fn get_cache() -> &'static Arc<RwLock<ModSideCache>> {
 /// Load cache from disk
 pub async fn load_cache(data_dir: &Path) -> ServerResult<()> {
     let cache_path = data_dir.join("mod_side_cache.json");
-    if cache_path.exists() {
+    if tokio::fs::try_exists(&cache_path).await.unwrap_or(false) {
         let content = fs::read_to_string(&cache_path).await?;
         if let Ok(cache) = serde_json::from_str::<ModSideCache>(&content) {
             if cache.version == ModSideCache::CURRENT_VERSION {
@@ -354,7 +354,7 @@ pub async fn scan_for_client_mods(mods_dir: impl AsRef<Path>) -> ServerResult<Ve
     let mods_dir = mods_dir.as_ref();
     let mut client_mods = Vec::new();
 
-    if !mods_dir.exists() {
+    if !tokio::fs::try_exists(mods_dir).await.unwrap_or(false) {
         return Ok(client_mods);
     }
 
@@ -594,7 +594,7 @@ pub async fn enable_all_mods(mods_dir: impl AsRef<Path>) -> ServerResult<Vec<Str
     let mods_dir = mods_dir.as_ref();
     let mut enabled = Vec::new();
 
-    if !mods_dir.exists() {
+    if !tokio::fs::try_exists(mods_dir).await.unwrap_or(false) {
         return Ok(enabled);
     }
 
@@ -623,7 +623,7 @@ pub async fn get_disabled_mods(mods_dir: impl AsRef<Path>) -> ServerResult<Vec<S
     let mods_dir = mods_dir.as_ref();
     let mut disabled = Vec::new();
 
-    if !mods_dir.exists() {
+    if !tokio::fs::try_exists(mods_dir).await.unwrap_or(false) {
         return Ok(disabled);
     }
 

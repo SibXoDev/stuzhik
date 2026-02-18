@@ -271,8 +271,8 @@ const LauncherImportDialog: Component<Props> = (props) => {
             <button
               class={`px-4 py-2 rounded-t-lg transition-colors inline-flex items-center gap-2 ${
                 mode() === "auto"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-800 text-gray-400 hover:text-white"
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "bg-gray-800 text-gray-400 hover:text-gray-200"
               }`}
               onClick={() => setMode("auto")}
             >
@@ -282,8 +282,8 @@ const LauncherImportDialog: Component<Props> = (props) => {
             <button
               class={`px-4 py-2 rounded-t-lg transition-colors inline-flex items-center gap-2 ${
                 mode() === "folder"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-800 text-gray-400 hover:text-white"
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "bg-gray-800 text-gray-400 hover:text-gray-200"
               }`}
               onClick={() => setMode("folder")}
             >
@@ -305,13 +305,13 @@ const LauncherImportDialog: Component<Props> = (props) => {
             <div class="flex-1 flex gap-4 min-h-0 overflow-hidden">
             {/* Launchers list */}
             <div class="w-64 flex flex-col gap-2 flex-shrink-0">
-              <div class="text-sm text-gray-400 mb-1">
+              <div class="text-sm text-gray-400">
                 {t().modpacks.launcherImport.detectedLaunchers}
               </div>
 
               <Show when={loading()}>
                 <div class="flex items-center justify-center py-8">
-                  <i class="i-svg-spinners-ring-resize w-6 h-6 text-blue-400" />
+                  <i class="i-svg-spinners-ring-resize w-6 h-6 text-[var(--color-primary)]" />
                 </div>
               </Show>
 
@@ -327,7 +327,7 @@ const LauncherImportDialog: Component<Props> = (props) => {
                     <button
                       class={`flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
                         selectedLauncher()?.root_path === launcher.root_path
-                          ? "bg-blue-600/20 border border-blue-500"
+                          ? "bg-[var(--color-primary-bg)] border border-[var(--color-primary)]"
                           : "bg-gray-800 hover:bg-gray-700 border border-transparent"
                       }`}
                       onClick={() => selectLauncher(launcher)}
@@ -345,11 +345,11 @@ const LauncherImportDialog: Component<Props> = (props) => {
               </div>
 
               <button
-                class="btn-ghost text-sm mt-2"
+                class="btn-ghost text-sm flex items-center gap-1"
                 onClick={detectLaunchers}
                 disabled={loading()}
               >
-                <i class="i-hugeicons-refresh w-4 h-4 mr-1" />
+                <i class="i-hugeicons-refresh w-4 h-4" />
                 {t().modpacks.launcherImport.refresh}
               </button>
             </div>
@@ -357,13 +357,14 @@ const LauncherImportDialog: Component<Props> = (props) => {
             {/* Instances list */}
             <div class="flex-1 flex flex-col min-h-0 min-w-0">
               <Show when={selectedLauncher()}>
-                <div class="text-sm text-gray-400 mb-2">
+                <div class="flex flex-col gap-2 flex-1 min-h-0">
+                <div class="text-sm text-gray-400">
                   {t().modpacks.launcherImport.instancesIn} {selectedLauncher()?.display_name}
                 </div>
 
                 <Show when={instancesLoading()}>
                   <div class="flex items-center justify-center py-8">
-                    <i class="i-svg-spinners-ring-resize w-6 h-6 text-blue-400" />
+                    <i class="i-svg-spinners-ring-resize w-6 h-6 text-[var(--color-primary)]" />
                   </div>
                 </Show>
 
@@ -373,7 +374,7 @@ const LauncherImportDialog: Component<Props> = (props) => {
                       <button
                         class={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
                           selectedInstance()?.path === instance.path
-                            ? "bg-blue-600/20 border border-blue-500"
+                            ? "bg-[var(--color-primary-bg)] border border-[var(--color-primary)]"
                             : "bg-gray-800 hover:bg-gray-700 border border-transparent"
                         }`}
                         onClick={() => selectInstance(instance)}
@@ -400,6 +401,7 @@ const LauncherImportDialog: Component<Props> = (props) => {
                     )}
                   </For>
                 </div>
+                </div>
               </Show>
 
               <Show when={!selectedLauncher()}>
@@ -422,15 +424,15 @@ const LauncherImportDialog: Component<Props> = (props) => {
                 onInput={(e) => setFolderPath(e.currentTarget.value)}
                 placeholder={t().modpacks.launcherImport.folderPath}
               />
-              <button class="btn-secondary" onClick={browseFolder}>
-                <i class="i-hugeicons-folder-open w-4 h-4 mr-1" />
+              <button class="btn-secondary flex items-center gap-1" onClick={browseFolder}>
+                <i class="i-hugeicons-folder-open w-4 h-4" />
                 {t().common.browse}
               </button>
             </div>
 
             <Show when={folderAnalyzing()}>
-              <div class="flex items-center justify-center py-8">
-                <i class="i-svg-spinners-ring-resize w-6 h-6 text-blue-400 mr-2" />
+              <div class="flex items-center justify-center gap-2 py-8">
+                <i class="i-svg-spinners-ring-resize w-6 h-6 text-[var(--color-primary)]" />
                 <span class="text-gray-400">{t().modpacks.launcherImport.analyzing}</span>
               </div>
             </Show>
@@ -464,8 +466,8 @@ const LauncherImportDialog: Component<Props> = (props) => {
                 </div>
 
                 <Show when={folderAnalysis()?.suspicious_files.length}>
-                  <div class="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3">
-                    <div class="flex items-center gap-2 text-yellow-400 mb-2">
+                  <div class="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 flex flex-col gap-2">
+                    <div class="flex items-center gap-2 text-yellow-400">
                       <i class="i-hugeicons-alert-02 w-4 h-4" />
                       <span class="font-medium">
                         {t().modpacks.launcherImport.suspiciousFiles}
@@ -520,15 +522,15 @@ const LauncherImportDialog: Component<Props> = (props) => {
 
         {/* Import progress */}
         <Show when={importing() && importProgress()}>
-          <div class="bg-gray-800 rounded-lg p-4">
-            <div class="flex items-center gap-3 mb-3">
-              <i class="i-svg-spinners-ring-resize w-5 h-5 text-blue-400" />
+          <div class="bg-gray-800 rounded-lg p-4 flex flex-col gap-2">
+            <div class="flex items-center gap-3">
+              <i class="i-svg-spinners-ring-resize w-5 h-5 text-[var(--color-primary)]" />
               <span class="font-medium">{getPhaseText(importProgress()!.phase)}</span>
             </div>
 
-            <div class="h-2 bg-gray-700 rounded-full overflow-hidden mb-2">
+            <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
               <div
-                class="h-full bg-blue-500 transition-all duration-300"
+                class="h-full bg-[var(--color-primary)] transition-all duration-300"
                 style={{
                   width: `${
                     importProgress()!.total > 0
@@ -550,7 +552,7 @@ const LauncherImportDialog: Component<Props> = (props) => {
             </div>
 
             <Show when={importProgress()?.current_file}>
-              <div class="text-xs text-gray-500 mt-2 truncate">
+              <div class="text-xs text-gray-500 truncate">
                 {importProgress()?.current_file}
               </div>
             </Show>
@@ -559,8 +561,8 @@ const LauncherImportDialog: Component<Props> = (props) => {
 
         {/* Import result */}
         <Show when={importResult()}>
-          <div class="bg-green-900/30 border border-green-600/50 rounded-lg p-4">
-            <div class="flex items-center gap-2 text-green-400 mb-3">
+          <div class="bg-green-900/30 border border-green-600/50 rounded-lg p-4 flex flex-col gap-3">
+            <div class="flex items-center gap-2 text-green-400">
               <i class="i-hugeicons-checkmark-circle-02 w-5 h-5" />
               <span class="font-medium">{t().modpacks.launcherImport.importComplete}</span>
             </div>
@@ -581,7 +583,7 @@ const LauncherImportDialog: Component<Props> = (props) => {
             </div>
 
             <Show when={importResult()?.warnings.length}>
-              <div class="mt-3 text-xs text-yellow-400">
+              <div class="text-xs text-yellow-400">
                 <For each={importResult()?.warnings}>
                   {(warning) => <div>⚠️ {warning}</div>}
                 </For>
@@ -597,12 +599,12 @@ const LauncherImportDialog: Component<Props> = (props) => {
           </button>
           <Show when={!importResult()}>
             <button
-              class="btn-primary"
+              class="btn-primary flex items-center gap-1"
               disabled={!canImport()}
               onClick={startImport}
             >
               <Show when={importing()}>
-                <i class="i-svg-spinners-ring-resize w-4 h-4 mr-1" />
+                <i class="i-svg-spinners-ring-resize w-4 h-4" />
               </Show>
               {t().modpacks.launcherImport.startImport}
             </button>

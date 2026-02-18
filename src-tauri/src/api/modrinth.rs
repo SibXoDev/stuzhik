@@ -359,10 +359,7 @@ impl ModrinthClient {
     ) -> Result<std::collections::HashMap<String, ModrinthVersion>> {
         let url = format!("{}/version_files", MODRINTH_API_BASE);
 
-        let client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .timeout(std::time::Duration::from_secs(10)) // 10 second timeout
-            .build()?;
+        let client = &*crate::utils::SHARED_HTTP_CLIENT;
 
         let body = serde_json::json!({
             "hashes": hashes,
@@ -400,12 +397,7 @@ impl ModrinthClient {
             ids_json
         );
 
-        let client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .timeout(std::time::Duration::from_secs(15))
-            .build()?;
-
-        let response = client.get(&url).send().await?;
+        let response = crate::utils::SHARED_HTTP_CLIENT.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(LauncherError::ApiError(format!(
@@ -435,10 +427,7 @@ impl ModrinthClient {
 
         let url = format!("{}/version_files/update", MODRINTH_API_BASE);
 
-        let client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .timeout(std::time::Duration::from_secs(30))
-            .build()?;
+        let client = &*crate::utils::SHARED_HTTP_CLIENT;
 
         let body = serde_json::json!({
             "hashes": hashes,

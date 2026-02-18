@@ -283,13 +283,7 @@ pub struct MinecraftInstaller;
 
 impl MinecraftInstaller {
     pub async fn fetch_version_manifest() -> Result<VersionManifest> {
-        let client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .map_err(|e| LauncherError::ApiError(format!("Failed to build HTTP client: {}", e)))?;
-
-        let response = client.get(MOJANG_MANIFEST_URL).send().await.map_err(|e| {
+        let response = crate::utils::SHARED_HTTP_CLIENT.get(MOJANG_MANIFEST_URL).send().await.map_err(|e| {
             log::error!(
                 "Failed to fetch Mojang manifest from {}: {}",
                 MOJANG_MANIFEST_URL,
@@ -330,35 +324,47 @@ impl MinecraftInstaller {
     }
 
     pub async fn cache_versions() -> Result<()> {
-        let conn = get_db_conn()?;
+        // Check cache freshness (scoped to drop conn before async)
+        let needs_update = {
+            let conn = get_db_conn()?;
+            let cache_check: std::result::Result<String, _> = conn.query_row(
+                "SELECT cached_at FROM minecraft_versions ORDER BY cached_at DESC LIMIT 1",
+                [],
+                |row| row.get(0),
+            );
 
-        // Проверяем, есть ли уже закэшированные версии и когда они были обновлены
-        let cache_check: std::result::Result<String, _> = conn.query_row(
-            "SELECT cached_at FROM minecraft_versions ORDER BY cached_at DESC LIMIT 1",
-            [],
-            |row| row.get(0),
-        );
+            if let Ok(last_cached) = cache_check {
+                if let Ok(cached_time) = chrono::DateTime::parse_from_rfc3339(&last_cached) {
+                    let now = Utc::now();
+                    let duration = now.signed_duration_since(cached_time);
 
-        if let Ok(last_cached) = cache_check {
-            if let Ok(cached_time) = chrono::DateTime::parse_from_rfc3339(&last_cached) {
-                let now = Utc::now();
-                let duration = now.signed_duration_since(cached_time);
-
-                // Если кэш свежее 24 часов, не обновляем
-                if duration.num_hours() < 24 {
-                    log::debug!(
-                        "Minecraft versions cache is fresh (last update: {} hours ago)",
-                        duration.num_hours()
-                    );
-                    return Ok(());
+                    if duration.num_hours() < 24 {
+                        log::debug!(
+                            "Minecraft versions cache is fresh (last update: {} hours ago)",
+                            duration.num_hours()
+                        );
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    true
                 }
+            } else {
+                true
             }
+        }; // conn dropped here
+
+        if !needs_update {
+            return Ok(());
         }
 
         log::info!("Updating Minecraft versions cache...");
         let manifest = Self::fetch_version_manifest().await?;
         log::info!("Caching {} Minecraft versions", manifest.versions.len());
 
+        // Re-acquire conn for inserts (after async fetch)
+        let conn = get_db_conn()?;
         for version in &manifest.versions {
             let java_version = Self::estimate_java_version(&version.id);
 

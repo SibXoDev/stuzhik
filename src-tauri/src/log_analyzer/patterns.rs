@@ -1,7 +1,6 @@
 //! Паттерны распознавания ошибок в логах
 
 use super::mappings::{analyze_class_path, extract_mod_id_from_class};
-use lazy_static::lazy_static;
 use regex::{Regex, RegexSet};
 use stuzhik_core::{
     AutoFix, ClassAnalysisResult, DetectedProblem, ProblemCategory, ProblemStatus, Severity,
@@ -19,29 +18,27 @@ pub(super) struct ErrorPattern {
 
 // Кешируем скомпилированные паттерны глобально для производительности
 // Компиляция ~50 regex паттернов происходит один раз при первом использовании
-lazy_static! {
-    pub(super) static ref CACHED_PATTERNS: Vec<ErrorPattern> = {
-        let start = std::time::Instant::now();
-        let patterns = build_patterns_internal();
-        let elapsed = start.elapsed();
-        log::info!(
-            "✨ Compiled {} regex patterns in {:.1}ms (cached globally)",
-            patterns.len(),
-            elapsed.as_secs_f64() * 1000.0
-        );
-        patterns
-    };
+pub(super) static CACHED_PATTERNS: std::sync::LazyLock<Vec<ErrorPattern>> = std::sync::LazyLock::new(|| {
+    let start = std::time::Instant::now();
+    let patterns = build_patterns_internal();
+    let elapsed = start.elapsed();
+    log::info!(
+        "Compiled {} regex patterns in {:.1}ms (cached globally)",
+        patterns.len(),
+        elapsed.as_secs_f64() * 1000.0
+    );
+    patterns
+});
 
-    /// RegexSet для быстрой пред-фильтрации строк (O(1) проверка всех паттернов)
-    /// Это даёт 2-10x ускорение по сравнению с проверкой каждого паттерна по отдельности
-    pub(super) static ref PATTERN_SET: RegexSet = {
-        let pattern_strings: Vec<&str> = CACHED_PATTERNS
-            .iter()
-            .map(|p| p.pattern.as_str())
-            .collect();
-        RegexSet::new(&pattern_strings).expect("Failed to compile RegexSet")
-    };
-}
+/// RegexSet для быстрой пред-фильтрации строк (O(1) проверка всех паттернов)
+/// Это даёт 2-10x ускорение по сравнению с проверкой каждого паттерна по отдельности
+pub(super) static PATTERN_SET: std::sync::LazyLock<RegexSet> = std::sync::LazyLock::new(|| {
+    let pattern_strings: Vec<&str> = CACHED_PATTERNS
+        .iter()
+        .map(|p| p.pattern.as_str())
+        .collect();
+    RegexSet::new(&pattern_strings).expect("Failed to compile RegexSet")
+});
 
 /// Получить индексы паттернов, которые матчат строку (быстрая пред-фильтрация)
 pub(super) fn get_matching_pattern_indices(line: &str) -> Vec<usize> {

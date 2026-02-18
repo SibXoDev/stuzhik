@@ -16,7 +16,7 @@ export function useDeveloperMode() {
       const settings = await invoke<Settings>('get_settings');
       setDeveloperMode(settings.developer_mode);
     } catch (e) {
-      console.warn('Failed to load developer mode setting:', e);
+      if (import.meta.env.DEV) console.warn('Failed to load developer mode setting:', e);
     } finally {
       setLoading(false);
     }

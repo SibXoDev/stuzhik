@@ -1,5 +1,6 @@
-import { createSignal, onMount, onCleanup, Show } from "solid-js";
+import { createSignal, createMemo, onMount, onCleanup, Show } from "solid-js";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { getActiveTheme, resolveTheme } from "../stores/uiPreferences";
 import FloatingLines from "./FloatingLines";
 import Aurora from "./Aurora";
 import DotGrid from "./DotGrid";
@@ -50,6 +51,12 @@ const AppBackground = (props: AppBackgroundProps) => {
   const [imageLoaded, setImageLoaded] = createSignal(false);
   const [dimming, setDimming] = createSignal(getBackgroundDimming());
   const [ready, setReady] = createSignal(false);
+
+  // Theme-aware colors for backgrounds
+  const isLight = createMemo(() => {
+    const theme = resolveTheme(getActiveTheme());
+    return theme?.colorScheme === "light";
+  });
 
   // Cache key for session storage
   const BG_CACHE_KEY = "stuzhik_bg_cache";
@@ -102,13 +109,13 @@ const AppBackground = (props: AppBackgroundProps) => {
               }
             }
           } catch (e2) {
-            console.error("[BG] Failed to load background:", e2);
+            if (import.meta.env.DEV) console.error("[BG] Failed to load background:", e2);
           }
         };
         img.src = assetUrl;
       }
     } catch (e) {
-      console.error("[BG] Failed to load background image:", e);
+      if (import.meta.env.DEV) console.error("[BG] Failed to load background image:", e);
     }
 
     // Listen for background type changes
@@ -158,10 +165,17 @@ const AppBackground = (props: AppBackgroundProps) => {
   });
 
   return (
-    <div class="fixed inset-0 -z-10 overflow-hidden bg-gray-975">
+    <div class="fixed inset-0 -z-10 overflow-hidden bg-[var(--color-bg)]">
       {/* Static background */}
       <Show when={bgType() === "static"}>
-        <div class="absolute inset-0 bg-gradient-to-b from-[#0f1012] via-[#0a0b0d] to-[#060708]" />
+        <div
+          class="absolute inset-0"
+          style={{
+            background: isLight()
+              ? "linear-gradient(to bottom, #f0f1f3, #e8e9ec, #e0e1e4)"
+              : "linear-gradient(to bottom, #0f1012, #0a0b0d, #060708)",
+          }}
+        />
       </Show>
 
       {/* Image background with fade-in */}
@@ -181,12 +195,15 @@ const AppBackground = (props: AppBackgroundProps) => {
         <Show when={bgType() === "floatingLines"}>
           <div class="absolute inset-0">
             <FloatingLines
-              linesGradient={["#1e3a5f", "#2d1b4e", "#1a3d5c", "#3d1f5c"]}
+              linesGradient={isLight()
+                ? ["#93b4d4", "#a98bc4", "#8ab4cc", "#b490c4"]
+                : ["#1e3a5f", "#2d1b4e", "#1a3d5c", "#3d1f5c"]
+              }
               lineCount={6}
               lineDistance={5}
               animationSpeed={0.5}
               mixBlendMode="normal"
-              opacity={1}
+              opacity={isLight() ? 0.6 : 1}
             />
           </div>
         </Show>
@@ -195,9 +212,12 @@ const AppBackground = (props: AppBackgroundProps) => {
         <Show when={bgType() === "aurora"}>
           <div class="absolute inset-0">
             <Aurora
-              colorStops={["#0d3d4d", "#0d4035", "#2d1b4e"]}
+              colorStops={isLight()
+                ? ["#8dc8d8", "#8dc0a5", "#a590c0"]
+                : ["#0d3d4d", "#0d4035", "#2d1b4e"]
+              }
               amplitude={1.2}
-              blend={0.4}
+              blend={isLight() ? 0.3 : 0.4}
               speed={0.6}
             />
           </div>
@@ -209,8 +229,8 @@ const AppBackground = (props: AppBackgroundProps) => {
             <DotGrid
               dotSize={3}
               gap={24}
-              baseColor="#1a1a2e"
-              activeColor="#3b82f6"
+              baseColor={isLight() ? "#c8c9d4" : "#1a1a2e"}
+              activeColor={isLight() ? "#2563eb" : "#3b82f6"}
               proximity={100}
               waveIntensity={0.2}
               waveSpeed={0.3}
@@ -222,13 +242,13 @@ const AppBackground = (props: AppBackgroundProps) => {
         <Show when={bgType() === "rippleGrid"}>
           <div class="absolute inset-0">
             <RippleGrid
-              gridColor="#2d3748"
+              gridColor={isLight() ? "#b0b8c8" : "#2d3748"}
               rippleIntensity={0.04}
               gridSize={12.0}
               gridThickness={18.0}
               fadeDistance={1.3}
-              vignetteStrength={2.5}
-              glowIntensity={0.08}
+              vignetteStrength={isLight() ? 1.5 : 2.5}
+              glowIntensity={isLight() ? 0.04 : 0.08}
             />
           </div>
         </Show>
@@ -237,7 +257,7 @@ const AppBackground = (props: AppBackgroundProps) => {
         <Show when={bgType() === "edgePixels"}>
           <div class="absolute inset-0">
             <EdgePixels
-              pixelColor="#3b82f6"
+              pixelColor={isLight() ? "#2563eb" : "#3b82f6"}
               pixelSize={4}
               edgeWidth={0.12}
             />

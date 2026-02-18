@@ -13,7 +13,14 @@ use super::lifecycle::get_instance;
 /// Checks common installation paths for each platform
 fn find_vscode_executable() -> Option<PathBuf> {
     // First, try the 'code' command in PATH
-    if Command::new("code").arg("--version").output().is_ok() {
+    let mut cmd = Command::new("code");
+    cmd.arg("--version");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    if cmd.output().is_ok() {
         return Some(PathBuf::from("code"));
     }
 
@@ -229,7 +236,7 @@ pub async fn open_instance_folder(
     }
 
     // Проверяем что путь существует
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "Folder not found: {}",
             path.display()
@@ -277,7 +284,7 @@ pub async fn reveal_instance_file(
     path.push(&relative_path);
 
     // Проверяем что файл существует
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "File not found: {}",
             path.display()
@@ -323,7 +330,7 @@ pub async fn open_file_in_editor(
     let mut path = PathBuf::from(&instance.dir);
     path.push(&relative_path);
 
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "File not found: {}",
             path.display()
@@ -368,7 +375,7 @@ pub async fn open_file_in_vscode(
     let mut path = PathBuf::from(&instance.dir);
     path.push(&relative_path);
 
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "File not found: {}",
             path.display()
@@ -413,7 +420,7 @@ pub async fn open_folder_in_vscode(instance_id: String) -> Result<()> {
     let instance = get_instance(instance_id.clone()).await?;
 
     let path = PathBuf::from(&instance.dir);
-    if !path.exists() {
+    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "Instance folder not found: {}",
             path.display()

@@ -96,7 +96,7 @@ const Pagination: Component<PaginationProps> = (props) => {
                 <button
                   class={`min-w-8 px-2 py-1.5 rounded-xl text-sm font-medium transition-colors duration-100 ${
                     item === props.currentPage
-                      ? "bg-blue-600 text-white"
+                      ? "bg-[var(--color-primary)] text-white"
                       : "btn-ghost"
                   }`}
                   onClick={() => props.onPageChange(item as number)}

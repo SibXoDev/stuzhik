@@ -1,116 +1,113 @@
 use super::types::{BottleneckCategory, BottleneckSeverity, PerformanceBottleneck};
-use lazy_static::lazy_static;
 use regex::Regex;
 use std::path::Path;
 
-lazy_static! {
-    /// Паттерны для обнаружения проблем производительности в логах
-    static ref PERFORMANCE_PATTERNS: Vec<PerformancePattern> = vec![
-        // TPS проблемы
-        PerformancePattern {
-            pattern: Regex::new(r"Can't keep up! Is the server overloaded\? Running (\d+)ms or (\d+) ticks behind").unwrap(),
-            category: BottleneckCategory::TickTime,
-            severity: BottleneckSeverity::High,
-            description_template: "Сервер не успевает: отставание на {1}ms ({2} тиков)",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"Server is running (\d+) ticks behind").unwrap(),
-            category: BottleneckCategory::TickTime,
-            severity: BottleneckSeverity::Medium,
-            description_template: "Сервер отстаёт на {1} тиков",
-        },
+/// Паттерны для обнаружения проблем производительности в логах
+static PERFORMANCE_PATTERNS: std::sync::LazyLock<Vec<PerformancePattern>> = std::sync::LazyLock::new(|| vec![
+    // TPS проблемы
+    PerformancePattern {
+        pattern: Regex::new(r"Can't keep up! Is the server overloaded\? Running (\d+)ms or (\d+) ticks behind").unwrap(),
+        category: BottleneckCategory::TickTime,
+        severity: BottleneckSeverity::High,
+        description_template: "Сервер не успевает: отставание на {1}ms ({2} тиков)",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"Server is running (\d+) ticks behind").unwrap(),
+        category: BottleneckCategory::TickTime,
+        severity: BottleneckSeverity::Medium,
+        description_template: "Сервер отстаёт на {1} тиков",
+    },
 
-        // Проблемы с памятью
-        PerformancePattern {
-            pattern: Regex::new(r"java\.lang\.OutOfMemoryError").unwrap(),
-            category: BottleneckCategory::Memory,
-            severity: BottleneckSeverity::Critical,
-            description_template: "Критическая нехватка памяти (OutOfMemoryError)",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"Attempting to allocate (\d+) bytes").unwrap(),
-            category: BottleneckCategory::Memory,
-            severity: BottleneckSeverity::High,
-            description_template: "Попытка выделить {1} байт памяти",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"GC overhead limit exceeded").unwrap(),
-            category: BottleneckCategory::GarbageCollection,
-            severity: BottleneckSeverity::Critical,
-            description_template: "Превышен лимит времени на сборку мусора",
-        },
+    // Проблемы с памятью
+    PerformancePattern {
+        pattern: Regex::new(r"java\.lang\.OutOfMemoryError").unwrap(),
+        category: BottleneckCategory::Memory,
+        severity: BottleneckSeverity::Critical,
+        description_template: "Критическая нехватка памяти (OutOfMemoryError)",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"Attempting to allocate (\d+) bytes").unwrap(),
+        category: BottleneckCategory::Memory,
+        severity: BottleneckSeverity::High,
+        description_template: "Попытка выделить {1} байт памяти",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"GC overhead limit exceeded").unwrap(),
+        category: BottleneckCategory::GarbageCollection,
+        severity: BottleneckSeverity::Critical,
+        description_template: "Превышен лимит времени на сборку мусора",
+    },
 
-        // Проблемы с чанками
-        PerformancePattern {
-            pattern: Regex::new(r"Chunk (\d+), (\d+) took (\d+)ms to generate").unwrap(),
-            category: BottleneckCategory::ChunkLoading,
-            severity: BottleneckSeverity::Medium,
-            description_template: "Чанк ({1}, {2}) генерировался {3}ms",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"Loading chunk took (\d+)ms").unwrap(),
-            category: BottleneckCategory::ChunkLoading,
-            severity: BottleneckSeverity::Low,
-            description_template: "Загрузка чанка заняла {1}ms",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"Saving chunks for level '([^']+)' took (\d+)ms").unwrap(),
-            category: BottleneckCategory::DiskIO,
-            severity: BottleneckSeverity::Medium,
-            description_template: "Сохранение чанков '{1}' заняло {2}ms",
-        },
+    // Проблемы с чанками
+    PerformancePattern {
+        pattern: Regex::new(r"Chunk (\d+), (\d+) took (\d+)ms to generate").unwrap(),
+        category: BottleneckCategory::ChunkLoading,
+        severity: BottleneckSeverity::Medium,
+        description_template: "Чанк ({1}, {2}) генерировался {3}ms",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"Loading chunk took (\d+)ms").unwrap(),
+        category: BottleneckCategory::ChunkLoading,
+        severity: BottleneckSeverity::Low,
+        description_template: "Загрузка чанка заняла {1}ms",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"Saving chunks for level '([^']+)' took (\d+)ms").unwrap(),
+        category: BottleneckCategory::DiskIO,
+        severity: BottleneckSeverity::Medium,
+        description_template: "Сохранение чанков '{1}' заняло {2}ms",
+    },
 
-        // Проблемы с сетью
-        PerformancePattern {
-            pattern: Regex::new(r"(Read timed out|Connection timed out)").unwrap(),
-            category: BottleneckCategory::NetworkLag,
-            severity: BottleneckSeverity::Medium,
-            description_template: "Сетевой таймаут: {1}",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"Player '([^']+)' has been kicked for packet spam").unwrap(),
-            category: BottleneckCategory::NetworkLag,
-            severity: BottleneckSeverity::Low,
-            description_template: "Игрок '{1}' кикнут за спам пакетов",
-        },
+    // Проблемы с сетью
+    PerformancePattern {
+        pattern: Regex::new(r"(Read timed out|Connection timed out)").unwrap(),
+        category: BottleneckCategory::NetworkLag,
+        severity: BottleneckSeverity::Medium,
+        description_template: "Сетевой таймаут: {1}",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"Player '([^']+)' has been kicked for packet spam").unwrap(),
+        category: BottleneckCategory::NetworkLag,
+        severity: BottleneckSeverity::Low,
+        description_template: "Игрок '{1}' кикнут за спам пакетов",
+    },
 
-        // Проблемы с рендерингом
-        PerformancePattern {
-            pattern: Regex::new(r"Shader compilation took (\d+)ms").unwrap(),
-            category: BottleneckCategory::RenderLag,
-            severity: BottleneckSeverity::Low,
-            description_template: "Компиляция шейдера заняла {1}ms",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"OpenGL Error: (\d+)").unwrap(),
-            category: BottleneckCategory::RenderLag,
-            severity: BottleneckSeverity::Medium,
-            description_template: "Ошибка OpenGL: {1}",
-        },
+    // Проблемы с рендерингом
+    PerformancePattern {
+        pattern: Regex::new(r"Shader compilation took (\d+)ms").unwrap(),
+        category: BottleneckCategory::RenderLag,
+        severity: BottleneckSeverity::Low,
+        description_template: "Компиляция шейдера заняла {1}ms",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"OpenGL Error: (\d+)").unwrap(),
+        category: BottleneckCategory::RenderLag,
+        severity: BottleneckSeverity::Medium,
+        description_template: "Ошибка OpenGL: {1}",
+    },
 
-        // Долгие операции
-        PerformancePattern {
-            pattern: Regex::new(r"Something is taking too long! '([^']+)' took (\d+)ms").unwrap(),
-            category: BottleneckCategory::TickTime,
-            severity: BottleneckSeverity::High,
-            description_template: "Операция '{1}' заняла {2}ms",
-        },
-        PerformancePattern {
-            pattern: Regex::new(r"Block entity at \(([^)]+)\) took (\d+)ms").unwrap(),
-            category: BottleneckCategory::TickTime,
-            severity: BottleneckSeverity::Medium,
-            description_template: "Block entity на ({1}) обрабатывался {2}ms",
-        },
+    // Долгие операции
+    PerformancePattern {
+        pattern: Regex::new(r"Something is taking too long! '([^']+)' took (\d+)ms").unwrap(),
+        category: BottleneckCategory::TickTime,
+        severity: BottleneckSeverity::High,
+        description_template: "Операция '{1}' заняла {2}ms",
+    },
+    PerformancePattern {
+        pattern: Regex::new(r"Block entity at \(([^)]+)\) took (\d+)ms").unwrap(),
+        category: BottleneckCategory::TickTime,
+        severity: BottleneckSeverity::Medium,
+        description_template: "Block entity на ({1}) обрабатывался {2}ms",
+    },
 
-        // Forge/Fabric специфичные
-        PerformancePattern {
-            pattern: Regex::new(r"\[([^\]]+)\] Took (\d+)ms to process tick").unwrap(),
-            category: BottleneckCategory::TickTime,
-            severity: BottleneckSeverity::Medium,
-            description_template: "[{1}] Обработка тика заняла {2}ms",
-        },
-    ];
-}
+    // Forge/Fabric специфичные
+    PerformancePattern {
+        pattern: Regex::new(r"\[([^\]]+)\] Took (\d+)ms to process tick").unwrap(),
+        category: BottleneckCategory::TickTime,
+        severity: BottleneckSeverity::Medium,
+        description_template: "[{1}] Обработка тика заняла {2}ms",
+    },
+]);
 
 struct PerformancePattern {
     pattern: Regex,

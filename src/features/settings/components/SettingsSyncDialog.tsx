@@ -110,7 +110,7 @@ const SettingsSyncDialog: Component<Props> = (props) => {
       const p = await invoke<SyncProfile[]>("list_sync_profiles");
       setProfiles(p);
     } catch (e) {
-      console.error("Failed to load sync profiles:", e);
+      if (import.meta.env.DEV) console.error("Failed to load sync profiles:", e);
     }
   });
 
@@ -401,7 +401,7 @@ const SettingsSyncDialog: Component<Props> = (props) => {
                     <button
                       class={`w-full p-4 rounded-xl border text-left transition-colors duration-100 ${
                         selectedProfile() === profile.id
-                          ? "bg-blue-600/20 border-blue-500"
+                          ? "bg-[var(--color-primary-bg)] border-[var(--color-primary)]"
                           : "bg-gray-800/50 border-gray-700 hover:border-gray-600"
                       }`}
                       onClick={() => { setSelectedProfile(profile.id); setPreview(null); }}
@@ -414,7 +414,7 @@ const SettingsSyncDialog: Component<Props> = (props) => {
                               profile.id === "minimal" ? t().sync.profiles.minimal : profile.name}
                           </span>
                           <Show when={selectedProfile() === profile.id}>
-                            <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-blue-400" />
+                            <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-[var(--color-primary)]" />
                           </Show>
                         </div>
                         <p class="text-sm text-muted leading-relaxed justify-center text-center">

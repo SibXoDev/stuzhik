@@ -2,6 +2,7 @@ import { Component, createSignal, createEffect, Show, onCleanup } from "solid-js
 import { highlightCode, detectLanguage, escapeHtml } from "../utils/highlighter";
 import { useSafeTimers } from "../hooks";
 import { useI18n } from "../i18n";
+import { Tooltip } from "../ui";
 
 interface CodeViewerProps {
   code: string;
@@ -15,6 +16,9 @@ interface CodeViewerProps {
   minimal?: boolean;
 }
 
+// Отслеживание актуального запроса подсветки (вместо window as any)
+let lastCodeViewerRequest = 0;
+
 const CodeViewer: Component<CodeViewerProps> = (props) => {
   const { t } = useI18n();
   const [html, setHtml] = createSignal("");
@@ -23,7 +27,6 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
   const [copied, setCopied] = createSignal(false);
   const { setTimeout: safeTimeout } = useSafeTimers();
 
-  // NOTE: Using sync wrapper to avoid SolidJS async effect issues
   createEffect(() => {
     const code = props.code;
     if (!code) {
@@ -33,32 +36,29 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
       return;
     }
 
-    // Track request to handle race conditions
-    const requestId = Date.now();
-    (window as any).__lastCodeViewerRequest = requestId;
+    const requestId = ++lastCodeViewerRequest;
 
     setLoading(true);
     setError(null);
 
     const lang = detectLanguage(props.filename, props.language);
 
-    // Safety timeout - ensure loading state is cleared even if highlighter hangs
+    // Safety timeout — если highlighter зависнет
     const safetyTimeout = setTimeout(() => {
-      if ((window as any).__lastCodeViewerRequest === requestId) {
-        console.warn("[CodeViewer] Safety timeout - highlighter might be stuck");
+      if (lastCodeViewerRequest === requestId) {
+        if (import.meta.env.DEV) console.warn("[CodeViewer] Safety timeout - highlighter might be stuck");
         setError("Timeout");
         setHtml(`<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`);
         setLoading(false);
       }
     }, 15000);
 
-    // Cleanup timeout on effect re-run or unmount
     onCleanup(() => clearTimeout(safetyTimeout));
 
     highlightCode(code, lang)
       .then((result) => {
         clearTimeout(safetyTimeout);
-        if ((window as any).__lastCodeViewerRequest === requestId) {
+        if (lastCodeViewerRequest === requestId) {
           setHtml(result);
           setLoading(false);
           setError(null);
@@ -66,10 +66,9 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
       })
       .catch((e) => {
         clearTimeout(safetyTimeout);
-        if ((window as any).__lastCodeViewerRequest === requestId) {
-          console.error("Failed to highlight code:", e);
+        if (lastCodeViewerRequest === requestId) {
+          if (import.meta.env.DEV) console.error("Failed to highlight code:", e);
           setError((e as Error).message);
-          // Fallback to plain text
           setHtml(`<pre class="shiki"><code>${escapeHtml(code)}</code></pre>`);
           setLoading(false);
         }
@@ -82,7 +81,7 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
       setCopied(true);
       safeTimeout(() => setCopied(false), 2000);
     } catch (e) {
-      console.error("Failed to copy:", e);
+      if (import.meta.env.DEV) console.error("Failed to copy:", e);
     }
   };
 
@@ -110,15 +109,16 @@ const CodeViewer: Component<CodeViewerProps> = (props) => {
             <i class={`w-4 h-4 ${getFileIcon(props.filename || "")}`} />
             <span class="font-mono">{props.filename}</span>
           </div>
-          <button
-            class="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
-            onClick={handleCopy}
-            title={t().ui?.tooltips?.copy ?? "Copy"}
-          >
-            <Show when={copied()} fallback={<i class="i-hugeicons-copy-01 w-4 h-4" />}>
-              <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
-            </Show>
-          </button>
+          <Tooltip text={t().ui?.tooltips?.copy ?? "Copy"} position="bottom">
+            <button
+              class="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-500 hover:text-gray-300"
+              onClick={handleCopy}
+            >
+              <Show when={copied()} fallback={<i class="i-hugeicons-copy-01 w-4 h-4" />}>
+                <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
+              </Show>
+            </button>
+          </Tooltip>
         </div>
       </Show>
 

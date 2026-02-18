@@ -6,7 +6,6 @@ use tauri::{
 };
 
 use crate::settings::{LaunchBehavior, SettingsManager};
-use stuzhik_core::i18n::Language;
 
 /// Flag to track if the launcher was hidden due to game launch
 /// This prevents accidental re-showing while a game is running
@@ -27,11 +26,11 @@ pub fn clear_hidden_for_game() {
 fn get_tray_labels() -> (&'static str, &'static str, &'static str) {
     let lang = SettingsManager::get_all()
         .map(|s| s.language)
-        .unwrap_or_default();
+        .unwrap_or_else(|_| "ru".to_string());
 
-    match lang {
-        Language::Russian => ("Показать", "Свернуть в трей", "Выход"),
-        Language::English => ("Show", "Minimize to tray", "Quit"),
+    match lang.as_str() {
+        "ru" => ("Показать", "Свернуть в трей", "Выход"),
+        _ => ("Show", "Minimize to tray", "Quit"),
     }
 }
 

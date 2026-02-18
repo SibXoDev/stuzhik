@@ -517,9 +517,12 @@ pub async fn open_app_folder(folder_type: String) -> Result<()> {
 #[tauri::command]
 pub async fn clear_cache() -> Result<u64> {
     let cache_path = cache_dir();
-    let size = calculate_dir_size(&cache_path);
+    let path_clone = cache_path.clone();
+    let size = tokio::task::spawn_blocking(move || calculate_dir_size(&path_clone))
+        .await
+        .unwrap_or(0);
 
-    if cache_path.exists() {
+    if tokio::fs::try_exists(&cache_path).await.unwrap_or(false) {
         tokio::fs::remove_dir_all(&cache_path).await?;
         tokio::fs::create_dir_all(&cache_path).await?;
     }
@@ -561,7 +564,10 @@ pub async fn clear_logs() -> Result<u64> {
             if metadata.is_file() {
                 deleted_size += metadata.len();
             } else if metadata.is_dir() {
-                deleted_size += calculate_dir_size(&path);
+                let path_clone = path.clone();
+                deleted_size += tokio::task::spawn_blocking(move || calculate_dir_size(&path_clone))
+                    .await
+                    .unwrap_or(0);
             }
         }
 
@@ -794,7 +800,10 @@ pub async fn get_orphaned_folders() -> Result<Vec<OrphanedFolder>> {
 
                 // Если папки нет в БД - это orphaned
                 if !db_ids.contains(&folder_name) {
-                    let size = calculate_dir_size(&entry_path);
+                    let ep = entry_path.clone();
+                    let size = tokio::task::spawn_blocking(move || calculate_dir_size(&ep))
+                        .await
+                        .unwrap_or(0);
                     orphaned.push(OrphanedFolder {
                         path: entry_path.to_string_lossy().to_string(),
                         name: folder_name,
@@ -847,7 +856,10 @@ pub async fn delete_orphaned_folder(path: String) -> Result<u64> {
         ));
     }
 
-    let size = calculate_dir_size(&folder_path);
+    let fp = folder_path.clone();
+    let size = tokio::task::spawn_blocking(move || calculate_dir_size(&fp))
+        .await
+        .unwrap_or(0);
 
     // ИСПРАВЛЕНО: Используем tokio::fs::try_exists вместо блокирующего exists()
     if tokio::fs::try_exists(&folder_path).await.unwrap_or(false) {

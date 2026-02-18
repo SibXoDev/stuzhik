@@ -1,7 +1,7 @@
 import { For, Show, createSignal, createMemo } from "solid-js";
 import type { Component } from "solid-js";
 import type { Mod } from "../../../shared/types";
-import { ModalWrapper } from "../../../shared/ui";
+import { ModalWrapper, Tooltip } from "../../../shared/ui";
 import { sanitizeImageUrl } from "../../../shared/utils/url-validator";
 import { MarkdownRenderer, HtmlRenderer } from "../../../shared/components/MarkdownRenderer";
 import { useI18n } from "../../../shared/i18n";
@@ -115,16 +115,16 @@ const UpdateModsModal: Component<Props> = (props) => {
 
         {/* Progress bar when updating */}
         <Show when={props.updating}>
-          <div class="px-5 py-3 bg-blue-600/10 border-b border-blue-600/20">
+          <div class="px-5 py-3 bg-[var(--color-primary-bg)] border-b border-[var(--color-primary-border)]">
             <div class="flex items-center gap-3 mb-2">
-              <i class="i-svg-spinners-6-dots-scale w-4 h-4 text-blue-400" />
-              <span class="text-sm text-blue-300">
+              <i class="i-svg-spinners-6-dots-scale w-4 h-4 text-[var(--color-primary)]" />
+              <span class="text-sm text-[var(--color-primary-light)]">
                 {t().mods.updates.updating} {updatedCount()}/{selectedCount()}
               </span>
             </div>
             <div class="h-1.5 bg-gray-700 rounded-full overflow-hidden">
               <div
-                class="h-full bg-blue-500 transition-all duration-200"
+                class="h-full bg-[var(--color-primary)] transition-all duration-200"
                 style={{ width: `${selectedCount() > 0 ? (updatedCount() / selectedCount()) * 100 : 0}%` }}
               />
             </div>
@@ -138,7 +138,7 @@ const UpdateModsModal: Component<Props> = (props) => {
           </span>
           <div class="flex items-center gap-2">
             <button
-              class="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              class="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-light)] transition-colors"
               onClick={selectAll}
               disabled={props.updating}
             >
@@ -174,7 +174,7 @@ const UpdateModsModal: Component<Props> = (props) => {
                 <div class="border-b border-gray-700/50">
                   <div
                     class={`flex items-center gap-3 px-5 py-3 transition-colors ${
-                      isUpdating() ? "bg-blue-600/10" : wasUpdated() ? "bg-green-600/10" : "hover:bg-gray-800/50"
+                      isUpdating() ? "bg-[var(--color-primary-bg)]" : wasUpdated() ? "bg-green-600/10" : "hover:bg-gray-800/50"
                     }`}
                   >
                     {/* Checkbox */}
@@ -183,7 +183,7 @@ const UpdateModsModal: Component<Props> = (props) => {
                       checked={isSelected()}
                       onChange={() => toggleMod(mod.id)}
                       disabled={props.updating}
-                      class="w-4 h-4 rounded border-gray-600 bg-gray-800 checked:bg-blue-600 checked:border-blue-600 focus:ring-2 focus:ring-blue-600/50 cursor-pointer disabled:opacity-50"
+                      class="w-4 h-4 rounded border-gray-600 bg-gray-800 focus:ring-2 focus:ring-[var(--color-primary-border)] cursor-pointer disabled:opacity-50"
                     />
 
                     {/* Icon */}
@@ -207,7 +207,7 @@ const UpdateModsModal: Component<Props> = (props) => {
                       <div class="flex items-center gap-2">
                         <span class="font-medium text-white truncate">{mod.name}</span>
                         <Show when={isUpdating()}>
-                          <i class="i-svg-spinners-6-dots-scale w-3.5 h-3.5 text-blue-400" />
+                          <i class="i-svg-spinners-6-dots-scale w-3.5 h-3.5 text-[var(--color-primary)]" />
                         </Show>
                         <Show when={wasUpdated()}>
                           <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-green-400" />
@@ -222,18 +222,19 @@ const UpdateModsModal: Component<Props> = (props) => {
 
                     {/* Changelog toggle button */}
                     <Show when={hasChangelog()}>
-                      <button
-                        class={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
-                          isExpanded()
-                            ? "bg-blue-600/20 text-blue-400"
-                            : "bg-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-gray-300"
-                        }`}
-                        onClick={() => toggleChangelog(mod.id)}
-                        title={t().mods.updates.viewChangelog}
-                      >
-                        <i class={`w-3.5 h-3.5 transition-transform ${isExpanded() ? "i-hugeicons-arrow-up-01" : "i-hugeicons-arrow-down-01"}`} />
-                        <span>{t().mods.updates.changelog}</span>
-                      </button>
+                      <Tooltip text={t().mods.updates.viewChangelog} position="bottom">
+                        <button
+                          class={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                            isExpanded()
+                              ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]"
+                              : "bg-gray-700/50 text-gray-400 hover:bg-gray-700 hover:text-gray-300"
+                          }`}
+                          onClick={() => toggleChangelog(mod.id)}
+                        >
+                          <i class={`w-3.5 h-3.5 transition-transform ${isExpanded() ? "i-hugeicons-arrow-up-01" : "i-hugeicons-arrow-down-01"}`} />
+                          <span>{t().mods.updates.changelog}</span>
+                        </button>
+                      </Tooltip>
                     </Show>
 
                     {/* Source badge */}

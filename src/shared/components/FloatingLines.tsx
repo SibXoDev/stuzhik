@@ -128,7 +128,7 @@ const FloatingLines = (props: FloatingLinesProps) => {
       premultipliedAlpha: false
     });
     if (!gl) {
-      console.error("WebGL2 not supported");
+      if (import.meta.env.DEV) console.error("WebGL2 not supported");
       return;
     }
 
@@ -148,11 +148,11 @@ const FloatingLines = (props: FloatingLinesProps) => {
 
     // Check for errors
     if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
-      console.error("Vertex shader error:", gl.getShaderInfoLog(vs));
+      if (import.meta.env.DEV) console.error("Vertex shader error:", gl.getShaderInfoLog(vs));
       return;
     }
     if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
-      console.error("Fragment shader error:", gl.getShaderInfoLog(fs));
+      if (import.meta.env.DEV) console.error("Fragment shader error:", gl.getShaderInfoLog(fs));
       return;
     }
 
@@ -163,7 +163,7 @@ const FloatingLines = (props: FloatingLinesProps) => {
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error("Program link error:", gl.getProgramInfoLog(program));
+      if (import.meta.env.DEV) console.error("Program link error:", gl.getProgramInfoLog(program));
       return;
     }
 

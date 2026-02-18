@@ -81,7 +81,7 @@ impl TransferHistory {
 
     /// Загрузить историю из файла
     pub async fn load(&self) -> Result<(), String> {
-        if !self.history_file.exists() {
+        if !tokio::fs::try_exists(&self.history_file).await.unwrap_or(false) {
             return Ok(());
         }
 

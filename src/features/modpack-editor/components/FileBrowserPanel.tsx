@@ -8,6 +8,7 @@ import { addToast } from "../../../shared/components/Toast";
 import CodeViewer from "../../../shared/components/CodeViewer";
 import { formatRelativeTime, formatFullDateTime } from "../../../shared/utils/date-formatter";
 import { useI18n } from "../../../shared/i18n";
+import { Tooltip } from "../../../shared/ui";
 
 // Decode Unicode escape sequences like \u0027, \u0026
 function decodeUnicodeEscapes(str: string): string {
@@ -573,14 +574,14 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
         {/* Search */}
         <div class="flex flex-col gap-2">
-          <div class="relative">
+          <div>
             <i class="i-hugeicons-search-01 w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               type="text"
               placeholder={useGlobalSearch() ? t().ui.placeholders.globalSearch : t().ui.placeholders.searchFiles}
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.currentTarget.value)}
-              class="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              class="w-full pl-10 pr-10 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors"
             />
             <Show when={searchQuery()}>
               <button
@@ -594,30 +595,32 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
           {/* Search Options */}
           <div class="flex gap-2 items-center text-xs">
-            <button
-              class={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
-                useGlobalSearch() ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-300"
-              }`}
-              onClick={() => setUseGlobalSearch(!useGlobalSearch())}
-              title={t().editor.fileBrowser.searchGlobal}
-            >
-              <i class="i-hugeicons-folder-search w-3.5 h-3.5" />
-              {t().editor.fileBrowser.global}
-            </button>
+            <Tooltip text={t().editor.fileBrowser.searchGlobal} position="bottom">
+              <button
+                class={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                  useGlobalSearch() ? "bg-[var(--color-primary)] text-white" : "bg-gray-800 text-gray-400 hover:text-gray-300"
+                }`}
+                onClick={() => setUseGlobalSearch(!useGlobalSearch())}
+              >
+                <i class="i-hugeicons-folder-search w-3.5 h-3.5" />
+                {t().editor.fileBrowser.global}
+              </button>
+            </Tooltip>
 
-            <button
-              class={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
-                useRegex() ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-300"
-              }`}
-              onClick={() => setUseRegex(!useRegex())}
-              title={t().editor.fileBrowser.useRegex}
-            >
-              <i class="i-hugeicons-source-code w-3.5 h-3.5" />
-              {t().editor.fileBrowser.regex}
-            </button>
+            <Tooltip text={t().editor.fileBrowser.useRegex} position="bottom">
+              <button
+                class={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
+                  useRegex() ? "bg-[var(--color-primary)] text-white" : "bg-gray-800 text-gray-400 hover:text-gray-300"
+                }`}
+                onClick={() => setUseRegex(!useRegex())}
+              >
+                <i class="i-hugeicons-source-code w-3.5 h-3.5" />
+                {t().editor.fileBrowser.regex}
+              </button>
+            </Tooltip>
 
             <Show when={searchLoading()}>
-              <i class="i-svg-spinners-ring-resize w-3.5 h-3.5 text-blue-400" />
+              <i class="i-svg-spinners-ring-resize w-3.5 h-3.5 text-[var(--color-primary)]" />
             </Show>
 
             <Show when={useGlobalSearch() && globalSearchResults().length > 0}>
@@ -630,31 +633,34 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
 
         {/* Actions */}
         <div class="flex gap-2">
-          <button
-            class="btn-sm btn-secondary flex-1"
-            onClick={handleGoUp}
-            disabled={!browser.currentPath()}
-            title={t().editor.fileBrowser.goUpLevel}
-          >
-            <i class="i-hugeicons-arrow-left-01 w-4 h-4" />
-            {t().editor.fileBrowser.back}
-          </button>
+          <Tooltip text={t().editor.fileBrowser.goUpLevel} position="bottom">
+            <button
+              class="btn-sm btn-secondary flex-1"
+              onClick={handleGoUp}
+              disabled={!browser.currentPath()}
+            >
+              <i class="i-hugeicons-arrow-left-01 w-4 h-4" />
+              {t().editor.fileBrowser.back}
+            </button>
+          </Tooltip>
 
-          <button
-            class="btn-sm btn-secondary"
-            onClick={handleOpenInExplorer}
-            title={t().editor.fileBrowser.openInExplorer}
-          >
-            <i class="i-hugeicons-folder-open w-4 h-4" />
-          </button>
+          <Tooltip text={t().editor.fileBrowser.openInExplorer} position="bottom">
+            <button
+              class="btn-sm btn-secondary"
+              onClick={handleOpenInExplorer}
+            >
+              <i class="i-hugeicons-folder-open w-4 h-4" />
+            </button>
+          </Tooltip>
 
-          <button
-            class={`btn-sm ${showHidden() ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => setShowHidden(!showHidden())}
-            title={showHidden() ? t().editor.fileBrowser.hideHiddenFiles : t().editor.fileBrowser.showHiddenFiles}
-          >
-            <i class={`w-4 h-4 ${showHidden() ? "i-hugeicons-view" : "i-hugeicons-view-off"}`} />
-          </button>
+          <Tooltip text={showHidden() ? t().editor.fileBrowser.hideHiddenFiles : t().editor.fileBrowser.showHiddenFiles} position="bottom">
+            <button
+              class={`btn-sm ${showHidden() ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setShowHidden(!showHidden())}
+            >
+              <i class={`w-4 h-4 ${showHidden() ? "i-hugeicons-view" : "i-hugeicons-view-off"}`} />
+            </button>
+          </Tooltip>
         </div>
 
         {/* File List */}
@@ -684,7 +690,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
               {(entry) => (
                 <button
                   class={`w-full text-left px-4 py-3 border-b border-gray-800 hover:bg-gray-800/50 transition-colors flex items-center gap-3 ${
-                    selectedFile()?.path === entry.path ? "bg-blue-600/20 border-l-4 border-l-blue-600" : ""
+                    selectedFile()?.path === entry.path ? "bg-[var(--color-primary-bg)] border-l-4 border-l-[var(--color-primary)]" : ""
                   }`}
                   onClick={() => handleNavigate(entry)}
                   onContextMenu={(e) => {
@@ -701,7 +707,7 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
                       <Show when={useGlobalSearch()}>
                         <span class="text-blue-400 font-mono mr-2">{entry.path}</span>
                       </Show>
-                      {entry.is_dir ? t().editor.fileBrowser.folder : formatFileSize(entry.size)} • <span title={formatFullDateTime(entry.modified)}>{formatRelativeTime(entry.modified)}</span>
+                      {entry.is_dir ? t().editor.fileBrowser.folder : formatFileSize(entry.size)} • <Tooltip text={formatFullDateTime(entry.modified)} position="bottom"><span>{formatRelativeTime(entry.modified)}</span></Tooltip>
                     </div>
                   </div>
                   <Show when={entry.is_dir}>
@@ -739,58 +745,64 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
               <div class="flex items-center gap-3 min-w-0">
                 <i class={`${getFileIcon(selectedFile()!)} w-5 h-5 text-gray-500 flex-shrink-0`} />
                 <div class="min-w-0">
-                  <h3 class="font-semibold truncate" title={selectedFile()!.name}>{selectedFile()!.name}</h3>
+                  <Tooltip text={selectedFile()!.name} position="bottom"><h3 class="font-semibold truncate">{selectedFile()!.name}</h3></Tooltip>
                   <p class="text-xs text-muted">
-                    {formatFileSize(selectedFile()!.size)} • <span title={formatFullDateTime(selectedFile()!.modified)}>{formatRelativeTime(selectedFile()!.modified)}</span>
+                    {formatFileSize(selectedFile()!.size)} • <Tooltip text={formatFullDateTime(selectedFile()!.modified)} position="bottom"><span>{formatRelativeTime(selectedFile()!.modified)}</span></Tooltip>
                   </p>
                 </div>
               </div>
 
               <div class="flex gap-1 flex-shrink-0">
                 <Show when={isTextFile(selectedFile()!.name)}>
-                  <button
-                    class="btn-ghost btn-sm p-1.5 text-blue-400 hover:text-blue-300"
-                    onClick={handleOpenInVSCode}
-                    title={t().editor.fileBrowser.openInVSCode}
-                  >
-                    <i class="i-hugeicons-source-code w-4 h-4" />
-                  </button>
+                  <Tooltip text={t().editor.fileBrowser.openInVSCode} position="bottom">
+                    <button
+                      class="btn-ghost btn-sm p-1.5 text-blue-400 hover:text-blue-300"
+                      onClick={handleOpenInVSCode}
+                    >
+                      <i class="i-hugeicons-source-code w-4 h-4" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip text={t().editor.fileBrowser.openInDefaultEditor} position="bottom">
+                    <button
+                      class="btn-ghost btn-sm p-1.5"
+                      onClick={handleOpenInEditor}
+                    >
+                      <i class="i-hugeicons-file-edit w-4 h-4" />
+                    </button>
+                  </Tooltip>
+                </Show>
+                <Tooltip text={t().editor.fileBrowser.showInFileManager} position="bottom">
                   <button
                     class="btn-ghost btn-sm p-1.5"
-                    onClick={handleOpenInEditor}
-                    title={t().editor.fileBrowser.openInDefaultEditor}
+                    onClick={handleShowFileInExplorer}
                   >
-                    <i class="i-hugeicons-file-edit w-4 h-4" />
+                    <i class="i-hugeicons-folder-search w-4 h-4" />
                   </button>
-                </Show>
-                <button
-                  class="btn-ghost btn-sm p-1.5"
-                  onClick={handleShowFileInExplorer}
-                  title={t().editor.fileBrowser.showInFileManager}
-                >
-                  <i class="i-hugeicons-folder-search w-4 h-4" />
-                </button>
-                <button
-                  class="btn-ghost btn-sm p-1.5"
-                  onClick={handleRename}
-                  title={t().editor.fileBrowser.renameFile}
-                >
-                  <i class="i-hugeicons-edit-02 w-4 h-4" />
-                </button>
-                <button
-                  class="btn-ghost btn-sm p-1.5"
-                  onClick={handleCopy}
-                  title={t().editor.fileBrowser.copyFile}
-                >
-                  <i class="i-hugeicons-copy-01 w-4 h-4" />
-                </button>
-                <button
-                  class="btn-ghost btn-sm p-1.5 text-red-400 hover:text-red-300"
-                  onClick={handleDelete}
-                  title={t().editor.fileBrowser.deleteFile}
-                >
-                  <i class="i-hugeicons-delete-02 w-4 h-4" />
-                </button>
+                </Tooltip>
+                <Tooltip text={t().editor.fileBrowser.renameFile} position="bottom">
+                  <button
+                    class="btn-ghost btn-sm p-1.5"
+                    onClick={handleRename}
+                  >
+                    <i class="i-hugeicons-edit-02 w-4 h-4" />
+                  </button>
+                </Tooltip>
+                <Tooltip text={t().editor.fileBrowser.copyFile} position="bottom">
+                  <button
+                    class="btn-ghost btn-sm p-1.5"
+                    onClick={handleCopy}
+                  >
+                    <i class="i-hugeicons-copy-01 w-4 h-4" />
+                  </button>
+                </Tooltip>
+                <Tooltip text={t().editor.fileBrowser.deleteFile} position="bottom">
+                  <button
+                    class="btn-ghost btn-sm p-1.5 text-red-400 hover:text-red-300"
+                    onClick={handleDelete}
+                  >
+                    <i class="i-hugeicons-delete-02 w-4 h-4" />
+                  </button>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -838,8 +850,8 @@ export function FileBrowserPanel(props: FileBrowserPanelProps) {
         <div class="modal-backdrop" onClick={() => setShowRenameDialog(false)}>
           <div class="modal-content max-w-md" onClick={(e) => e.stopPropagation()}>
             <h2 class="text-xl font-semibold mb-4">{t().editor.fileBrowser.renameDialog.title}</h2>
-            <div class="mb-4">
-              <label class="block text-sm font-medium mb-2">{t().editor.fileBrowser.renameDialog.newName}</label>
+            <div class="flex flex-col gap-2 mb-4">
+              <label class="block text-sm font-medium">{t().editor.fileBrowser.renameDialog.newName}</label>
               <input
                 type="text"
                 value={newName()}

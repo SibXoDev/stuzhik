@@ -2,6 +2,7 @@ import { Show, For, createMemo, createSignal } from "solid-js";
 import type { Component } from "solid-js";
 import type { SnapshotMeta, SnapshotHistory as SnapshotHistoryType } from "../../../shared/types";
 import { Select } from "../../../shared/ui";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import { addToast } from "../../../shared/components/Toast";
 
 interface Props {
@@ -187,28 +188,30 @@ const SnapshotHistory: Component<Props> = (props) => {
           {/* Навигация по снимкам */}
           <Show when={snapshots().length > 1}>
             <div class="flex items-center gap-1">
-              <button
-                class="p-1 rounded hover:bg-gray-700/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={goToNewer}
-                disabled={!canGoNewer()}
-                title="К более новому снимку"
-              >
-                <i class="i-hugeicons-arrow-up-01 w-4 h-4" />
-              </button>
-              <button
-                class="p-1 rounded hover:bg-gray-700/50 disabled:opacity-30 disabled:cursor-not-allowed"
-                onClick={goToOlder}
-                disabled={!canGoOlder()}
-                title="К более старому снимку"
-              >
-                <i class="i-hugeicons-arrow-down-01 w-4 h-4" />
-              </button>
+              <Tooltip text="К более новому снимку" position="bottom">
+                <button
+                  class="p-1 rounded hover:bg-gray-700/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  onClick={goToNewer}
+                  disabled={!canGoNewer()}
+                >
+                  <i class="i-hugeicons-arrow-up-01 w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip text="К более старому снимку" position="bottom">
+                <button
+                  class="p-1 rounded hover:bg-gray-700/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                  onClick={goToOlder}
+                  disabled={!canGoOlder()}
+                >
+                  <i class="i-hugeicons-arrow-down-01 w-4 h-4" />
+                </button>
+              </Tooltip>
             </div>
           </Show>
 
           <Show when={props.selectedSnapshotId}>
             <button
-              class="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 rounded hover:bg-blue-500/10"
+              class="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-light)] flex items-center gap-1 px-2 py-1 rounded hover:bg-[var(--color-primary-bg)]"
               onClick={() => {
                 props.onCompareLatest();
                 addToast({
@@ -225,15 +228,16 @@ const SnapshotHistory: Component<Props> = (props) => {
           </Show>
 
           <Show when={props.onSetMaxSnapshots}>
-            <button
-              class={`p-1.5 rounded transition-colors ${
-                showSettings() ? "bg-gray-700 text-white" : "text-gray-400 hover:text-gray-300 hover:bg-gray-700/50"
-              }`}
-              onClick={() => setShowSettings(!showSettings())}
-              title="Настройки истории"
-            >
-              <i class="i-hugeicons-settings-02 w-4 h-4" />
-            </button>
+            <Tooltip text="Настройки истории" position="bottom">
+              <button
+                class={`p-1.5 rounded transition-colors ${
+                  showSettings() ? "bg-gray-700 text-white" : "text-gray-400 hover:text-gray-300 hover:bg-gray-700/50"
+                }`}
+                onClick={() => setShowSettings(!showSettings())}
+              >
+                <i class="i-hugeicons-settings-02 w-4 h-4" />
+              </button>
+            </Tooltip>
           </Show>
         </div>
       </div>
@@ -286,7 +290,7 @@ const SnapshotHistory: Component<Props> = (props) => {
                 <button
                   class={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
                     isSelected() || isCurrent()
-                      ? "bg-blue-600/15 border border-blue-500/30 shadow-sm"
+                      ? "bg-[var(--color-primary-bg)] border border-[var(--color-primary-border)] shadow-sm"
                       : "bg-gray-800/40 hover:bg-gray-700/50 border border-transparent"
                   }`}
                   onClick={() => {
@@ -305,9 +309,11 @@ const SnapshotHistory: Component<Props> = (props) => {
                   }}
                 >
                   {/* Статус иконка */}
-                  <div class="flex-shrink-0" title={getStatusText(meta)}>
-                    <i class={`${getStatusIcon(meta)} w-5 h-5`} />
-                  </div>
+                  <Tooltip text={getStatusText(meta)} position="bottom">
+                    <div class="flex-shrink-0">
+                      <i class={`${getStatusIcon(meta)} w-5 h-5`} />
+                    </div>
+                  </Tooltip>
 
                   {/* Информация */}
                   <div class="flex-1 min-w-0">
@@ -316,18 +322,19 @@ const SnapshotHistory: Component<Props> = (props) => {
                         {formatDate(meta.created_at)}
                       </span>
                       <Show when={isLatest()}>
-                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-600/30 text-blue-400 font-medium">
+                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-primary-bg)] text-[var(--color-primary)] font-medium">
                           Последний
                         </span>
                       </Show>
                       <Show when={meta.backup_id}>
-                        <span
-                          class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-600/30 text-green-400 flex items-center gap-1"
-                          title="Связан с бэкапом"
-                        >
-                          <i class="i-hugeicons-archive w-3 h-3" />
-                          Бэкап
-                        </span>
+                        <Tooltip text="Связан с бэкапом" position="bottom">
+                          <span
+                            class="text-[10px] px-1.5 py-0.5 rounded-full bg-green-600/30 text-green-400 flex items-center gap-1"
+                          >
+                            <i class="i-hugeicons-archive w-3 h-3" />
+                            Бэкап
+                          </span>
+                        </Tooltip>
                       </Show>
                     </div>
                     <div class="text-xs text-gray-500 mt-0.5">
@@ -337,7 +344,7 @@ const SnapshotHistory: Component<Props> = (props) => {
 
                   {/* Индикатор выбора */}
                   <Show when={isSelected() || isCurrent()}>
-                    <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-blue-400 flex-shrink-0" />
+                    <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-[var(--color-primary)] flex-shrink-0" />
                   </Show>
                 </button>
               );

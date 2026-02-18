@@ -51,7 +51,7 @@ export function useInstances() {
       setInstances(items.filter(i => i != null));
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to load instances:", e);
+      if (import.meta.env.DEV) console.error("Failed to load instances:", e);
     } finally {
       setLoading(false);
     }
@@ -66,7 +66,7 @@ export function useInstances() {
       return instance;
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to create instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to create instance:", e);
       return null;
     } finally {
       setLoading(false);
@@ -114,7 +114,7 @@ export function useInstances() {
       }
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to start instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to start instance:", e);
       updateInstanceStatus(id, "stopped");
       clearOperating(id);
     }
@@ -146,7 +146,7 @@ export function useInstances() {
           // The monitor thread will update status when done
           return;
         } catch (e) {
-          console.warn("Graceful stop failed, falling back to force stop:", e);
+          if (import.meta.env.DEV) console.warn("Graceful stop failed, falling back to force stop:", e);
           // Fall through to force stop
         }
       }
@@ -155,7 +155,7 @@ export function useInstances() {
       await invoke("stop_instance", { id });
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to stop instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to stop instance:", e);
       updateInstanceStatus(id, "running");
       clearOperating(id);
     }
@@ -171,7 +171,7 @@ export function useInstances() {
       setInstances(prev => prev.filter(inst => inst.id !== id));
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to delete instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to delete instance:", e);
     } finally {
       clearOperating(id);
     }
@@ -187,7 +187,7 @@ export function useInstances() {
       updateInstanceStatus(id, "installing");
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to reinstall instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to reinstall instance:", e);
     } finally {
       clearOperating(id);
     }
@@ -203,7 +203,7 @@ export function useInstances() {
       updateInstanceStatus(id, "installing");
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to repair instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to repair instance:", e);
     } finally {
       clearOperating(id);
     }
@@ -218,7 +218,7 @@ export function useInstances() {
       );
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
-      console.error("Failed to update instance:", e);
+      if (import.meta.env.DEV) console.error("Failed to update instance:", e);
     }
   }
 
@@ -232,7 +232,7 @@ export function useInstances() {
           setInstances(prev => [{ ...newInstance, status }, ...prev.filter(i => i != null)]);
         }
       } catch (e) {
-        console.error("Failed to fetch instance:", e);
+        if (import.meta.env.DEV) console.error("Failed to fetch instance:", e);
         load(); // Fallback - reload all
       }
     } else {
@@ -243,7 +243,10 @@ export function useInstances() {
   onMount(() => {
     load();
 
-    // Массив для хранения отписок
+    // Массив для хранения отписок.
+    // Resolved listeners stored directly for safe cleanup.
+    const resolvedUnlisteners: UnlistenFn[] = [];
+    let isCleanedUp = false;
     const unlisteners: Promise<UnlistenFn>[] = [];
 
     // Обработчик изменения статуса
@@ -355,6 +358,17 @@ export function useInstances() {
       );
     }
 
+    // Экземпляр удалён (отмена установки модпака / cleanup).
+    // Немедленно убираем из списка — экземпляр уже удалён из БД на backend.
+    unlisteners.push(
+      listen<{ id: string }>("instance-removed", (event) => {
+        const { id } = event.payload;
+        if (import.meta.env.DEV) console.log("Instance removed (cancelled):", id);
+        setInstances(prev => prev.filter(inst => inst.id !== id));
+        clearOperating(id);
+      })
+    );
+
     // Auto-restart сервера при краше (если включено)
     unlisteners.push(
       listen<{ instance_id: string }>("server-restart-now", async (event) => {
@@ -368,6 +382,16 @@ export function useInstances() {
         // Небольшая задержка для стабильности
         await new Promise(resolve => setTimeout(resolve, 500));
 
+        // Guard against stale operations after unmount
+        if (isCleanedUp) return;
+
+        // Re-check instance status after delay — user may have manually started/deleted
+        const currentInstance = instances().find(i => i.id === instance_id);
+        if (!currentInstance || currentInstance.status !== "stopped") {
+          if (import.meta.env.DEV) console.log(`Auto-restart skipped for ${instance_id}: status is ${currentInstance?.status ?? "deleted"}`);
+          return;
+        }
+
         // Запускаем заново
         try {
           // Create snapshot before restart
@@ -376,20 +400,34 @@ export function useInstances() {
           } catch {
             // Non-critical
           }
+          if (isCleanedUp) return;
           await invoke("start_instance", { id: instance_id });
         } catch (e) {
-          console.error("Auto-restart failed:", e);
-          updateInstanceStatus(instance_id, "crashed");
+          if (import.meta.env.DEV) console.error("Auto-restart failed:", e);
+          if (!isCleanedUp) updateInstanceStatus(instance_id, "crashed");
         }
       })
     );
 
+    // Track all listener promises to handle cleanup race
+    for (const promise of unlisteners) {
+      promise.then(fn => {
+        if (isCleanedUp) {
+          fn(); // Already cleaned up — unlisten immediately
+        } else {
+          resolvedUnlisteners.push(fn);
+        }
+      }).catch(() => {});
+    }
+
     // Очистка при размонтировании
     onCleanup(() => {
+      isCleanedUp = true;
       clearInterval(cleanupInterval);
-      unlisteners.forEach(promise => {
-        promise.then(fn => fn()).catch(console.error);
-      });
+      // Unlisten all resolved listeners
+      for (const fn of resolvedUnlisteners) {
+        fn();
+      }
     });
   });
 

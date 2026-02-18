@@ -7,6 +7,19 @@ const MODRINTH_API_BASE: &str = "https://api.modrinth.com/v2";
 
 pub struct ModpackManager;
 
+/// Нормализация поискового запроса:
+/// - Заменяет дефисы/подчёркивания на пробелы ("beyond-depth" → "beyond depth")
+/// - Убирает лишние пробелы
+/// Это улучшает качество поиска, т.к. API лучше матчит слова через пробелы.
+fn normalize_search_query(query: &str) -> String {
+    query
+        .replace('-', " ")
+        .replace('_', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 impl ModpackManager {
     /// Поиск модпаков на Modrinth
     pub async fn search_modrinth(
@@ -16,10 +29,11 @@ impl ModpackManager {
         limit: u32,
         offset: u32,
     ) -> Result<ModpackSearchResponse> {
+        let normalized_query = normalize_search_query(query);
         let mut url = format!(
-            "{}/search?query={}&limit={}&offset={}",
+            "{}/search?query={}&limit={}&offset={}&index=relevance",
             MODRINTH_API_BASE,
-            urlencoding::encode(query),
+            urlencoding::encode(&normalized_query),
             limit,
             offset
         );
@@ -75,10 +89,11 @@ impl ModpackManager {
     ) -> Result<ModpackSearchResponse> {
         let _client = CurseForgeClient::new()?;
 
-        // classId=4471 для модпаков
+        let normalized_query = normalize_search_query(query);
+        // classId=4471 для модпаков, sortField=2 = popularity, sortOrder=desc
         let mut url = format!(
-            "https://api.curseforge.com/v1/mods/search?gameId=432&classId=4471&searchFilter={}&pageSize={}&index={}",
-            urlencoding::encode(query),
+            "https://api.curseforge.com/v1/mods/search?gameId=432&classId=4471&searchFilter={}&pageSize={}&index={}&sortField=2&sortOrder=desc",
+            urlencoding::encode(&normalized_query),
             limit,
             offset
         );
@@ -100,21 +115,15 @@ impl ModpackManager {
             }
         }
 
-        let http_client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .default_headers({
-                let mut headers = reqwest::header::HeaderMap::new();
-                headers.insert(
-                    "x-api-key",
-                    "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
-                        .parse()
-                        .expect("valid API key header value"),
-                );
-                headers
-            })
-            .build()?;
-
-        let response: serde_json::Value = http_client.get(&url).send().await?.json().await?;
+        let url_clone = url.clone();
+        let response: serde_json::Value =
+            crate::api::curseforge::cf_api_retry("search_modpacks", || {
+                let u = url_clone.clone();
+                async move {
+                    crate::api::curseforge::shared_client()
+                        .get(&u).send().await?.json().await
+                }
+            }).await?;
 
         let data = response
             .get("data")
@@ -283,21 +292,15 @@ impl ModpackManager {
             }
         }
 
-        let http_client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .default_headers({
-                let mut headers = reqwest::header::HeaderMap::new();
-                headers.insert(
-                    "x-api-key",
-                    "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
-                        .parse()
-                        .expect("valid API key header value"),
-                );
-                headers
-            })
-            .build()?;
-
-        let response: serde_json::Value = http_client.get(&url).send().await?.json().await?;
+        let url_clone = url.clone();
+        let response: serde_json::Value =
+            crate::api::curseforge::cf_api_retry("get_modpack_versions", || {
+                let u = url_clone.clone();
+                async move {
+                    crate::api::curseforge::shared_client()
+                        .get(&u).send().await?.json().await
+                }
+            }).await?;
 
         let data = response
             .get("data")
@@ -449,21 +452,15 @@ impl ModpackManager {
 
         let url = format!("https://api.curseforge.com/v1/mods/{}", pid);
 
-        let http_client = reqwest::Client::builder()
-            .user_agent(crate::USER_AGENT)
-            .default_headers({
-                let mut headers = reqwest::header::HeaderMap::new();
-                headers.insert(
-                    "x-api-key",
-                    "$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm"
-                        .parse()
-                        .expect("valid API key header value"),
-                );
-                headers
-            })
-            .build()?;
-
-        let response: serde_json::Value = http_client.get(&url).send().await?.json().await?;
+        let url_clone = url.clone();
+        let response: serde_json::Value =
+            crate::api::curseforge::cf_api_retry("get_modpack_details", || {
+                let u = url_clone.clone();
+                async move {
+                    crate::api::curseforge::shared_client()
+                        .get(&u).send().await?.json().await
+                }
+            }).await?;
 
         let data = response
             .get("data")

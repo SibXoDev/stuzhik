@@ -6,6 +6,7 @@ import type {
 } from "../types";
 import { formatSize } from "../utils/format-size";
 import { useI18n } from "../i18n";
+import { Tooltip } from "../ui";
 
 interface IntegrityCheckerProps {
   instanceId: string;
@@ -159,16 +160,17 @@ export function IntegrityChecker(props: IntegrityCheckerProps) {
           </Show>
           Полная проверка
         </button>
-        <button
-          onClick={createManifest}
-          disabled={loading()}
-          class="btn-ghost"
-          data-size="sm"
-          title="Создать манифест для отслеживания изменений"
-        >
-          <i class="i-hugeicons-file-add w-4 h-4" />
-          Создать манифест
-        </button>
+        <Tooltip text="Создать манифест для отслеживания изменений" position="bottom">
+          <button
+            onClick={createManifest}
+            disabled={loading()}
+            class="btn-ghost"
+            data-size="sm"
+          >
+            <i class="i-hugeicons-file-add w-4 h-4" />
+            Создать манифест
+          </button>
+        </Tooltip>
       </div>
 
       <Show when={loading()}>
@@ -243,7 +245,7 @@ export function IntegrityChecker(props: IntegrityCheckerProps) {
                 </h3>
                 <button
                   onClick={selectAllRecoverable}
-                  class="text-xs text-blue-400 hover:underline"
+                  class="text-xs text-[var(--color-primary)] hover:underline"
                 >
                   Выбрать все восстанавливаемые
                 </button>
@@ -257,13 +259,15 @@ export function IntegrityChecker(props: IntegrityCheckerProps) {
                             type="checkbox"
                             checked={selectedFiles().includes(file.path)}
                             onChange={() => toggleFile(file.path)}
-                            class="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                            class="rounded border-gray-600 bg-gray-800 focus:ring-[var(--color-primary)] focus:ring-offset-0"
                           />
                         </Show>
                         <div class="flex-1 min-w-0">
-                          <div class="text-white text-sm truncate" title={file.path}>
-                            {file.path}
-                          </div>
+                          <Tooltip text={file.path} position="bottom">
+                            <div class="text-white text-sm truncate">
+                              {file.path}
+                            </div>
+                          </Tooltip>
                           <div class="text-xs text-muted inline-flex items-center gap-2">
                             <span>Размер: {fmtSize(file.size)}</span>
                             <Show when={!file.recoverable}>
@@ -293,13 +297,15 @@ export function IntegrityChecker(props: IntegrityCheckerProps) {
                             type="checkbox"
                             checked={selectedFiles().includes(file.path)}
                             onChange={() => toggleFile(file.path)}
-                            class="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                            class="rounded border-gray-600 bg-gray-800 focus:ring-[var(--color-primary)] focus:ring-offset-0"
                           />
                         </Show>
                         <div class="flex-1 min-w-0">
-                          <div class="text-white text-sm truncate" title={file.path}>
-                            {file.path}
-                          </div>
+                          <Tooltip text={file.path} position="bottom">
+                            <div class="text-white text-sm truncate">
+                              {file.path}
+                            </div>
+                          </Tooltip>
                           <div class="text-xs text-muted inline-flex items-center gap-2">
                             <span>Ожидаемый размер: {fmtSize(file.expected_size)}</span>
                             <Show when={!file.recoverable}>

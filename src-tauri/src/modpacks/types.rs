@@ -153,22 +153,35 @@ pub struct ModpackInstallProgress {
     pub current_file: Option<String>,
 }
 
+/// Информация о неудачно загруженном моде
+#[derive(Debug, Clone, Serialize)]
+pub struct FailedModInfo {
+    /// Имя файла (как было в манифесте)
+    pub file_name: String,
+    /// Извлечённое имя мода (из filename)
+    pub display_name: String,
+    /// CurseForge project ID (если известен)
+    pub curseforge_project_id: Option<u64>,
+    /// CurseForge file ID (если известен)
+    pub curseforge_file_id: Option<u64>,
+}
+
 /// Итоги установки модпака
 #[derive(Debug, Clone, Serialize)]
 pub struct ModpackInstallSummary {
     pub total_mods: u32,
     pub from_curseforge: Vec<String>,
     pub from_modrinth: Vec<String>,
-    pub failed: Vec<String>,
+    pub failed: Vec<FailedModInfo>,
+    /// ID экземпляра (для последующей установки модов)
+    pub instance_id: String,
+    /// Версия Minecraft (для поиска совместимых модов)
+    pub minecraft_version: String,
+    /// Загрузчик (для поиска совместимых модов)
+    pub loader: String,
 }
 
-/// Источник скачивания мода
-#[derive(Debug, Clone)]
-pub(super) enum DownloadSource {
-    CurseForge,
-    Modrinth,
-    Failed,
-}
+// DownloadSource — внутренний enum, определён в install.rs
 
 // ========== Детали модпака ==========
 

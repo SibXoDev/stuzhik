@@ -1,165 +1,19 @@
-import { createSignal, createEffect, createMemo, onMount, onCleanup, For, Show, untrack } from "solid-js";
+import { createSignal, createEffect, createMemo, onMount, onCleanup, Show, untrack } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "../../../shared/i18n";
-import { ModalWrapper } from "../../../shared/ui";
 import { registerSearchHandler, unregisterSearchHandler } from "../../../shared/stores";
-
-// Types
-interface DependencyNode {
-  id: string;
-  name: string;
-  enabled: boolean;
-  version: string;
-  icon_url: string | null;
-  source: string;
-  dependency_count: number;
-  dependent_count: number;
-  is_library: boolean;
-}
-
-interface DependencyEdge {
-  from: string;
-  from_name?: string; // Optional - backend might not provide it
-  to: string;
-  to_name: string;
-  dependency_type: string;
-  version_requirement: string | null;
-  is_satisfied: boolean;
-  is_problem: boolean;
-}
-
-interface DependencyGraphData {
-  nodes: DependencyNode[];
-  edges: DependencyEdge[];
-}
-
-interface ModRemovalAnalysis {
-  mod_slug: string;
-  is_safe: boolean;
-  affected_mods: AffectedMod[];
-  warning_mods: AffectedMod[];
-  total_affected: number;
-  recommendation: string;
-}
-
-interface AffectedMod {
-  slug: string;
-  name: string;
-  impact: string;
-  reason: string;
-}
-
-// Internal node with position for rendering
-interface GraphNode extends DependencyNode {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  radius: number;
-  pinned: boolean; // If true, physics won't move this node
-}
+import type { DependencyGraphData, DependencyEdge, GraphNode, ModRemovalAnalysis } from "./graphTypes";
+import { VERTEX_SHADER_CIRCLE, FRAGMENT_SHADER_CIRCLE, VERTEX_SHADER_LINE, FRAGMENT_SHADER_LINE } from "./graphShaders";
+import { createGraphNodes, runForceSimulation, createLivePhysics } from "./graphPhysics";
+import type { LivePhysicsController } from "./graphPhysics";
+import GraphNodePanel from "./GraphNodePanel";
+import RemovalAnalysisDialog from "./RemovalAnalysisDialog";
+import { Tooltip } from "../../../shared/ui";
 
 interface Props {
   instanceId: string;
   onClose?: () => void;
 }
-
-// WebGL2 Shaders
-const VERTEX_SHADER_CIRCLE = `#version 300 es
-  in vec2 a_position;
-  in vec2 a_center;
-  in float a_radius;
-  in vec4 a_color;
-  in float a_selected;
-
-  uniform vec2 u_resolution;
-  uniform vec2 u_pan;
-  uniform float u_zoom;
-
-  out vec4 v_color;
-  out vec2 v_position;
-  out float v_radius;
-  out float v_selected;
-
-  void main() {
-    vec2 worldPos = a_center + a_position * a_radius;
-    vec2 screenPos = (worldPos * u_zoom + u_pan) / u_resolution * 2.0 - 1.0;
-    screenPos.y *= -1.0;
-
-    gl_Position = vec4(screenPos, 0.0, 1.0);
-    v_color = a_color;
-    v_position = a_position;
-    v_radius = a_radius;
-    v_selected = a_selected;
-  }
-`;
-
-const FRAGMENT_SHADER_CIRCLE = `#version 300 es
-  precision highp float;
-
-  in vec4 v_color;
-  in vec2 v_position;
-  in float v_radius;
-  in float v_selected;
-
-  out vec4 fragColor;
-
-  void main() {
-    float dist = length(v_position);
-
-    // Anti-aliased circle
-    float edge = fwidth(dist);
-    float alpha = 1.0 - smoothstep(1.0 - edge * 2.0, 1.0, dist);
-
-    if (alpha < 0.01) discard;
-
-    // Border
-    float borderWidth = 0.08;
-    float borderInner = 1.0 - borderWidth;
-
-    vec4 borderColor = v_selected > 0.5 ? vec4(1.0, 1.0, 1.0, 1.0) : vec4(0.06, 0.06, 0.07, 1.0);
-    float borderAlpha = smoothstep(borderInner - edge, borderInner, dist);
-
-    vec4 finalColor = mix(v_color, borderColor, borderAlpha);
-    finalColor.a *= alpha;
-
-    // Glow for selected
-    if (v_selected > 0.5) {
-      float glowDist = dist - 1.0;
-      float glow = exp(-glowDist * 3.0) * 0.5;
-      finalColor.rgb += v_color.rgb * glow;
-    }
-
-    fragColor = finalColor;
-  }
-`;
-
-const VERTEX_SHADER_LINE = `#version 300 es
-  in vec2 a_position;
-  in vec4 a_color;
-
-  uniform vec2 u_resolution;
-  uniform vec2 u_pan;
-  uniform float u_zoom;
-
-  out vec4 v_color;
-
-  void main() {
-    vec2 screenPos = (a_position * u_zoom + u_pan) / u_resolution * 2.0 - 1.0;
-    screenPos.y *= -1.0;
-    gl_Position = vec4(screenPos, 0.0, 1.0);
-    v_color = a_color;
-  }
-`;
-
-const FRAGMENT_SHADER_LINE = `#version 300 es
-  precision highp float;
-  in vec4 v_color;
-  out vec4 fragColor;
-  void main() {
-    fragColor = v_color;
-  }
-`;
 
 export default function DependencyGraph(props: Props) {
   const { t } = useI18n();
@@ -194,9 +48,6 @@ export default function DependencyGraph(props: Props) {
 
   // Live physics simulation
   const [livePhysics, setLivePhysics] = createSignal(true); // Always on by default
-  let physicsFrame: number | null = null;
-  let physicsAdjacency: Map<string, Set<string>> | null = null;
-  let physicsNodeMap: Map<string, GraphNode> | null = null;
 
   // Search state
   const [searchOpen, setSearchOpen] = createSignal(false);
@@ -407,7 +258,7 @@ export default function DependencyGraph(props: Props) {
     });
 
     if (!gl) {
-      console.error("[DependencyGraph] WebGL2 not supported");
+      if (import.meta.env.DEV) console.error("[DependencyGraph] WebGL2 not supported");
       return false;
     }
 
@@ -416,7 +267,7 @@ export default function DependencyGraph(props: Props) {
     lineProgram = createProgram(gl, VERTEX_SHADER_LINE, FRAGMENT_SHADER_LINE);
 
     if (!circleProgram || !lineProgram) {
-      console.error("[DependencyGraph] Failed to create shader programs");
+      if (import.meta.env.DEV) console.error("[DependencyGraph] Failed to create shader programs");
       return false;
     }
 
@@ -504,7 +355,7 @@ export default function DependencyGraph(props: Props) {
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      console.error("Shader compile error:", gl.getShaderInfoLog(shader));
+      if (import.meta.env.DEV) console.error("Shader compile error:", gl.getShaderInfoLog(shader));
       gl.deleteShader(shader);
       return null;
     }
@@ -523,7 +374,7 @@ export default function DependencyGraph(props: Props) {
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error("Program link error:", gl.getProgramInfoLog(program));
+      if (import.meta.env.DEV) console.error("Program link error:", gl.getProgramInfoLog(program));
       gl.deleteProgram(program);
       return null;
     }
@@ -557,455 +408,66 @@ export default function DependencyGraph(props: Props) {
     }
   };
 
-  // Initialize node positions
+  // Initialize node positions using extracted physics module
   const initializeNodes = (data: DependencyGraphData) => {
     if (!canvasRef || canvasRef.width === 0 || canvasRef.height === 0) {
       pendingGraphData = data;
       return;
     }
 
-    // Use CSS dimensions (not canvas dimensions with DPR) for node coordinates
-    // This ensures consistency with pan/zoom calculations
     const dpr = window.devicePixelRatio || 1;
-    const width = canvasRef.width / dpr;
-    const height = canvasRef.height / dpr;
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    // Calculate radius based on node importance
-    const getRadius = (node: DependencyNode): number => {
-      if (node.is_library || node.dependent_count > 5) return 28;
-      if (node.dependent_count > 2) return 22;
-      return 18;
-    };
-
-    // Place nodes in a spiral for better initial distribution
-    const graphNodes: GraphNode[] = data.nodes.map((node, i) => {
-      const angle = i * 0.5;
-      const radius = 50 + i * 3;
-      return {
-        ...node,
-        x: centerX + Math.cos(angle) * Math.min(radius, Math.min(width, height) * 0.4),
-        y: centerY + Math.sin(angle) * Math.min(radius, Math.min(width, height) * 0.4),
-        vx: 0,
-        vy: 0,
-        radius: getRadius(node),
-        pinned: false,
-      };
-    });
+    const canvas = { width: canvasRef.width, height: canvasRef.height, dpr };
+    const graphNodes = createGraphNodes(data, canvas);
 
     setNodes(graphNodes);
-    runForceSimulation(graphNodes, data.edges);
+    runForceSimulation(graphNodes, data.edges, canvas, {
+      setNodes: (n) => setNodes(n),
+      setSimulationProgress: (p) => setSimulationProgress(p),
+      setLoading: (l) => setLoading(l),
+      render,
+      fitToScreen,
+    });
   };
 
-  // Force simulation with collision detection
-  const runForceSimulation = (graphNodes: GraphNode[], edges: DependencyEdge[]) => {
-    if (!canvasRef || canvasRef.width === 0) {
-      return;
-    }
-
-    // Use CSS dimensions for simulation (same as initializeNodes)
-    const dpr = window.devicePixelRatio || 1;
-    const width = canvasRef.width / dpr;
-    const height = canvasRef.height / dpr;
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    // Build adjacency maps
-    const dependsOn = new Map<string, Set<string>>(); // node -> its dependencies
-    const dependedBy = new Map<string, Set<string>>(); // node -> nodes that depend on it
-    const nodeMap = new Map<string, GraphNode>();
-
-    for (const node of graphNodes) {
-      nodeMap.set(node.id, node);
-      dependsOn.set(node.id, new Set());
-      dependedBy.set(node.id, new Set());
-    }
-
-    for (const edge of edges) {
-      if (edge.dependency_type === "required" || edge.dependency_type === "optional") {
-        // from depends on to
-        dependsOn.get(edge.from)?.add(edge.to);
-        dependedBy.get(edge.to)?.add(edge.from);
-      }
-    }
-
-    // Compute dependency levels (topological sort)
-    // Level 0 = libraries (no dependencies or very few), higher levels = more dependent
-    const levels = new Map<string, number>();
-    const computeLevel = (nodeId: string, visited: Set<string>): number => {
-      if (levels.has(nodeId)) return levels.get(nodeId)!;
-      if (visited.has(nodeId)) return 0; // cycle detection
-      visited.add(nodeId);
-
-      const deps = dependsOn.get(nodeId) || new Set();
-      if (deps.size === 0) {
-        levels.set(nodeId, 0);
-        return 0;
-      }
-
-      let maxDepLevel = 0;
-      for (const depId of deps) {
-        if (nodeMap.has(depId)) {
-          maxDepLevel = Math.max(maxDepLevel, computeLevel(depId, visited) + 1);
-        }
-      }
-      levels.set(nodeId, maxDepLevel);
-      return maxDepLevel;
-    };
-
-    for (const node of graphNodes) {
-      computeLevel(node.id, new Set());
-    }
-
-    // Group nodes by level
-    const maxLevel = Math.max(...Array.from(levels.values()), 0);
-    const nodesByLevel: GraphNode[][] = Array.from({ length: maxLevel + 1 }, () => []);
-    for (const node of graphNodes) {
-      const level = levels.get(node.id) || 0;
-      nodesByLevel[level].push(node);
-    }
-
-    // Initial placement: place by level in concentric rings
-    // Level 0 (hubs/libraries) in center, higher levels outward
-    const maxRadius = Math.min(width, height) * 0.45;
-
-    for (let level = 0; level <= maxLevel; level++) {
-      const nodesAtLevel = nodesByLevel[level];
-      if (nodesAtLevel.length === 0) continue;
-
-      // Ring radius increases with level
-      const ringRadius = level === 0
-        ? Math.min(width, height) * 0.1
-        : (level / (maxLevel || 1)) * maxRadius;
-
-      // Sort nodes at this level by their primary dependency for better grouping
-      nodesAtLevel.sort((a, b) => {
-        const aDeps = Array.from(dependsOn.get(a.id) || []);
-        const bDeps = Array.from(dependsOn.get(b.id) || []);
-        return (aDeps[0] || "").localeCompare(bDeps[0] || "");
-      });
-
-      // Place nodes around the ring
-      nodesAtLevel.forEach((node, i) => {
-        const angle = (i / nodesAtLevel.length) * Math.PI * 2 - Math.PI / 2;
-        const jitter = (Math.random() - 0.5) * 20;
-        node.x = centerX + Math.cos(angle) * (ringRadius + jitter);
-        node.y = centerY + Math.sin(angle) * (ringRadius + jitter);
-      });
-    }
-
-    // Build bidirectional adjacency for force simulation
-    const adjacency = new Map<string, Set<string>>();
-    for (const edge of edges) {
-      if (!adjacency.has(edge.from)) adjacency.set(edge.from, new Set());
-      if (!adjacency.has(edge.to)) adjacency.set(edge.to, new Set());
-      adjacency.get(edge.from)!.add(edge.to);
-      adjacency.get(edge.to)!.add(edge.from);
-    }
-
-    const TOTAL_ITERATIONS = 250; // More iterations for complex graphs
-    const ITERATIONS_PER_CHUNK = 5;
-    let currentIteration = 0;
-
-    const runChunk = () => {
-      const endIteration = Math.min(currentIteration + ITERATIONS_PER_CHUNK, TOTAL_ITERATIONS);
-      const alpha = Math.pow(1 - currentIteration / TOTAL_ITERATIONS, 2); // Quadratic decay
-
-      for (let iter = currentIteration; iter < endIteration; iter++) {
-        for (let i = 0; i < graphNodes.length; i++) {
-          const node = graphNodes[i];
-          let fx = 0;
-          let fy = 0;
-
-          // Repulsion from all nodes (weaker for connected nodes)
-          for (let j = 0; j < graphNodes.length; j++) {
-            if (i === j) continue;
-            const other = graphNodes[j];
-            let dx = node.x - other.x;
-            let dy = node.y - other.y;
-
-            if (dx === 0 && dy === 0) {
-              dx = (Math.random() - 0.5) * 2;
-              dy = (Math.random() - 0.5) * 2;
-            }
-
-            const distSq = dx * dx + dy * dy;
-            const dist = Math.sqrt(distSq);
-
-            // Weaker repulsion for connected nodes
-            const isConnected = adjacency.get(node.id)?.has(other.id);
-            const repulsionStrength = isConnected ? 3000 : 5000;
-            const minDistSq = 400;
-            const effectiveDistSq = Math.max(distSq, minDistSq);
-            const repulsion = repulsionStrength / effectiveDistSq;
-            fx += (dx / dist) * repulsion;
-            fy += (dy / dist) * repulsion;
-
-            // Collision resolution
-            const minDist = node.radius + other.radius + 15;
-            if (dist < minDist && dist > 0) {
-              const overlap = minDist - dist;
-              const pushX = (dx / dist) * overlap * 0.5;
-              const pushY = (dy / dist) * overlap * 0.5;
-              node.x += pushX;
-              node.y += pushY;
-              other.x -= pushX;
-              other.y -= pushY;
-            }
-          }
-
-          // STRONG attraction along edges - this is key for grouping!
-          const neighbors = adjacency.get(node.id);
-          if (neighbors) {
-            for (const otherId of neighbors) {
-              const other = nodeMap.get(otherId);
-              if (!other) continue;
-
-              let dx = other.x - node.x;
-              let dy = other.y - node.y;
-
-              if (dx === 0 && dy === 0) {
-                dx = (Math.random() - 0.5) * 2;
-                dy = (Math.random() - 0.5) * 2;
-              }
-
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              // Target distance: closer for connected nodes
-              const targetDist = node.radius + other.radius + 80;
-              // Strong attraction force
-              const force = (dist - targetDist) * 0.08;
-              fx += (dx / dist) * force;
-              fy += (dy / dist) * force;
-            }
-          }
-
-          // Weak center gravity
-          fx += (centerX - node.x) * 0.001;
-          fy += (centerY - node.y) * 0.001;
-
-          // No hard boundaries - nodes can spread freely, use pan/zoom
-
-          // Apply velocity with strong damping
-          node.vx = (node.vx + fx * alpha * 0.4) * 0.8;
-          node.vy = (node.vy + fy * alpha * 0.4) * 0.8;
-
-          // Velocity cap (prevents oscillation)
-          const maxVelocity = 20;
-          const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
-          if (speed > maxVelocity) {
-            node.vx = (node.vx / speed) * maxVelocity;
-            node.vy = (node.vy / speed) * maxVelocity;
-          }
-
-          node.x += node.vx;
-          node.y += node.vy;
-
-          // NaN check - reset to center if corrupted
-          if (!isFinite(node.x) || !isFinite(node.y)) {
-            node.x = centerX + (Math.random() - 0.5) * 100;
-            node.y = centerY + (Math.random() - 0.5) * 100;
-            node.vx = 0;
-            node.vy = 0;
-          }
-
-          // Soft safety clamp (only for extreme cases, with margin)
-          const safetyMargin = node.radius;
-          node.x = Math.max(safetyMargin, Math.min(width - safetyMargin, node.x));
-          node.y = Math.max(safetyMargin, Math.min(height - safetyMargin, node.y));
-        }
-      }
-
-      currentIteration = endIteration;
-      setSimulationProgress(Math.round((currentIteration / TOTAL_ITERATIONS) * 100));
-      setNodes([...graphNodes]);
-      render();
-
-      if (currentIteration < TOTAL_ITERATIONS) {
-        requestAnimationFrame(runChunk);
-      } else {
-        setLoading(false);
-        // Auto fit after simulation
-        fitToScreen();
-      }
-    };
-
-    runChunk();
-  };
-
-  // Live physics loop - runs continuously when enabled
-  const runLivePhysics = () => {
-    if (!livePhysics() || !canvasRef || canvasRef.width === 0) {
-      physicsFrame = null;
-      return;
-    }
-
-    const graphNodes = nodes();
-    const graphData = graph();
-    if (!graphData || graphNodes.length === 0) {
-      physicsFrame = requestAnimationFrame(runLivePhysics);
-      return;
-    }
-
-    // Build adjacency (cached) and node map (updated every frame to reflect drag changes)
-    if (!physicsAdjacency) {
-      physicsAdjacency = new Map<string, Set<string>>();
-      for (const edge of graphData.edges) {
-        if (!physicsAdjacency.has(edge.from)) physicsAdjacency.set(edge.from, new Set());
-        if (!physicsAdjacency.has(edge.to)) physicsAdjacency.set(edge.to, new Set());
-        physicsAdjacency.get(edge.from)!.add(edge.to);
-        physicsAdjacency.get(edge.to)!.add(edge.from);
-      }
-    }
-
-    // Rebuild node map every frame to get current positions from signal
-    physicsNodeMap = new Map<string, GraphNode>();
-    for (const node of graphNodes) {
-      physicsNodeMap.set(node.id, node);
-    }
-
-    const dpr = window.devicePixelRatio || 1;
-    const width = canvasRef.width / dpr;
-    const height = canvasRef.height / dpr;
-    const centerX = width / 2;
-    const centerY = height / 2;
-
-    const currentDraggedNode = draggedNode();
-
-    // Adjust physics parameters based on window size
-    const minDimension = Math.min(width, height);
-    const isSmallWindow = minDimension < 400;
-    const alpha = isSmallWindow ? 0.15 : 0.3; // Weaker forces for small windows
-    const damping = isSmallWindow ? 0.7 : 0.85; // Stronger damping for small windows
-    const maxVelocity = isSmallWindow ? 5 : 15; // Limit max velocity for small windows
-
-    // Single physics step
-    for (let i = 0; i < graphNodes.length; i++) {
-      const node = graphNodes[i];
-
-      // Skip dragged node - it's being moved by user
-      if (currentDraggedNode && node.id === currentDraggedNode.id) continue;
-
-      // Skip pinned nodes - user has positioned them manually
-      if (node.pinned) continue;
-
-      let fx = 0;
-      let fy = 0;
-
-      // Repulsion from all nodes
-      for (let j = 0; j < graphNodes.length; j++) {
-        if (i === j) continue;
-        const other = graphNodes[j];
-        let dx = node.x - other.x;
-        let dy = node.y - other.y;
-
-        if (dx === 0 && dy === 0) {
-          dx = (Math.random() - 0.5) * 2;
-          dy = (Math.random() - 0.5) * 2;
-        }
-
-        const distSq = dx * dx + dy * dy;
-        const dist = Math.sqrt(distSq);
-
-        const isConnected = physicsAdjacency.get(node.id)?.has(other.id);
-        const repulsionStrength = isConnected ? 2000 : 4000;
-        const minDistSq = 400;
-        const effectiveDistSq = Math.max(distSq, minDistSq);
-        const repulsion = repulsionStrength / effectiveDistSq;
-        fx += (dx / dist) * repulsion;
-        fy += (dy / dist) * repulsion;
-
-        // Collision
-        const minDist = node.radius + other.radius + 15;
-        if (dist < minDist && dist > 0) {
-          const overlap = minDist - dist;
-          const pushX = (dx / dist) * overlap * 0.3;
-          const pushY = (dy / dist) * overlap * 0.3;
-          node.x += pushX;
-          node.y += pushY;
-          if (!currentDraggedNode || other.id !== currentDraggedNode.id) {
-            other.x -= pushX;
-            other.y -= pushY;
-          }
-        }
-      }
-
-      // Attraction along edges
-      const neighbors = physicsAdjacency.get(node.id);
-      if (neighbors) {
-        for (const otherId of neighbors) {
-          const other = physicsNodeMap.get(otherId);
-          if (!other) continue;
-
-          let dx = other.x - node.x;
-          let dy = other.y - node.y;
-
-          if (dx === 0 && dy === 0) {
-            dx = (Math.random() - 0.5) * 2;
-            dy = (Math.random() - 0.5) * 2;
-          }
-
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const targetDist = node.radius + other.radius + 80;
-          // Stronger force when connected to dragged node (makes neighbors follow)
-          const isDraggedNeighbor = currentDraggedNode && other.id === currentDraggedNode.id;
-          const forceMultiplier = isDraggedNeighbor ? 0.15 : 0.05;
-          const force = (dist - targetDist) * forceMultiplier;
-          fx += (dx / dist) * force;
-          fy += (dy / dist) * force;
-        }
-      }
-
-      // Center gravity (stronger for small windows to keep nodes in view)
-      const gravityStrength = isSmallWindow ? 0.003 : 0.001;
-      fx += (centerX - node.x) * gravityStrength;
-      fy += (centerY - node.y) * gravityStrength;
-
-      // Very weak center attraction instead of hard boundaries
-      // This keeps nodes somewhat centered but allows them to spread naturally
-      const centerAttractionStrength = 0.001;
-      fx += (centerX - node.x) * centerAttractionStrength;
-      fy += (centerY - node.y) * centerAttractionStrength;
-
-      // Apply velocity with damping
-      node.vx = (node.vx + fx * alpha * 0.3) * damping;
-      node.vy = (node.vy + fy * alpha * 0.3) * damping;
-
-      // Clamp velocity to prevent chaos
-      const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
-      if (speed > maxVelocity) {
-        node.vx = (node.vx / speed) * maxVelocity;
-        node.vy = (node.vy / speed) * maxVelocity;
-      }
-
-      node.x += node.vx;
-      node.y += node.vy;
-      // No hard boundaries - use pan/zoom to navigate
-    }
-
-    setNodes([...graphNodes]);
-    render();
-
-    physicsFrame = requestAnimationFrame(runLivePhysics);
+  // Live physics controller (extracted to graphPhysics.ts)
+  let livePhysicsController: LivePhysicsController | null = null;
+
+  const initLivePhysics = () => {
+    livePhysicsController = createLivePhysics({
+      getNodes: () => nodes(),
+      getGraph: () => graph(),
+      getCanvas: () => {
+        if (!canvasRef || canvasRef.width === 0) return null;
+        return { width: canvasRef.width, height: canvasRef.height, dpr: window.devicePixelRatio || 1 };
+      },
+      getFilters: () => ({
+        showOrphans: showOrphans(),
+        showLibraries: showLibraries(),
+        showDisabled: showDisabled(),
+      }),
+      getDraggedNode: () => draggedNode(),
+      setNodes: (n) => setNodes(n),
+      render,
+    });
   };
 
   // Start/stop live physics based on signal
   createEffect(() => {
     if (livePhysics()) {
-      // Clear cached data when starting
-      physicsAdjacency = null;
-      physicsNodeMap = null;
-      if (!physicsFrame) {
-        physicsFrame = requestAnimationFrame(runLivePhysics);
-      }
+      if (!livePhysicsController) initLivePhysics();
+      livePhysicsController?.start();
     } else {
-      if (physicsFrame) {
-        cancelAnimationFrame(physicsFrame);
-        physicsFrame = null;
-      }
+      livePhysicsController?.stop();
     }
   });
 
+  // Invalidate physics active nodes cache when filter signals change
+  createEffect(() => {
+    showOrphans();
+    showLibraries();
+    showDisabled();
+    livePhysicsController?.invalidateActiveNodes();
+  });
   // Get node color
   const getNodeColor = (node: GraphNode): [number, number, number, number] => {
     if (!node.enabled) return [0.22, 0.25, 0.31, 1.0]; // gray
@@ -1332,6 +794,8 @@ export default function DependencyGraph(props: Props) {
     if (node) {
       setDraggedNode(node);
       setIsDragging(true);
+      // Wake physics from stable state when user starts dragging
+      livePhysicsController?.resetStability();
     } else {
       setIsPanning(true);
     }
@@ -1391,6 +855,12 @@ export default function DependencyGraph(props: Props) {
   };
 
   const handleMouseUp = () => {
+    // Invalidate cached activeNodes after drag — during drag, setNodes() creates
+    // new objects each frame, making the cached references stale. Without this,
+    // physics mutations go to old objects and are silently discarded.
+    if (isDragging() && wasDragged()) {
+      livePhysicsController?.invalidateActiveNodes();
+    }
     setIsDragging(false);
     setIsPanning(false);
     setDraggedNode(null);
@@ -1422,13 +892,15 @@ export default function DependencyGraph(props: Props) {
     const y = e.clientY - rect.top;
     const node = getNodeAtPosition(x, y);
 
-    if (node && node.pinned) {
-      // Double-click on pinned node unpins it
+    if (node) {
+      // Double-click toggles pin state
       const nodesCopy = [...nodes()];
       const idx = nodesCopy.findIndex(n => n.id === node.id);
       if (idx >= 0) {
-        nodesCopy[idx] = { ...nodesCopy[idx], pinned: false };
+        nodesCopy[idx] = { ...nodesCopy[idx], pinned: !nodesCopy[idx].pinned };
         setNodes(nodesCopy);
+        // Invalidate cache — setNodes created new objects, old activeNodes refs are stale
+        livePhysicsController?.invalidateActiveNodes();
         render();
       }
     }
@@ -1437,6 +909,7 @@ export default function DependencyGraph(props: Props) {
   const unpinAllNodes = () => {
     const nodesCopy = nodes().map(n => ({ ...n, pinned: false }));
     setNodes(nodesCopy);
+    livePhysicsController?.invalidateActiveNodes();
     render();
   };
 
@@ -1532,7 +1005,7 @@ export default function DependencyGraph(props: Props) {
       setRemovalAnalysis(analysis);
       setShowRemovalDialog(true);
     } catch (e) {
-      console.error("Failed to analyze removal:", e);
+      if (import.meta.env.DEV) console.error("Failed to analyze removal:", e);
     }
   };
 
@@ -1685,7 +1158,6 @@ export default function DependencyGraph(props: Props) {
       return;
     }
   };
-
   onMount(() => {
     // Register search handler for global Ctrl+F
     registerSearchHandler("dependency-graph", openSearch, 10); // Higher priority when graph is open
@@ -1733,10 +1205,7 @@ export default function DependencyGraph(props: Props) {
     stopAnimationLoop();
 
     // Stop live physics
-    if (physicsFrame) {
-      cancelAnimationFrame(physicsFrame);
-      physicsFrame = null;
-    }
+    livePhysicsController?.destroy();
 
     // Cleanup WebGL resources
     if (gl) {
@@ -1748,7 +1217,6 @@ export default function DependencyGraph(props: Props) {
       if (lineProgram) gl.deleteProgram(lineProgram);
     }
   });
-
   // Re-render when filters change
   createEffect(() => {
     showLibraries();
@@ -1780,7 +1248,7 @@ export default function DependencyGraph(props: Props) {
               type="checkbox"
               checked={showLibraries()}
               onChange={(e) => setShowLibraries(e.currentTarget.checked)}
-              class="w-3 h-3 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-0"
+              class="w-3 h-3 rounded border-gray-600 bg-gray-700 focus:ring-0"
             />
             {t().mods?.dependencyGraph?.filters?.libs || "Libs"}
           </label>
@@ -1790,7 +1258,7 @@ export default function DependencyGraph(props: Props) {
               type="checkbox"
               checked={showDisabled()}
               onChange={(e) => setShowDisabled(e.currentTarget.checked)}
-              class="w-3 h-3 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-0"
+              class="w-3 h-3 rounded border-gray-600 bg-gray-700 focus:ring-0"
             />
             {t().mods?.dependencyGraph?.filters?.disabled || "Off"}
           </label>
@@ -1800,68 +1268,75 @@ export default function DependencyGraph(props: Props) {
               type="checkbox"
               checked={highlightProblems()}
               onChange={(e) => setHighlightProblems(e.currentTarget.checked)}
-              class="w-3 h-3 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-0"
+              class="w-3 h-3 rounded border-gray-600 bg-gray-700 focus:ring-0"
             />
             {t().mods?.dependencyGraph?.filters?.issues || "Issues"}
           </label>
 
-          <label class="flex items-center gap-1 text-xs text-gray-300 cursor-pointer select-none px-1.5 py-1 rounded hover:bg-gray-700/50" title="Show mods without any dependencies">
-            <input
-              type="checkbox"
-              checked={showOrphans()}
-              onChange={(e) => setShowOrphans(e.currentTarget.checked)}
-              class="w-3 h-3 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-0"
-            />
-            {t().mods?.dependencyGraph?.filters?.solo || "Solo"}
-          </label>
+          <Tooltip text="Show mods without any dependencies" position="bottom">
+            <label class="flex items-center gap-1 text-xs text-gray-300 cursor-pointer select-none px-1.5 py-1 rounded hover:bg-gray-700/50">
+              <input
+                type="checkbox"
+                checked={showOrphans()}
+                onChange={(e) => setShowOrphans(e.currentTarget.checked)}
+                class="w-3 h-3 rounded border-gray-600 bg-gray-700 focus:ring-0"
+              />
+              {t().mods?.dependencyGraph?.filters?.solo || "Solo"}
+            </label>
+          </Tooltip>
 
           <div class="w-px h-4 bg-gray-700 mx-0.5" />
 
-          <button
-            onClick={() => setLivePhysics(!livePhysics())}
-            class={`p-2 flex items-center justify-center rounded-full transition-colors ${
-              livePhysics()
-                ? "text-green-400 bg-green-500/20 hover:bg-green-500/30"
-                : "text-gray-400 hover:text-white hover:bg-gray-700"
-            }`}
-            title={livePhysics() ? "Остановить физику" : "Включить физику (реальное время)"}
-          >
-            <i class={livePhysics() ? "i-hugeicons-stop w-3 h-3" : "i-hugeicons-play w-3 h-3"} />
-          </button>
+          <Tooltip text={livePhysics() ? "Остановить физику" : "Включить физику (реальное время)"} position="bottom">
+            <button
+              onClick={() => setLivePhysics(!livePhysics())}
+              class={`p-2 flex items-center justify-center rounded-full transition-colors ${
+                livePhysics()
+                  ? "text-green-400 bg-green-500/20 hover:bg-green-500/30"
+                  : "text-gray-400 hover:text-white hover:bg-gray-700"
+              }`}
+            >
+              <i class={livePhysics() ? "i-hugeicons-stop w-3 h-3" : "i-hugeicons-play w-3 h-3"} />
+            </button>
+          </Tooltip>
 
           <Show when={hasPinnedNodes()}>
-            <button
-              onClick={unpinAllNodes}
-              class="p-2 flex items-center justify-center text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/20 rounded-full transition-colors"
-              title="Открепить все узлы (двойной клик на узел = открепить)"
-            >
-              <i class="i-hugeicons-pin-off w-3 h-3" />
-            </button>
+            <Tooltip text="Открепить все узлы (двойной клик на узел = открепить)" position="bottom">
+              <button
+                onClick={unpinAllNodes}
+                class="p-2 flex items-center justify-center text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/20 rounded-full transition-colors"
+              >
+                <i class="i-hugeicons-pin-off w-3 h-3" />
+              </button>
+            </Tooltip>
           </Show>
 
-          <button
-            onClick={openSearch}
-            class="p-2 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
-            title={t().mods?.dependencyGraph?.tooltips?.search || "Search (Ctrl+F)"}
-          >
-            <i class="i-hugeicons-search-01 w-3 h-3" />
-          </button>
+          <Tooltip text={t().mods?.dependencyGraph?.tooltips?.search || "Search (Ctrl+F)"} position="bottom">
+            <button
+              onClick={openSearch}
+              class="p-2 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
+            >
+              <i class="i-hugeicons-search-01 w-3 h-3" />
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={fitToScreen}
-            class="p-2 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
-            title={t().mods?.dependencyGraph?.tooltips?.fitToScreen || "Fit to screen"}
-          >
-            <i class="i-hugeicons-arrow-expand-02 w-3 h-3" />
-          </button>
+          <Tooltip text={t().mods?.dependencyGraph?.tooltips?.fitToScreen || "Fit to screen"} position="bottom">
+            <button
+              onClick={fitToScreen}
+              class="p-2 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
+            >
+              <i class="i-hugeicons-arrow-expand-02 w-3 h-3" />
+            </button>
+          </Tooltip>
 
-          <button
-            onClick={resetView}
-            class="p-2 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
-            title={t().mods?.dependencyGraph?.tooltips?.resetView || "Reset view"}
-          >
-            <i class="i-hugeicons-home-01 w-3 h-3" />
-          </button>
+          <Tooltip text={t().mods?.dependencyGraph?.tooltips?.resetView || "Reset view"} position="bottom">
+            <button
+              onClick={resetView}
+              class="p-2 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
+            >
+              <i class="i-hugeicons-home-01 w-3 h-3" />
+            </button>
+          </Tooltip>
 
           <Show when={props.onClose}>
             <button
@@ -1877,17 +1352,17 @@ export default function DependencyGraph(props: Props) {
       {/* Main content */}
       <div class="flex flex-1 min-h-0">
         {/* Canvas container */}
-        <div ref={containerRef} class="flex-1 relative overflow-hidden">
+        <div ref={containerRef} class="flex-1 overflow-hidden">
           <Show when={loading()}>
             <div class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95 z-20">
-              <i class="i-svg-spinners-ring-resize w-10 h-10 text-blue-500 mb-3" />
+              <i class="i-svg-spinners-ring-resize w-10 h-10 text-[var(--color-primary)] mb-3" />
               <Show when={simulationProgress() > 0}>
                 <div class="text-sm text-gray-400 mb-2">
                   {t().mods?.dependencyGraph?.calculatingLayout || "Calculating layout..."} {simulationProgress()}%
                 </div>
                 <div class="w-48 h-1.5 bg-gray-700 rounded-full overflow-hidden">
                   <div
-                    class="h-full bg-blue-500 transition-all duration-150"
+                    class="h-full bg-[var(--color-primary)] transition-all duration-150"
                     style={{ width: `${simulationProgress()}%` }}
                   />
                 </div>
@@ -1902,12 +1377,12 @@ export default function DependencyGraph(props: Props) {
 
           <Show when={error()}>
             <div class="absolute inset-0 flex items-center justify-center bg-gray-900/95 z-20">
-              <div class="text-center max-w-md px-4">
-                <i class="i-hugeicons-alert-02 w-12 h-12 text-red-400 mb-4" />
-                <p class="text-red-400 text-sm mb-4">{error()}</p>
+              <div class="flex flex-col items-center gap-4 text-center max-w-md px-4">
+                <i class="i-hugeicons-alert-02 w-12 h-12 text-red-400" />
+                <p class="text-red-400 text-sm">{error()}</p>
                 <button
                   onClick={() => loadGraph()}
-                  class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors"
+                  class="btn-primary px-4 py-2 text-sm rounded-lg"
                 >
                   Try Again
                 </button>
@@ -1959,20 +1434,22 @@ export default function DependencyGraph(props: Props) {
                       {searchIndex() + 1}/{searchResults().length}
                     </span>
                     <div class="flex items-center gap-0.5">
-                      <button
-                        onClick={prevSearchResult}
-                        class="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50"
-                        title={t().mods?.dependencyGraph?.search?.prev || "Previous (Shift+Enter)"}
-                      >
-                        <i class="i-hugeicons-arrow-up-01 w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={nextSearchResult}
-                        class="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50"
-                        title={t().mods?.dependencyGraph?.search?.next || "Next (Enter)"}
-                      >
-                        <i class="i-hugeicons-arrow-down-01 w-3 h-3" />
-                      </button>
+                      <Tooltip text={t().mods?.dependencyGraph?.search?.prev || "Previous (Shift+Enter)"} position="bottom">
+                        <button
+                          onClick={prevSearchResult}
+                          class="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50"
+                        >
+                          <i class="i-hugeicons-arrow-up-01 w-3 h-3" />
+                        </button>
+                      </Tooltip>
+                      <Tooltip text={t().mods?.dependencyGraph?.search?.next || "Next (Enter)"} position="bottom">
+                        <button
+                          onClick={nextSearchResult}
+                          class="p-1 text-gray-400 hover:text-white rounded hover:bg-gray-700/50"
+                        >
+                          <i class="i-hugeicons-arrow-down-01 w-3 h-3" />
+                        </button>
+                      </Tooltip>
                     </div>
                   </Show>
                   <button
@@ -2019,355 +1496,27 @@ export default function DependencyGraph(props: Props) {
           </div>
         </div>
 
-        {/* Selected node panel - uses memoized data to avoid infinite render loops */}
-        {/* keyed forces re-render when selected node changes */}
+
+        {/* Selected node panel — extracted to GraphNodePanel */}
         <Show when={selectedPanelData()} keyed>
-          {(data) => {
-            // With keyed=true, 'data' is the actual value (not accessor),
-            // and this block re-runs when selectedPanelData changes identity
-            const sel = data.sel;
-            const uniqueDependsOnMods = data.uniqueDependsOnMods;
-            const uniqueIncompatibleMods = data.uniqueIncompatibleMods;
-            const uniqueDependentMods = data.uniqueDependentMods;
-            const tg = () => t().mods?.dependencyGraph;
-
-            return (
-              <div class="flex-shrink-0 w-72 bg-gray-850 border-l border-gray-700 p-4 overflow-y-auto">
-                <div class="flex items-start gap-3 mb-4">
-                  <Show
-                    when={sel.icon_url}
-                    fallback={
-                      <div class="w-12 h-12 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0">
-                        <i class="i-hugeicons-package w-6 h-6 text-gray-500" />
-                      </div>
-                    }
-                  >
-                    <img
-                      src={sel.icon_url!}
-                      alt=""
-                      class="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                    />
-                  </Show>
-                  <div class="min-w-0 flex-1">
-                    <h3 class="font-medium text-white text-sm leading-tight mb-1">
-                      {sel.name}
-                    </h3>
-                    <p class="text-xs text-gray-400 truncate">{sel.version}</p>
-                  </div>
-                </div>
-
-                <div class="space-y-3 text-sm">
-                  <div class="flex justify-between items-center py-2 border-b border-gray-700/50">
-                    <span class="text-gray-400">{tg()?.panel?.source || "Source"}</span>
-                    <span class="text-white capitalize font-medium">{sel.source}</span>
-                  </div>
-                  <div class="flex justify-between items-center py-2 border-b border-gray-700/50">
-                    <span class="text-gray-400">{tg()?.panel?.status || "Status"}</span>
-                    <span class={`font-medium ${sel.enabled ? "text-green-400" : "text-gray-500"}`}>
-                      {sel.enabled
-                        ? (tg()?.panel?.enabled || "Enabled")
-                        : (tg()?.panel?.disabled || "Disabled")}
-                    </span>
-                  </div>
-
-                  <Show when={sel.is_library}>
-                    <div class="flex items-center gap-2 px-3 py-2 bg-indigo-500/20 rounded-lg text-indigo-300">
-                      <i class="i-hugeicons-libraries w-4 h-4" />
-                      <span class="text-sm font-medium">{tg()?.panel?.library || "Library Mod"}</span>
-                    </div>
-                  </Show>
-
-                  {/* Dependencies section */}
-                  <div class="pt-2">
-                    <div class="flex items-center gap-2 mb-2">
-                      <i class="i-hugeicons-arrow-down-01 w-4 h-4 text-blue-400" />
-                      <span class="text-gray-300 font-medium text-xs uppercase tracking-wide">
-                        {tg()?.panel?.dependsOn || "Depends on"} ({uniqueDependsOnMods.length})
-                      </span>
-                    </div>
-                    <Show
-                      when={uniqueDependsOnMods.length > 0}
-                      fallback={
-                        <p class="text-xs text-gray-500 italic pl-6">
-                          {tg()?.panel?.noDependencies || "No dependencies"}
-                        </p>
-                      }
-                    >
-                      <div class="space-y-1 max-h-32 overflow-y-auto">
-                        <For each={uniqueDependsOnMods}>
-                          {(dep) => (
-                            <button
-                              class="w-full text-left px-2 py-1.5 rounded transition-colors flex items-center gap-2 group"
-                              classList={{
-                                "hover:bg-gray-700/50 cursor-pointer": !!dep.node,
-                                "cursor-default opacity-60": !dep.node,
-                              }}
-                              onClick={() => dep.node && focusOnNode(dep.node)}
-                              disabled={!dep.node}
-                              title={dep.node ? tg()?.panel?.clickToFocus || "Click to focus" : tg()?.panel?.notInstalled || "Not installed"}
-                            >
-                              <Show
-                                when={dep.node?.icon_url}
-                                fallback={
-                                  <div
-                                    class="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center"
-                                    classList={{
-                                      "bg-red-500/30": !dep.node || dep.type === "required",
-                                      "bg-yellow-500/30": dep.node && dep.type === "optional",
-                                      "bg-gray-600": dep.node && dep.type !== "required" && dep.type !== "optional",
-                                    }}
-                                  >
-                                    <i
-                                      class="w-3 h-3"
-                                      classList={{
-                                        "i-hugeicons-alert-02 text-red-400": !dep.node,
-                                        "i-hugeicons-package text-gray-400": !!dep.node,
-                                      }}
-                                    />
-                                  </div>
-                                }
-                              >
-                                <img
-                                  src={dep.node!.icon_url!}
-                                  alt=""
-                                  class="w-5 h-5 rounded flex-shrink-0 object-cover"
-                                />
-                              </Show>
-                              <span
-                                class="text-xs truncate flex-1"
-                                classList={{
-                                  "text-gray-300 group-hover:text-white": !!dep.node,
-                                  "text-gray-500 line-through": !dep.node,
-                                }}
-                              >
-                                {dep.name}
-                              </span>
-                              <Show when={!dep.node}>
-                                <span class="text-[10px] text-red-400" title={tg()?.panel?.missingDependency || "Missing dependency"}>
-                                  {tg()?.panel?.missing || "missing"}
-                                </span>
-                              </Show>
-                              <Show when={dep.node && dep.type === "optional"}>
-                                <span class="text-[10px] text-gray-500">(opt)</span>
-                              </Show>
-                            </button>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-                  </div>
-
-                  {/* Incompatible section */}
-                  <Show when={uniqueIncompatibleMods.length > 0}>
-                    <div class="pt-2">
-                      <div class="flex items-center gap-2 mb-2">
-                        <i class="i-hugeicons-alert-02 w-4 h-4 text-red-400" />
-                        <span class="text-gray-300 font-medium text-xs uppercase tracking-wide">
-                          {tg()?.panel?.incompatibleWith || "Incompatible with"} ({uniqueIncompatibleMods.length})
-                        </span>
-                      </div>
-                      <div class="space-y-1 max-h-32 overflow-y-auto">
-                        <For each={uniqueIncompatibleMods}>
-                          {(mod) => (
-                            <button
-                              class="w-full text-left px-2 py-1.5 rounded transition-colors flex items-center gap-2 group"
-                              classList={{
-                                "hover:bg-gray-700/50 cursor-pointer": !!mod.node,
-                                "cursor-default opacity-60": !mod.node,
-                              }}
-                              onClick={() => mod.node && focusOnNode(mod.node)}
-                              disabled={!mod.node}
-                              title={mod.node ? tg()?.panel?.clickToFocus || "Click to focus" : tg()?.panel?.notInstalled || "Not installed"}
-                            >
-                              <Show
-                                when={mod.node?.icon_url}
-                                fallback={
-                                  <div class="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center bg-red-500/30">
-                                    <i class="i-hugeicons-package w-3 h-3 text-red-400" />
-                                  </div>
-                                }
-                              >
-                                <img
-                                  src={mod.node!.icon_url!}
-                                  alt=""
-                                  class="w-5 h-5 rounded flex-shrink-0 object-cover ring-1 ring-red-500/50"
-                                />
-                              </Show>
-                              <span
-                                class="text-xs truncate flex-1"
-                                classList={{
-                                  "text-gray-300 group-hover:text-white": !!mod.node,
-                                  "text-gray-500": !mod.node,
-                                }}
-                              >
-                                {mod.name}
-                              </span>
-                              <Show when={mod.is_problem}>
-                                <i class="i-hugeicons-alert-02 w-3 h-3 text-red-400" title={tg()?.panel?.installedConflict || "Installed - conflict!"} />
-                              </Show>
-                            </button>
-                          )}
-                        </For>
-                      </div>
-                    </div>
-                  </Show>
-
-                  {/* Dependents section */}
-                  <div class="pt-2">
-                    <div class="flex items-center gap-2 mb-2">
-                      <i class="i-hugeicons-arrow-up-01 w-4 h-4 text-green-400" />
-                      <span class="text-gray-300 font-medium text-xs uppercase tracking-wide">
-                        {tg()?.panel?.requiredBy || "Required by"} ({uniqueDependentMods.length})
-                      </span>
-                    </div>
-                    <Show
-                      when={uniqueDependentMods.length > 0}
-                      fallback={
-                        <p class="text-xs text-gray-500 italic pl-6">
-                          {tg()?.panel?.noDependents || "No dependents"}
-                        </p>
-                      }
-                    >
-                      <div class="space-y-1 max-h-32 overflow-y-auto">
-                        <For each={uniqueDependentMods}>
-                          {(dep) => (
-                            <button
-                              class="w-full text-left px-2 py-1.5 rounded transition-colors flex items-center gap-2 group"
-                              classList={{
-                                "hover:bg-gray-700/50 cursor-pointer": !!dep.node,
-                                "cursor-default opacity-60": !dep.node,
-                              }}
-                              onClick={() => dep.node && focusOnNode(dep.node)}
-                              disabled={!dep.node}
-                              title={dep.node ? tg()?.panel?.clickToFocus || "Click to focus" : undefined}
-                            >
-                              <Show
-                                when={dep.node?.icon_url}
-                                fallback={
-                                  <div
-                                    class="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center"
-                                    classList={{
-                                      "bg-green-500/30": dep.type === "required",
-                                      "bg-yellow-500/30": dep.type === "optional",
-                                      "bg-gray-600": dep.type !== "required" && dep.type !== "optional",
-                                    }}
-                                  >
-                                    <i class="i-hugeicons-package w-3 h-3 text-gray-400" />
-                                  </div>
-                                }
-                              >
-                                <img
-                                  src={dep.node!.icon_url!}
-                                  alt=""
-                                  class="w-5 h-5 rounded flex-shrink-0 object-cover"
-                                />
-                              </Show>
-                              <span
-                                class="text-xs truncate flex-1"
-                                classList={{
-                                  "text-gray-300 group-hover:text-white": !!dep.node,
-                                  "text-gray-500": !dep.node,
-                                }}
-                              >
-                                {dep.name}
-                              </span>
-                              <Show when={dep.type === "optional"}>
-                                <span class="text-[10px] text-gray-500">(opt)</span>
-                              </Show>
-                            </button>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
-                  </div>
-                </div>
-
-                <button
-                  onClick={analyzeRemoval}
-                  class="w-full mt-4 px-3 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
-                >
-                  <i class="i-hugeicons-delete-02 w-4 h-4" />
-                  {tg()?.panel?.analyzeRemoval || "Analyze Removal"}
-                </button>
-              </div>
-            );
-          }}
+          {(data) => (
+            <GraphNodePanel
+              data={data}
+              onFocusNode={focusOnNode}
+              onAnalyzeRemoval={analyzeRemoval}
+              t={t}
+            />
+          )}
         </Show>
       </div>
 
-      {/* Removal analysis dialog */}
+      {/* Removal analysis dialog — extracted to RemovalAnalysisDialog */}
       <Show when={showRemovalDialog() && removalAnalysis()}>
-        <ModalWrapper backdrop onBackdropClick={() => setShowRemovalDialog(false)}>
-          <div class="w-[480px] bg-gray-850 rounded-xl overflow-hidden">
-            <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-700">
-              <i
-                class={`w-6 h-6 ${
-                  removalAnalysis()!.is_safe
-                    ? "i-hugeicons-checkmark-circle-02 text-green-400"
-                    : "i-hugeicons-alert-02 text-yellow-400"
-                }`}
-              />
-              <h3 class="text-lg font-medium text-white">
-                {t().mods?.dependencyGraph?.removal?.title || "Removal Analysis"}
-              </h3>
-            </div>
-
-            <div class="p-5">
-              <p class="text-sm text-gray-300 mb-4">
-                {removalAnalysis()!.is_safe
-                  ? (t().mods?.dependencyGraph?.removal?.safe || "This mod can be safely removed without breaking other mods.")
-                  : (t().mods?.dependencyGraph?.removal?.unsafe || "Removing this mod may cause issues with other mods.")}
-              </p>
-
-              <Show when={removalAnalysis()!.affected_mods.length > 0}>
-                <div class="mb-4">
-                  <h4 class="text-sm font-medium text-red-400 mb-2 flex items-center gap-2">
-                    <i class="i-hugeicons-alert-02 w-4 h-4" />
-                    {t().mods?.dependencyGraph?.removal?.willBreak || "Will Break"} ({removalAnalysis()!.affected_mods.length} {t().mods?.dependencyGraph?.removal?.modsCount || "mods"})
-                  </h4>
-                  <div class="space-y-2 max-h-40 overflow-y-auto">
-                    <For each={removalAnalysis()!.affected_mods}>
-                      {(mod) => (
-                        <div class="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-                          <div class="font-medium text-white text-sm">{mod.name}</div>
-                          <div class="text-xs text-gray-400 mt-0.5">{mod.reason}</div>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </div>
-              </Show>
-
-              <Show when={removalAnalysis()!.warning_mods.length > 0}>
-                <div>
-                  <h4 class="text-sm font-medium text-yellow-400 mb-2 flex items-center gap-2">
-                    <i class="i-hugeicons-alert-02 w-4 h-4" />
-                    {t().mods?.dependencyGraph?.removal?.mayHaveIssues || "May Have Issues"} ({removalAnalysis()!.warning_mods.length} {t().mods?.dependencyGraph?.removal?.modsCount || "mods"})
-                  </h4>
-                  <div class="space-y-2 max-h-40 overflow-y-auto">
-                    <For each={removalAnalysis()!.warning_mods}>
-                      {(mod) => (
-                        <div class="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                          <div class="font-medium text-white text-sm">{mod.name}</div>
-                          <div class="text-xs text-gray-400 mt-0.5">{mod.reason}</div>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </div>
-              </Show>
-            </div>
-
-            <div class="flex justify-end px-5 py-4 border-t border-gray-700 bg-gray-800/50">
-              <button
-                onClick={() => setShowRemovalDialog(false)}
-                class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition-colors"
-              >
-                {t().mods?.dependencyGraph?.removal?.close || "Close"}
-              </button>
-            </div>
-          </div>
-        </ModalWrapper>
+        <RemovalAnalysisDialog
+          analysis={removalAnalysis}
+          onClose={() => setShowRemovalDialog(false)}
+          t={t}
+        />
       </Show>
     </div>
   );

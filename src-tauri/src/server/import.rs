@@ -56,7 +56,7 @@ pub struct ImportResult {
 pub async fn detect_server(server_dir: impl AsRef<Path>) -> ServerResult<DetectedServer> {
     let server_dir = server_dir.as_ref();
 
-    if !server_dir.exists() {
+    if !fs::try_exists(server_dir).await.unwrap_or(false) {
         return Err(ServerError::NotFound(format!(
             "Directory not found: {}",
             server_dir.display()
@@ -165,7 +165,7 @@ async fn detect_from_indicator_files(
     let fabric_folder = server_dir.join(".fabric");
     let fabric_props = server_dir.join("fabric-server-launcher.properties");
 
-    if fabric_folder.exists() {
+    if fs::try_exists(&fabric_folder).await.unwrap_or(false) {
         evidence.push("Found .fabric directory".into());
 
         // Try to read version from .fabric/server.properties or similar
@@ -173,7 +173,7 @@ async fn detect_from_indicator_files(
         return Some((ServerLoader::Fabric, version, evidence));
     }
 
-    if fabric_props.exists() {
+    if fs::try_exists(&fabric_props).await.unwrap_or(false) {
         evidence.push("Found fabric-server-launcher.properties".into());
 
         // Parse properties to get version
@@ -191,12 +191,12 @@ async fn detect_from_indicator_files(
     let quilt_folder = server_dir.join(".quilt");
     let quilt_props = server_dir.join("quilt-server-launcher.properties");
 
-    if quilt_folder.exists() {
+    if fs::try_exists(&quilt_folder).await.unwrap_or(false) {
         evidence.push("Found .quilt directory".into());
         return Some((ServerLoader::Quilt, None, evidence));
     }
 
-    if quilt_props.exists() {
+    if fs::try_exists(&quilt_props).await.unwrap_or(false) {
         evidence.push("Found quilt-server-launcher.properties".into());
         return Some((ServerLoader::Quilt, None, evidence));
     }
@@ -206,7 +206,7 @@ async fn detect_from_indicator_files(
     let user_jvm = server_dir.join("user_jvm_args.txt");
     let forge_config_dir = server_dir.join("config").join("forge");
 
-    if forge_log.exists() {
+    if fs::try_exists(&forge_log).await.unwrap_or(false) {
         evidence.push("Found forge-installer.jar.log".into());
 
         // Parse log for version
@@ -218,12 +218,12 @@ async fn detect_from_indicator_files(
         return Some((ServerLoader::Forge, None, evidence));
     }
 
-    if user_jvm.exists() {
+    if fs::try_exists(&user_jvm).await.unwrap_or(false) {
         evidence.push("Found user_jvm_args.txt (Forge/NeoForge)".into());
         // Could be Forge or NeoForge, need more info
     }
 
-    if forge_config_dir.exists() {
+    if fs::try_exists(&forge_config_dir).await.unwrap_or(false) {
         evidence.push("Found config/forge directory".into());
         return Some((ServerLoader::Forge, None, evidence));
     }
@@ -232,12 +232,12 @@ async fn detect_from_indicator_files(
     let neoforge_log = server_dir.join("neoforge-installer.jar.log");
     let neoforge_config_dir = server_dir.join("config").join("neoforge");
 
-    if neoforge_log.exists() {
+    if fs::try_exists(&neoforge_log).await.unwrap_or(false) {
         evidence.push("Found neoforge-installer.jar.log".into());
         return Some((ServerLoader::NeoForge, None, evidence));
     }
 
-    if neoforge_config_dir.exists() {
+    if fs::try_exists(&neoforge_config_dir).await.unwrap_or(false) {
         evidence.push("Found config/neoforge directory".into());
         return Some((ServerLoader::NeoForge, None, evidence));
     }
@@ -253,7 +253,7 @@ async fn detect_from_indicator_files(
 /// Read Fabric version from .fabric directory
 async fn read_fabric_version(fabric_dir: &Path) -> Option<String> {
     let remapped_path = fabric_dir.join("remappedJars");
-    if remapped_path.exists() {
+    if fs::try_exists(&remapped_path).await.unwrap_or(false) {
         // Try to find version from remapped jars folder name
         if let Ok(mut entries) = fs::read_dir(&remapped_path).await {
             while let Ok(Some(entry)) = entries.next_entry().await {
@@ -294,7 +294,7 @@ async fn detect_from_libraries(
     server_dir: &Path,
 ) -> Option<(ServerLoader, Option<String>, Option<String>, Vec<String>)> {
     let libraries_dir = server_dir.join("libraries");
-    if !libraries_dir.exists() {
+    if !fs::try_exists(&libraries_dir).await.unwrap_or(false) {
         return None;
     }
 
@@ -306,7 +306,7 @@ async fn detect_from_libraries(
     let forge_libs = libraries_dir.join("net/minecraftforge/forge");
     let neoforge_libs = libraries_dir.join("net/neoforged/neoforge");
 
-    if fabric_loader.exists() {
+    if fs::try_exists(&fabric_loader).await.unwrap_or(false) {
         evidence.push("Found net/fabricmc/fabric-loader in libraries".into());
 
         // Get version from folder name
@@ -316,7 +316,7 @@ async fn detect_from_libraries(
         return Some((ServerLoader::Fabric, mc_version, version, evidence));
     }
 
-    if quilt_loader.exists() {
+    if fs::try_exists(&quilt_loader).await.unwrap_or(false) {
         evidence.push("Found org/quiltmc/quilt-loader in libraries".into());
 
         let version = get_latest_version_from_dir(&quilt_loader).await;
@@ -325,7 +325,7 @@ async fn detect_from_libraries(
         return Some((ServerLoader::Quilt, mc_version, version, evidence));
     }
 
-    if neoforge_libs.exists() {
+    if fs::try_exists(&neoforge_libs).await.unwrap_or(false) {
         evidence.push("Found net/neoforged/neoforge in libraries".into());
 
         let version = get_latest_version_from_dir(&neoforge_libs).await;
@@ -334,7 +334,7 @@ async fn detect_from_libraries(
         return Some((ServerLoader::NeoForge, mc_version, version, evidence));
     }
 
-    if forge_libs.exists() {
+    if fs::try_exists(&forge_libs).await.unwrap_or(false) {
         evidence.push("Found net/minecraftforge/forge in libraries".into());
 
         let version = get_latest_version_from_dir(&forge_libs).await;
@@ -345,7 +345,7 @@ async fn detect_from_libraries(
 
     // Check for vanilla Minecraft
     let mc_libs = libraries_dir.join("net/minecraft/server");
-    if mc_libs.exists() {
+    if fs::try_exists(&mc_libs).await.unwrap_or(false) {
         evidence.push("Found vanilla Minecraft libraries".into());
         let mc_version = get_latest_version_from_dir(&mc_libs).await;
         return Some((ServerLoader::Vanilla, mc_version, None, evidence));
@@ -360,7 +360,7 @@ async fn get_latest_version_from_dir(dir: &Path) -> Option<String> {
     let mut versions = Vec::new();
 
     while let Ok(Some(entry)) = entries.next_entry().await {
-        if entry.path().is_dir() {
+        if fs::metadata(entry.path()).await.map(|m| m.is_dir()).unwrap_or(false) {
             versions.push(entry.file_name().to_string_lossy().to_string());
         }
     }
@@ -379,7 +379,7 @@ async fn detect_mc_version_from_libraries(libraries_dir: &Path) -> Option<String
     ];
 
     for path in &paths {
-        if path.exists() {
+        if fs::try_exists(path).await.unwrap_or(false) {
             if let Some(version) = get_latest_version_from_dir(path).await {
                 return Some(version);
             }
@@ -531,7 +531,7 @@ async fn detect_from_run_scripts(server_dir: &Path) -> Option<(ServerLoader, Vec
     let mut evidence = Vec::new();
 
     for script_path in [&run_sh, &run_bat] {
-        if !script_path.exists() {
+        if !fs::try_exists(script_path).await.unwrap_or(false) {
             continue;
         }
 
@@ -580,7 +580,7 @@ async fn detect_from_run_scripts(server_dir: &Path) -> Option<(ServerLoader, Vec
 /// Detect from mods folder
 async fn detect_from_mods(server_dir: &Path) -> Option<(ServerLoader, Vec<String>)> {
     let mods_dir = server_dir.join("mods");
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return None;
     }
 
@@ -656,7 +656,7 @@ async fn detect_mod_type(jar_path: &Path) -> Option<String> {
 /// Count mods in mods folder
 async fn count_mods(server_dir: &Path) -> usize {
     let mods_dir = server_dir.join("mods");
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return 0;
     }
 

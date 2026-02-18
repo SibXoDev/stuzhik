@@ -396,6 +396,18 @@ pub const MIGRATIONS: &[Migration] = &[
             ALTER TABLE mods ADD COLUMN latest_changelog TEXT;
         "#,
     },
+    Migration {
+        version: 19,
+        description: "Add game_type column for multi-game support (Minecraft/Hytale)",
+        sql: r#"
+            -- Add game_type column to instances table
+            -- Default to 'minecraft' for existing instances
+            ALTER TABLE instances ADD COLUMN game_type TEXT NOT NULL DEFAULT 'minecraft';
+
+            -- Create index for filtering by game type
+            CREATE INDEX IF NOT EXISTS idx_instances_game_type ON instances(game_type);
+        "#,
+    },
 ];
 
 /// Initialize migrations table

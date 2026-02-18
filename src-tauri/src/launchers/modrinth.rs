@@ -11,7 +11,7 @@ use tokio::fs;
 pub async fn parse_profile_json(profile_dir: &Path) -> LauncherResult<ModrinthProfile> {
     let json_path = profile_dir.join("profile.json");
 
-    if !json_path.exists() {
+    if !fs::try_exists(&json_path).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "profile.json not found in {}",
             profile_dir.display()
@@ -29,7 +29,7 @@ pub async fn parse_profile_json(profile_dir: &Path) -> LauncherResult<ModrinthPr
 async fn count_mods(profile_dir: &Path) -> usize {
     let mods_dir = profile_dir.join("mods");
 
-    if !mods_dir.exists() {
+    if !fs::try_exists(&mods_dir).await.unwrap_or(false) {
         return 0;
     }
 
@@ -116,7 +116,7 @@ pub async fn parse_instance(profile_dir: &Path) -> LauncherResult<LauncherInstan
 pub async fn list_instances(launcher_root: &Path) -> LauncherResult<Vec<LauncherInstance>> {
     // Modrinth App stores profiles in profiles/ folder
     let profiles_dir = launcher_root.join("profiles");
-    if !profiles_dir.exists() {
+    if !fs::try_exists(&profiles_dir).await.unwrap_or(false) {
         return Err(LauncherError::NotFound(format!(
             "Profiles directory not found in {}",
             launcher_root.display()
@@ -141,7 +141,7 @@ pub async fn list_instances(launcher_root: &Path) -> LauncherResult<Vec<Launcher
         }
 
         // Check if it's a valid profile (has profile.json)
-        if !path.join("profile.json").exists() {
+        if !fs::try_exists(path.join("profile.json")).await.unwrap_or(false) {
             continue;
         }
 
@@ -215,9 +215,9 @@ pub async fn detect_installations() -> Vec<DetectedLauncher> {
 
     for path_opt in search_paths {
         if let Some(path) = path_opt {
-            if path.exists() {
+            if fs::try_exists(&path).await.unwrap_or(false) {
                 let profiles_path = path.join("profiles");
-                if profiles_path.exists() {
+                if fs::try_exists(&profiles_path).await.unwrap_or(false) {
                     let instance_count = count_instances(&profiles_path).await;
 
                     if instance_count > 0 {
@@ -244,7 +244,9 @@ async fn count_instances(profiles_dir: &Path) -> usize {
     if let Ok(mut entries) = fs::read_dir(profiles_dir).await {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
-            if path.is_dir() && path.join("profile.json").exists() {
+            if path.is_dir()
+                && fs::try_exists(path.join("profile.json")).await.unwrap_or(false)
+            {
                 count += 1;
             }
         }

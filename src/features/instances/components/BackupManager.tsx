@@ -2,6 +2,7 @@ import { createSignal, Show, For, onMount } from "solid-js";
 import { useBackups } from "../../../shared/hooks";
 import { useI18n } from "../../../shared/i18n";
 import { createConfirmDialog } from "../../../shared/components/ConfirmDialog";
+import { Tooltip } from "../../../shared/ui/Tooltip";
 import { formatSize } from "../../../shared/utils/format-size";
 import type { Instance, BackupRecord, BackupModStatus } from "../../../shared/types";
 
@@ -113,7 +114,7 @@ export default function BackupManager(props: Props) {
       {/* Header */}
       <div class="flex items-center justify-between p-4 border-b border-gray-700">
         <div class="flex items-center gap-3">
-          <i class="i-hugeicons-floppy-disk w-5 h-5 text-blue-400" />
+          <i class="i-hugeicons-floppy-disk w-5 h-5 text-[var(--color-primary)]" />
           <h2 class="text-lg font-medium">{t().backup.title}</h2>
         </div>
         <Show when={isModal() && props.onClose}>
@@ -144,7 +145,7 @@ export default function BackupManager(props: Props) {
                   {backupModStatus()?.detected ? t().backup.backupModDetected : t().backup.noBackupMod}
                 </span>
               </div>
-              <p class="text-xs text-gray-400 mt-1">
+              <p class="text-xs text-gray-400">
                 {backupModStatus()?.detected
                   ? t().backup.backupModMessage.replace('{mod}', backupModStatus()?.mod_name || '')
                   : t().backup.noBackupModMessage
@@ -157,39 +158,42 @@ export default function BackupManager(props: Props) {
           <div class="space-y-2">
             <label class="text-sm font-medium">{t().backup.enabled}</label>
             <div class="grid grid-cols-3 gap-2">
-              <button
-                class={`px-2 py-2 rounded-2xl text-sm text-center truncate transition-colors ${
-                  backupStatus() === 'global'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-alpha-30 hover:bg-gray-alpha-50'
-                }`}
-                onClick={() => handleOverrideChange(null)}
-                title={t().backup.useGlobal}
-              >
-                {t().backup.useGlobal}
-              </button>
-              <button
-                class={`px-2 py-2 rounded-2xl text-sm text-center truncate transition-colors ${
-                  backupStatus() === 'enabled'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-alpha-30 hover:bg-gray-alpha-50'
-                }`}
-                onClick={() => handleOverrideChange(true)}
-                title={t().common.enabled}
-              >
-                {t().common.enabled}
-              </button>
-              <button
-                class={`px-2 py-2 rounded-2xl text-sm text-center truncate transition-colors ${
-                  backupStatus() === 'disabled'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-alpha-30 hover:bg-gray-alpha-50'
-                }`}
-                onClick={() => handleOverrideChange(false)}
-                title={t().backup.disabled}
-              >
-                {t().backup.disabled}
-              </button>
+              <Tooltip text={t().backup.useGlobal} position="bottom">
+                <button
+                  class={`px-2 py-2 rounded-2xl text-sm text-center truncate transition-colors ${
+                    backupStatus() === 'global'
+                      ? 'bg-[var(--color-primary)] text-white'
+                      : 'bg-gray-alpha-30 hover:bg-gray-alpha-50'
+                  }`}
+                  onClick={() => handleOverrideChange(null)}
+                >
+                  {t().backup.useGlobal}
+                </button>
+              </Tooltip>
+              <Tooltip text={t().common.enabled} position="bottom">
+                <button
+                  class={`px-2 py-2 rounded-2xl text-sm text-center truncate transition-colors ${
+                    backupStatus() === 'enabled'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-alpha-30 hover:bg-gray-alpha-50'
+                  }`}
+                  onClick={() => handleOverrideChange(true)}
+                >
+                  {t().common.enabled}
+                </button>
+              </Tooltip>
+              <Tooltip text={t().backup.disabled} position="bottom">
+                <button
+                  class={`px-2 py-2 rounded-2xl text-sm text-center truncate transition-colors ${
+                    backupStatus() === 'disabled'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-alpha-30 hover:bg-gray-alpha-50'
+                  }`}
+                  onClick={() => handleOverrideChange(false)}
+                >
+                  {t().backup.disabled}
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -248,25 +252,27 @@ export default function BackupManager(props: Props) {
                       </div>
                     </div>
                     <div class="flex items-center gap-1">
-                      <button
-                        class="p-2 hover:bg-blue-600/20 text-blue-400 rounded transition-colors"
-                        onClick={() => handleRestore(backup)}
-                        disabled={restoring() === backup.id}
-                        title={t().backup.restore}
-                      >
-                        <Show when={restoring() === backup.id} fallback={
-                          <i class="i-hugeicons-refresh w-4 h-4" />
-                        }>
-                          <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
-                        </Show>
-                      </button>
-                      <button
-                        class="p-2 hover:bg-red-600/20 text-red-400 rounded transition-colors"
-                        onClick={() => handleDelete(backup)}
-                        title={t().backup.delete}
-                      >
-                        <i class="i-hugeicons-delete-02 w-4 h-4" />
-                      </button>
+                      <Tooltip text={t().backup.restore} position="bottom">
+                        <button
+                          class="p-2 hover:bg-[var(--color-primary-bg)] text-[var(--color-primary)] rounded transition-colors"
+                          onClick={() => handleRestore(backup)}
+                          disabled={restoring() === backup.id}
+                        >
+                          <Show when={restoring() === backup.id} fallback={
+                            <i class="i-hugeicons-refresh w-4 h-4" />
+                          }>
+                            <i class="i-svg-spinners-6-dots-scale w-4 h-4" />
+                          </Show>
+                        </button>
+                      </Tooltip>
+                      <Tooltip text={t().backup.delete} position="bottom">
+                        <button
+                          class="p-2 hover:bg-red-600/20 text-red-400 rounded transition-colors"
+                          onClick={() => handleDelete(backup)}
+                        >
+                          <i class="i-hugeicons-delete-02 w-4 h-4" />
+                        </button>
+                      </Tooltip>
                     </div>
                   </div>
                 </div>

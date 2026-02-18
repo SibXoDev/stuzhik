@@ -211,7 +211,7 @@ impl WatchManager {
         // Добавляем папки для отслеживания
         for folder in &watch_folders {
             let path = modpack_path.join(folder);
-            if path.exists() {
+            if tokio::fs::try_exists(&path).await.unwrap_or(false) {
                 watcher
                     .watch(&path, RecursiveMode::Recursive)
                     .map_err(|e| format!("Failed to watch {}: {}", folder, e))?;

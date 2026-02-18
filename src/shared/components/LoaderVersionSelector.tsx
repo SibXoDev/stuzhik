@@ -79,7 +79,7 @@ function LoaderVersionSelector(props: Props) {
       setNotAvailable(!hasVersions);
       props.onAvailabilityChange?.(hasVersions);
     } catch (e: unknown) {
-      console.error("Failed to load loader versions:", e);
+      if (import.meta.env.DEV) console.error("Failed to load loader versions:", e);
       const msg = e instanceof Error ? e.message : String(e);
       setError(`Не удалось загрузить версии: ${msg}`);
       setVersions([]);
@@ -221,7 +221,7 @@ function LoaderVersionSelector(props: Props) {
                   <button
                     type="button"
                     class={`w-full px-3 py-2.5 flex items-center justify-between hover:bg-gray-700/50 transition-colors text-left rounded-2xl ${
-                      props.value === version ? "bg-blue-600/20 hover:bg-blue-600/30" : ""
+                      props.value === version ? "bg-[var(--color-primary-bg)] hover:bg-[var(--color-primary-bg)]" : ""
                     }`}
                     onClick={() => handleSelect(version)}
                   >
@@ -229,7 +229,7 @@ function LoaderVersionSelector(props: Props) {
                       <span class="font-medium text-sm">{version}</span>
                     </div>
                     <Show when={props.value === version}>
-                      <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-blue-400 flex-shrink-0" />
+                      <i class="i-hugeicons-checkmark-circle-02 w-5 h-5 text-[var(--color-primary)] flex-shrink-0" />
                     </Show>
                   </button>
                 )}

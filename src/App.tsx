@@ -1,12 +1,14 @@
-import { createSignal, Show, onMount, onCleanup } from "solid-js";
+import { createSignal, createMemo, Show, onMount, onCleanup } from "solid-js";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit, UnlistenFn } from "@tauri-apps/api/event";
 import { TitleBar, AppBackground, DevConsole, ErrorReporter, LogAnalyzer, QuickPlay, DownloadsPanel, ConnectPanel, ToastProvider, UIKit, DevTests, DragDropOverlay } from "./shared/components";
-import { initDownloadListener, useDownloads, useDeveloperMode } from "./shared/hooks";
+import { initDownloadListener, cleanupDownloadListener, useDownloads, useDeveloperMode, useTour, useSafeTimers, registerTour, unregisterTour } from "./shared/hooks";
+import { Tour } from "./shared/components/Tour";
 import AutoUpdater from "./shared/components/AutoUpdater";
 import { ModalWrapper, Dropdown } from "./shared/ui";
 import { initModInstallTracking, initDragDrop, cleanupDragDrop, registerDropHandler, filterByExtensions, triggerSearch } from "./shared/stores";
+import { currentGame } from "./shared/stores/gameContext";
 import { InstanceList, CreateInstanceForm, InstallProgressModal, EditInstanceDialog, useInstances, ImportServerDialog } from "./features/instances";
 import { Settings, SettingsSyncDialog } from "./features/settings";
 import { ModpackBrowser, ModpackProjectList, ModpackEditor, LauncherImportDialog } from "./features/modpacks";
@@ -17,6 +19,7 @@ import type { Instance, ModpackProject, Settings as AppSettings } from "./shared
 function AppContent() {
   const { t } = useI18n();
   const { developerMode } = useDeveloperMode();
+  const { setTimeout: safeTimeout } = useSafeTimers();
   const {
     instances,
     loading,
@@ -28,6 +31,16 @@ function AppContent() {
     deleteInstance,
     repairInstance,
   } = useInstances();
+
+  // Filter instances by currently selected game
+  const filteredInstances = createMemo(() => {
+    const game = currentGame();
+    return instances().filter(inst => {
+      // Handle legacy instances without game_type (treat as minecraft)
+      const instGame = inst.game_type || "minecraft";
+      return instGame === game;
+    });
+  });
 
   const [showCreateForm, setShowCreateForm] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
@@ -52,8 +65,151 @@ function AppContent() {
   const [consoleDetached, setConsoleDetached] = createSignal(false);
   const [detailViewOpen, setDetailViewOpen] = createSignal(false);
 
+  // Закрыть все модалки перед шагом тура — чтобы target-элемент был видимым
+  const ensureMainScreen = () => {
+    setShowSettings(false);
+    setShowModpackBrowser(false);
+    setShowDocs(false);
+    setShowSourceCode(false);
+    setShowConnect(false);
+  };
+
+  // Onboarding tour — полный гид по интерфейсу
+  const tour = useTour({
+    id: "welcome",
+    version: 2,
+    label: t().settings?.tour?.title || "Onboarding",
+    icon: "i-hugeicons-book-02",
+    description: t().settings?.tour?.description || "Interactive guide",
+    steps: [
+      // 1. Приветствие — общий вид
+      {
+        target: "[data-tour='instance-list']",
+        title: t().tour.welcome,
+        description: t().tour.welcomeDesc,
+        placement: "bottom",
+        onBeforeShow: ensureMainScreen,
+      },
+      // 2. Экземпляры (если есть)
+      {
+        target: "[data-tour='instance-grid']",
+        title: t().tour.instanceList,
+        description: t().tour.instanceListDesc,
+        placement: "top",
+      },
+      // 3. Создание экземпляра
+      {
+        target: "[data-tour='create-instance']",
+        title: t().tour.createInstance,
+        description: t().tour.createInstanceDesc,
+        placement: "bottom",
+      },
+      // 4. Модпаки
+      {
+        target: "[data-tour='modpacks']",
+        title: t().tour.modpacks,
+        description: t().tour.modpacksDesc,
+        placement: "bottom",
+      },
+      // 5. Инструменты
+      {
+        target: "[data-tour='tools']",
+        title: t().tour.tools,
+        description: t().tour.toolsDesc,
+        placement: "bottom",
+      },
+      // 6. Quick Play
+      {
+        target: "[data-tour='quick-play']",
+        title: t().tour.quickPlay,
+        description: t().tour.quickPlayDesc,
+        placement: "top",
+      },
+      // 7. Connect (друзья)
+      {
+        target: "[data-tour='connect']",
+        title: t().tour.connect,
+        description: t().tour.connectDesc,
+        placement: "bottom",
+      },
+      // 8. Документация
+      {
+        target: "[data-tour='docs']",
+        title: t().tour.docs,
+        description: t().tour.docsDesc,
+        placement: "bottom",
+      },
+      // 9. Настройки
+      {
+        target: "[data-tour='settings']",
+        title: t().tour.settings,
+        description: t().tour.settingsDesc,
+        placement: "bottom",
+      },
+    ],
+  });
+  registerTour(tour);
+  onCleanup(() => unregisterTour(tour.config.id));
+
+  // Instance Detail sub-tour — показывается внутри экземпляра
+  const detailTour = useTour({
+    id: "instance-detail",
+    version: 1,
+    label: t().tour.detailHeader || "Instance Detail",
+    icon: "i-hugeicons-layers-01",
+    description: t().tour.detailTabsDesc || "Instance management guide",
+    parentId: "welcome",
+    steps: [
+      {
+        target: "[data-tour='detail-header']",
+        title: t().tour.detailHeader,
+        description: t().tour.detailHeaderDesc,
+        placement: "bottom",
+      },
+      {
+        target: "[data-tour='detail-tabs']",
+        title: t().tour.detailTabs,
+        description: t().tour.detailTabsDesc,
+        placement: "bottom",
+      },
+      {
+        target: "[data-tour='detail-actions']",
+        title: t().tour.detailActions,
+        description: t().tour.detailActionsDesc,
+        placement: "bottom",
+      },
+    ],
+  });
+  registerTour(detailTour);
+  onCleanup(() => unregisterTour(detailTour.config.id));
+
   // Drag & drop: pending modpack file to install
   const [pendingModpackFile, setPendingModpackFile] = createSignal<string | null>(null);
+
+  // Auto-start onboarding tour на первом запуске (тур не пройден)
+  onMount(() => {
+    // Задержка чтобы DOM был готов и instances загрузились
+    safeTimeout(() => {
+      if (!tour.isCompleted()) {
+        tour.start();
+      }
+    }, 800);
+  });
+
+  // Restart tour по запросу из Settings
+  const handleRestartTour = () => {
+    setShowSettings(false);
+    safeTimeout(() => {
+      tour.resetTour();
+      tour.start();
+    }, 300);
+  };
+  onMount(() => {
+    window.addEventListener("stuzhik:restart-tour", handleRestartTour);
+  });
+  onCleanup(() => {
+    window.removeEventListener("stuzhik:restart-tour", handleRestartTour);
+  });
 
   // Listen for console detach/attach events
   let unlistenDetach: UnlistenFn | undefined;
@@ -245,7 +401,7 @@ function AppContent() {
           // Refresh instances
           load();
         } catch (e) {
-          console.error("Failed to import manifest:", e);
+          if (import.meta.env.DEV) console.error("Failed to import manifest:", e);
           const { addToast } = await import("./shared/components/Toast");
           addToast({
             type: "error",
@@ -285,7 +441,7 @@ function AppContent() {
   };
 
   const handleInstallError = (error: string) => {
-    console.error("Installation error:", error);
+    if (import.meta.env.DEV) console.error("Installation error:", error);
     // Можно показать toast или что-то ещё
   };
 
@@ -443,12 +599,14 @@ function AppContent() {
 
           {/* Normal content */}
           <Show when={!showSourceCode() && !showDocs()}>
-          <div class="max-w-7xl mx-auto p-4 w-full flex-1 flex flex-col min-h-0 min-w-0">
+          <div class="max-w-[1600px] mx-auto p-4 w-full flex-1 flex flex-col gap-4 min-h-0 min-w-0">
             {/* Header */}
-            <header class="mb-6 flex items-center justify-between">
-              <p class="text-sm text-gray-500">
-                {t().app.subtitle}
-              </p>
+            <header class="flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <p class="text-sm text-gray-500">
+                  {t().app.subtitle}
+                </p>
+              </div>
 
               <div class="flex items-center gap-2">
                 {/* Tools Dropdown - utility functions */}
@@ -456,6 +614,7 @@ function AppContent() {
                   trigger={
                     <button
                       class="btn-secondary"
+                      data-tour="tools"
                       title={t().common.tools}
                     >
                       <i class="i-hugeicons-wrench-01 w-4 h-4" />
@@ -493,6 +652,7 @@ function AppContent() {
 
                   <button
                     class="btn-secondary bg-purple-600/10 border-purple-500/30 text-purple-400 hover:bg-purple-600/20 hover:border-purple-500/40"
+                    data-tour="modpacks"
                     onClick={openModpackBrowser}
                     title={t().modpacks.install}
                   >
@@ -502,6 +662,7 @@ function AppContent() {
 
                   <button
                     class="btn-primary"
+                    data-tour="create-instance"
                     onClick={openCreateForm}
                   >
                     <i class="i-hugeicons-add-01 w-4 h-4" />
@@ -527,13 +688,13 @@ function AppContent() {
                 when={!loading()}
                 fallback={
                   <div class="flex items-center justify-center py-20 gap-3">
-                    <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-blue-500" />
+                    <i class="i-svg-spinners-6-dots-scale w-8 h-8 text-[var(--color-primary)]" />
                     <span class="text-gray-400">{t().instances.loading}</span>
                   </div>
                 }
               >
                 <InstanceList
-                  instances={instances()}
+                  instances={filteredInstances()}
                   onStart={startInstance}
                   onStop={stopInstance}
                   onDelete={deleteInstance}
@@ -543,7 +704,13 @@ function AppContent() {
                   onModpackClick={openModpackBrowser}
                   onImportServer={openImportServer}
                   onImportLauncher={openImportLauncher}
-                  onDetailViewChange={setDetailViewOpen}
+                  onDetailViewChange={(open) => {
+                    setDetailViewOpen(open);
+                    // Запускаем тур по экземпляру при первом открытии
+                    if (open && !detailTour.isCompleted() && !tour.active()) {
+                      safeTimeout(() => detailTour.start(), 400);
+                    }
+                  }}
                 />
               </Show>
             </div>
@@ -552,7 +719,7 @@ function AppContent() {
             <Show when={!detailViewOpen()}>
               <div class="flex-shrink-0 pt-4 pb-2">
                 <QuickPlay
-                  instances={instances()}
+                  instances={filteredInstances()}
                   onInstanceCreated={load}
                 />
               </div>
@@ -582,7 +749,7 @@ function AppContent() {
 
       {/* Modal backdrop - covers entire screen including under titlebar */}
       <Show when={hasModal()}>
-        <div class="fixed inset-0 bg-black/80 backdrop-blur-md z-40" />
+        <div class="fixed inset-0 bg-black/30 backdrop-blur-xl z-40" />
       </Show>
 
       {/* Modals - fixed, centered with titlebar offset */}
@@ -749,6 +916,28 @@ function AppContent() {
         </div>
       </Show>
 
+      {/* Onboarding Tour */}
+      <Tour
+        steps={tour.config.steps}
+        active={tour.active()}
+        currentStep={tour.currentStep()}
+        totalSteps={tour.totalSteps()}
+        onNext={tour.next}
+        onPrev={tour.prev}
+        onSkip={tour.skip}
+      />
+
+      {/* Instance Detail Tour */}
+      <Tour
+        steps={detailTour.config.steps}
+        active={detailTour.active()}
+        currentStep={detailTour.currentStep()}
+        totalSteps={detailTour.totalSteps()}
+        onNext={detailTour.next}
+        onPrev={detailTour.prev}
+        onSkip={detailTour.skip}
+      />
+
       {/* Fixed overlays */}
       <ErrorReporter />
     </div>
@@ -779,7 +968,7 @@ function ConsoleOnlyView() {
     try {
       await appWindow.show();
     } catch (e) {
-      console.error('Failed to show console window:', e);
+      if (import.meta.env.DEV) console.error('Failed to show console window:', e);
     }
 
     // Cleanup on unmount
@@ -834,7 +1023,7 @@ function App() {
         setLanguage(settings.language);
       }
     } catch (e) {
-      console.warn('Failed to load language from settings, using default (ru):', e);
+      if (import.meta.env.DEV) console.warn('Failed to load language from settings, using default (ru):', e);
     }
 
     // Wait for fonts and show window
@@ -851,7 +1040,7 @@ function App() {
           await appWindow.maximize();
           await appWindow.show();
         } catch (e) {
-          console.error('Failed to show window:', e);
+          if (import.meta.env.DEV) console.error('Failed to show window:', e);
         }
       });
     });
@@ -859,6 +1048,7 @@ function App() {
 
   onCleanup(() => {
     cleanupDragDrop();
+    cleanupDownloadListener();
   });
 
   return (

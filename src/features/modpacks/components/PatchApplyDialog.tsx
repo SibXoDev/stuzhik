@@ -38,7 +38,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
       const list = await invoke<Instance[]>("list_instances");
       setInstances(list.filter(i => i.status === "stopped"));
     } catch (e) {
-      console.error("Failed to load instances:", e);
+      if (import.meta.env.DEV) console.error("Failed to load instances:", e);
     }
   });
 
@@ -60,7 +60,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
       });
       setCompatibility(result);
     } catch (e) {
-      console.error("Failed to check compatibility:", e);
+      if (import.meta.env.DEV) console.error("Failed to check compatibility:", e);
       setCompatibility(null);
     } finally {
       setCheckingCompatibility(false);
@@ -89,7 +89,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
       setPreview(null);
       setResult(null);
     } catch (e) {
-      console.error("Failed to load patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to load patch:", e);
       setError(String(e));
     } finally {
       setLoading(false);
@@ -113,7 +113,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
       });
       setPreview(previewResult);
     } catch (e) {
-      console.error("Failed to preview patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to preview patch:", e);
       setError(String(e));
     } finally {
       setLoading(false);
@@ -137,7 +137,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
       });
       setResult(applyResult);
     } catch (e) {
-      console.error("Failed to apply patch:", e);
+      if (import.meta.env.DEV) console.error("Failed to apply patch:", e);
       setError(String(e));
     } finally {
       setApplying(false);
@@ -263,15 +263,15 @@ export const PatchApplyDialog: Component<Props> = (props) => {
               };
 
               return (
-                <div class={`p-3 rounded-xl border ${statusColors[compat.status]}`}>
-                  <div class="flex items-center gap-2 mb-2">
+                <div class={`p-3 rounded-xl border flex flex-col gap-2 ${statusColors[compat.status]}`}>
+                  <div class="flex items-center gap-2">
                     <i class={`w-4 h-4 ${statusIcons[compat.status]}`} />
                     <span class="font-medium text-sm">{statusLabels[compat.status]}</span>
                   </div>
 
                   {/* Errors */}
                   <Show when={compat.errors.length > 0}>
-                    <ul class="text-xs space-y-1 mb-2">
+                    <ul class="text-xs space-y-1">
                       <For each={compat.errors}>
                         {(err) => <li class="text-red-300">• {err}</li>}
                       </For>
@@ -280,7 +280,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
 
                   {/* Warnings */}
                   <Show when={compat.warnings.length > 0}>
-                    <ul class="text-xs space-y-1 mb-2">
+                    <ul class="text-xs space-y-1">
                       <For each={compat.warnings}>
                         {(warn) => <li class="text-yellow-300">• {warn}</li>}
                       </For>
@@ -289,7 +289,7 @@ export const PatchApplyDialog: Component<Props> = (props) => {
 
                   {/* Recommendation */}
                   <Show when={compat.recommendation}>
-                    <p class="text-xs text-muted mt-2 italic">{compat.recommendation}</p>
+                    <p class="text-xs text-muted italic">{compat.recommendation}</p>
                   </Show>
                 </div>
               );

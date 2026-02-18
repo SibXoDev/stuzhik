@@ -1,9 +1,11 @@
 import { createSignal, createEffect, Show, For, onMount, onCleanup } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { LoaderType, MinecraftVersion, Instance, Settings } from "../types";
 import { useI18n } from "../i18n";
 import { Select } from "../ui/Select";
+import { currentGame, isMinecraft } from "../stores/gameContext";
 
 interface Props {
   instances: Instance[];
@@ -34,7 +36,15 @@ const LOADERS: { id: LoaderType; name: string }[] = [
   { id: "quilt", name: "Quilt" },
 ];
 
-const QUICK_PLAY_INSTANCE_NAME = "Quick Play";
+// Quick Play instance name per game
+const getQuickPlayInstanceName = (game: string) => `Quick Play (${game === "minecraft" ? "MC" : "Hytale"})`;
+
+interface HytaleInfo {
+  installed: boolean;
+  path: string | null;
+  version: string | null;
+  executable: string | null;
+}
 
 export default function QuickPlay(props: Props) {
   const { t } = useI18n();
@@ -54,12 +64,22 @@ export default function QuickPlay(props: Props) {
   const [currentDownload, setCurrentDownload] = createSignal<DownloadProgress | null>(null);
   const [isInstalling, setIsInstalling] = createSignal(false);
 
-  // Find Quick Play instance
+  // Hytale state
+  const [hytaleInfo, setHytaleInfo] = createSignal<HytaleInfo | null>(null);
+  const [hytaleRunning, setHytaleRunning] = createSignal(false);
+
+  // Find Quick Play instance for current game
+  const quickPlayInstanceName = () => getQuickPlayInstanceName(currentGame());
   const quickPlayInstance = () =>
-    props.instances.find(i => i.name === QUICK_PLAY_INSTANCE_NAME);
+    props.instances.find(i => i.name === quickPlayInstanceName());
 
   // Check if currently running
   const isRunning = () => {
+    // For Hytale, check hytaleRunning state
+    if (!isMinecraft()) {
+      return hytaleRunning();
+    }
+    // For Minecraft, check instance status
     const instance = quickPlayInstance();
     return instance?.status === "running" || instance?.status === "starting";
   };
@@ -72,6 +92,7 @@ export default function QuickPlay(props: Props) {
 
   // Load versions on mount + restore saved values from existing instance
   onMount(async () => {
+    // Load Minecraft versions
     try {
       const data = await invoke<MinecraftVersion[]>("fetch_minecraft_versions");
       // Only releases, sorted by date
@@ -79,7 +100,7 @@ export default function QuickPlay(props: Props) {
       setVersions(releases);
 
       // Check if Quick Play instance exists and restore its version/loader
-      const existingInstance = props.instances.find(i => i.name === QUICK_PLAY_INSTANCE_NAME);
+      const existingInstance = props.instances.find(i => i.name === quickPlayInstanceName());
       if (existingInstance) {
         // Restore saved values from existing instance
         setSelectedVersion(existingInstance.version);
@@ -90,9 +111,21 @@ export default function QuickPlay(props: Props) {
         setSelectedVersion(releases[0].id);
       }
     } catch (e) {
-      console.error("[QuickPlay] Failed to load versions:", e);
+      if (import.meta.env.DEV) console.error("[QuickPlay] Failed to load versions:", e);
     } finally {
       setLoadingVersions(false);
+    }
+
+    // Load Hytale info
+    try {
+      const info = await invoke<HytaleInfo>("get_hytale_info");
+      setHytaleInfo(info);
+
+      // Check if Hytale is already running
+      const running = await invoke<boolean>("check_hytale_running");
+      setHytaleRunning(running);
+    } catch (e) {
+      if (import.meta.env.DEV) console.error("[QuickPlay] Failed to load Hytale info:", e);
     }
   });
 
@@ -173,16 +206,41 @@ export default function QuickPlay(props: Props) {
     });
   });
 
+  // Periodic check for Hytale running status
+  let hytaleCheckInterval: ReturnType<typeof setInterval> | undefined;
+
+  createEffect(() => {
+    if (!isMinecraft() && hytaleInfo()?.installed) {
+      // Start checking if Hytale is running
+      hytaleCheckInterval = setInterval(async () => {
+        try {
+          const running = await invoke<boolean>("check_hytale_running");
+          setHytaleRunning(running);
+        } catch {
+          // Ignore errors
+        }
+      }, 2000);
+    } else if (hytaleCheckInterval) {
+      clearInterval(hytaleCheckInterval);
+      hytaleCheckInterval = undefined;
+    }
+  });
+
   onCleanup(() => {
     unlistenStatus?.();
     unlistenProgress?.();
     unlistenDownload?.();
     unlistenCreated?.();
     unlistenFailed?.();
+    if (hytaleCheckInterval) {
+      clearInterval(hytaleCheckInterval);
+    }
   });
 
   // Check loader availability when loader or version changes
-  createEffect(async () => {
+  // Uses request ID to prevent stale responses from overwriting newer results
+  let loaderCheckId = 0;
+  createEffect(() => {
     const loader = selectedLoader();
     const version = selectedVersion();
 
@@ -192,22 +250,51 @@ export default function QuickPlay(props: Props) {
       return;
     }
 
+    const currentCheckId = ++loaderCheckId;
     setCheckingLoader(true);
-    try {
-      const loaderVersions = await invoke<string[]>("get_loader_versions", {
-        minecraftVersion: version,
-        loader: loader,
-      });
+
+    invoke<string[]>("get_loader_versions", {
+      minecraftVersion: version,
+      loader: loader,
+    }).then((loaderVersions) => {
+      // Only apply if this is still the latest request
+      if (currentCheckId !== loaderCheckId) return;
       setLoaderAvailable(loaderVersions.length > 0);
-    } catch (e) {
-      console.error("[QuickPlay] Failed to check loader availability:", e);
+    }).catch((e) => {
+      if (currentCheckId !== loaderCheckId) return;
+      if (import.meta.env.DEV) console.error("[QuickPlay] Failed to check loader:", e);
       setLoaderAvailable(false);
-    } finally {
+    }).finally(() => {
+      if (currentCheckId !== loaderCheckId) return;
       setCheckingLoader(false);
-    }
+    });
   });
 
   const handlePlay = async () => {
+    // Handle Hytale separately - direct launch
+    if (!isMinecraft()) {
+      if (hytaleRunning()) {
+        // Can't stop Hytale from here, just inform user
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        await invoke("launch_hytale_game", {
+          gameArgs: null,
+          server: null,
+          port: null,
+        });
+        setHytaleRunning(true);
+      } catch (e) {
+        if (import.meta.env.DEV) console.error("[QuickPlay] Failed to launch Hytale:", e);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Minecraft logic below
     if (isRunning()) {
       // Stop instance
       const instance = quickPlayInstance();
@@ -215,7 +302,7 @@ export default function QuickPlay(props: Props) {
         try {
           await invoke("stop_instance", { id: instance.id });
         } catch (e) {
-          console.error("[QuickPlay] Failed to stop:", e);
+          if (import.meta.env.DEV) console.error("[QuickPlay] Failed to stop:", e);
         }
       }
       return;
@@ -247,7 +334,7 @@ export default function QuickPlay(props: Props) {
                 loaderVersion = loaderVersions[0];
               }
             } catch (e) {
-              console.error("[QuickPlay] Failed to get loader versions:", e);
+              if (import.meta.env.DEV) console.error("[QuickPlay] Failed to get loader versions:", e);
             }
           }
 
@@ -282,13 +369,14 @@ export default function QuickPlay(props: Props) {
             loaderVersion = loaderVersions[0];
           }
         } catch (e) {
-          console.error("[QuickPlay] Failed to get loader versions:", e);
+          if (import.meta.env.DEV) console.error("[QuickPlay] Failed to get loader versions:", e);
         }
       }
 
       await invoke<Instance>("create_instance", {
         req: {
-          name: QUICK_PLAY_INSTANCE_NAME,
+          name: quickPlayInstanceName(),
+          game_type: currentGame(),
           version: selectedVersion(),
           loader: selectedLoader(),
           loader_version: loaderVersion,
@@ -299,7 +387,7 @@ export default function QuickPlay(props: Props) {
 
       props.onInstanceCreated?.();
     } catch (e) {
-      console.error("[QuickPlay] Failed:", e);
+      if (import.meta.env.DEV) console.error("[QuickPlay] Failed:", e);
       setIsPlaying(false);
     } finally {
       setIsLoading(false);
@@ -321,84 +409,125 @@ export default function QuickPlay(props: Props) {
   const showInstallingState = () => isInstalling() || isCurrentlyInstalling() || (isLoading() && !isRunning());
 
   return (
-    <div class="flex flex-col gap-3 mx-auto w-fit">
+    <div class="flex flex-col gap-3 mx-auto w-fit" data-tour="quick-play">
       {/* Main controls row */}
       <div class="flex items-center gap-3 bg-gray-850 border border-gray-750 rounded-2xl p-4">
-        {/* Version selector */}
-        <div class="w-[180px]">
-          <Show
-            when={!loadingVersions()}
-            fallback={
-              <div class="h-10 bg-gray-850 rounded-xl animate-pulse" />
-            }
-          >
-            <Select
-              value={selectedVersion()}
-              options={versions().map(v => ({ value: v.id, label: v.id }))}
-              onChange={setSelectedVersion}
-              disabled={isLoading() || isRunning() || isInstalling()}
-              maxHeight="300px"
-            />
-          </Show>
-        </div>
-
-        {/* Loader selector */}
-        <div class="w-[140px]">
-          <Select
-            value={selectedLoader()}
-            options={LOADERS.map(l => ({ value: l.id, label: l.name }))}
-            onChange={(v) => setSelectedLoader(v as LoaderType)}
-            disabled={isLoading() || isRunning() || isInstalling()}
-          />
-        </div>
-
-        {/* Play button */}
-        <button
-          class={`h-10 px-6 rounded-xl font-medium transition-colors flex items-center gap-2 ${
-            isRunning()
-              ? "bg-red-600 hover:bg-red-500 text-white"
-              : showInstallingState()
-                ? "bg-blue-600 text-white cursor-wait"
-                : !loaderAvailable() && selectedLoader() !== "vanilla"
-                  ? "bg-gray-600 cursor-not-allowed text-gray-400"
-                  : "bg-green-600 hover:bg-green-500 text-white"
-          }`}
-          onClick={handlePlay}
-          disabled={isLoading() || loadingVersions() || checkingLoader() || isInstalling() || (!loaderAvailable() && selectedLoader() !== "vanilla")}
-          title={!loaderAvailable() && selectedLoader() !== "vanilla"
-            ? t().loaders?.notSupportedHint || `${LOADERS.find(l => l.id === selectedLoader())?.name} does not support this Minecraft version`
-            : undefined}
-        >
-          <Show when={showInstallingState() || checkingLoader()}>
-            <i class="i-svg-spinners-6-dots-scale w-4 h-4 text-white" />
-          </Show>
-          <Show when={!showInstallingState() && !checkingLoader()}>
+        {/* Minecraft: Version + Loader selectors */}
+        <Show when={isMinecraft()}>
+          <div class="w-[180px]">
             <Show
-              when={!loaderAvailable() && selectedLoader() !== "vanilla"}
+              when={!loadingVersions()}
               fallback={
-                <i class={`w-5 h-5 ${isRunning() ? "i-hugeicons-stop" : "i-hugeicons-play"}`} />
+                <div class="h-10 bg-gray-850 rounded-xl animate-pulse" />
               }
             >
-              <i class="i-hugeicons-alert-02 w-5 h-5 text-yellow-400" />
+              <Select
+                value={selectedVersion()}
+                options={versions().map(v => ({ value: v.id, label: v.id }))}
+                onChange={setSelectedVersion}
+                disabled={isLoading() || isRunning() || isInstalling()}
+                maxHeight="300px"
+              />
             </Show>
+          </div>
+
+          {/* Loader selector */}
+          <div class="w-[140px]">
+            <Select
+              value={selectedLoader()}
+              options={LOADERS.map(l => ({ value: l.id, label: l.name }))}
+              onChange={(v) => setSelectedLoader(v as LoaderType)}
+              disabled={isLoading() || isRunning() || isInstalling()}
+            />
+          </div>
+        </Show>
+
+        {/* Hytale: Show installed version or Get Hytale button */}
+        <Show when={!isMinecraft()}>
+          <Show
+            when={hytaleInfo()?.installed}
+            fallback={
+              <button
+                class="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-xl text-sm font-medium text-white transition-colors"
+                onClick={() => openUrl("https://hytale.com")}
+              >
+                <i class="i-hugeicons-download-02 w-4 h-4" />
+                <span>{t().games?.getHytale || "Get Hytale"}</span>
+                <i class="i-hugeicons-arrow-up-right-01 w-3 h-3 opacity-60" />
+              </button>
+            }
+          >
+            <div class="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-xl text-sm">
+              <i class="i-hugeicons-game-controller-03 w-4 h-4 text-amber-400" />
+              <span class="text-white">{hytaleInfo()?.version || "Early Access"}</span>
+            </div>
           </Show>
-          <span>
-            {isRunning()
-              ? t().common.stop
-              : showInstallingState()
-                ? t().quickPlay?.installing || "Installing..."
-                : !loaderAvailable() && selectedLoader() !== "vanilla"
-                  ? t().loaders?.notSupported || "Not supported"
-                  : t().common.play || "Play"}
-          </span>
-        </button>
+        </Show>
+
+        {/* Play button - hidden for Hytale if not installed (Get Hytale button is shown instead) */}
+        <Show when={isMinecraft() || hytaleInfo()?.installed}>
+          <button
+            class={`h-10 px-6 rounded-xl font-medium transition-colors flex items-center gap-2 ${
+              isRunning()
+                ? isMinecraft()
+                  ? "bg-red-600 hover:bg-red-500 text-white"
+                  : "bg-amber-600 text-white cursor-default"
+                : showInstallingState()
+                  ? "bg-[var(--color-primary)] text-white cursor-wait"
+                  : (isMinecraft() && !loaderAvailable() && selectedLoader() !== "vanilla")
+                    ? "bg-gray-600 cursor-not-allowed text-gray-400"
+                    : "bg-green-600 hover:bg-green-500 text-white"
+            }`}
+            onClick={handlePlay}
+            disabled={
+              isLoading() ||
+              (isMinecraft() && loadingVersions()) ||
+              checkingLoader() ||
+              isInstalling() ||
+              (isMinecraft() && !loaderAvailable() && selectedLoader() !== "vanilla") ||
+              (!isMinecraft() && hytaleRunning())
+            }
+            title={
+              !isMinecraft() && hytaleRunning()
+                ? t().quickPlay?.hytaleRunning || "Hytale is running"
+                : isMinecraft() && !loaderAvailable() && selectedLoader() !== "vanilla"
+                  ? t().loaders?.notSupportedHint || `${LOADERS.find(l => l.id === selectedLoader())?.name} does not support this Minecraft version`
+                  : undefined
+            }
+          >
+            <Show when={showInstallingState() || checkingLoader()}>
+              <i class="i-svg-spinners-6-dots-scale w-4 h-4 text-white" />
+            </Show>
+            <Show when={!showInstallingState() && !checkingLoader()}>
+              <Show
+                when={isMinecraft() && !loaderAvailable() && selectedLoader() !== "vanilla"}
+                fallback={
+                  <i class={`w-5 h-5 ${isRunning() ? "i-hugeicons-stop" : "i-hugeicons-play"}`} />
+                }
+              >
+                <i class="i-hugeicons-alert-02 w-5 h-5 text-yellow-400" />
+              </Show>
+            </Show>
+            <span>
+              {isRunning()
+                ? isMinecraft()
+                  ? t().common.stop
+                  : t().quickPlay?.playing || "Playing..."
+                : showInstallingState()
+                  ? t().quickPlay?.installing || "Installing..."
+                  : isMinecraft() && !loaderAvailable() && selectedLoader() !== "vanilla"
+                    ? t().loaders?.notSupported || "Not supported"
+                    : t().common.play || "Play"}
+            </span>
+          </button>
+        </Show>
       </div>
 
       {/* Installation progress indicator */}
       <Show when={showInstallingState()}>
-        <div class="bg-gray-850 border border-gray-750 rounded-2xl p-3 animate-in fade-in slide-in-from-top-2 duration-100">
+        <div class="flex flex-col gap-2 bg-gray-850 border border-gray-750 rounded-2xl p-3 animate-in fade-in slide-in-from-top-2 duration-100">
           {/* Step indicators */}
-          <div class="flex items-center justify-center gap-2 mb-2">
+          <div class="flex items-center justify-center gap-2">
             <For each={["java", "minecraft", "loader"] as const}>
               {(step, index) => {
                 const currentIndex = () => {
@@ -420,7 +549,7 @@ export default function QuickPlay(props: Props) {
                           isCompleted()
                             ? "bg-green-600 text-white"
                             : isActive()
-                              ? "bg-blue-600 text-white"
+                              ? "bg-[var(--color-primary)] text-white"
                               : "bg-gray-700 text-gray-500"
                         }`}
                       >
@@ -453,18 +582,18 @@ export default function QuickPlay(props: Props) {
           {/* Download progress */}
           <Show when={currentDownload()}>
             {(download) => (
-              <div class="mt-2 pt-2 border-t border-gray-750">
-                <div class="flex items-center justify-between mb-1">
-                  <span class="text-xs text-gray-400 truncate flex-1 mr-2">{download().name}</span>
+              <div class="flex flex-col gap-1 pt-2 border-t border-gray-750">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-gray-400 truncate flex-1">{download().name}</span>
                   <span class="text-xs text-gray-500">{download().percentage.toFixed(0)}%</span>
                 </div>
                 <div class="w-full h-1 bg-gray-700 rounded-full overflow-hidden">
                   <div
-                    class="h-full bg-blue-600 transition-all duration-100"
+                    class="h-full bg-[var(--color-primary)] transition-all duration-100"
                     style={{ width: `${download().percentage}%` }}
                   />
                 </div>
-                <div class="flex items-center justify-between mt-1">
+                <div class="flex items-center justify-between">
                   <span class="text-xs text-gray-500">
                     {(download().downloaded / 1024 / 1024).toFixed(1)} / {(download().total / 1024 / 1024).toFixed(1)} MB
                   </span>

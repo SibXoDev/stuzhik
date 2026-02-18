@@ -199,7 +199,7 @@ export function Select(props: SelectProps) {
       aria-expanded={open()}
       aria-label={props.ariaLabel}
       aria-activedescendant={focusedIndex() >= 0 ? `select-option-${focusedIndex()}` : undefined}
-      class={`flex items-center justify-between w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl hover:border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all text-sm ${
+      class={`flex items-center justify-between w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl hover:border-gray-600 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary-border)] transition-all text-sm ${
         props.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
       } ${props.class || ""}`}
       disabled={props.disabled}
@@ -237,7 +237,7 @@ export function Select(props: SelectProps) {
             aria-selected={option.value === props.value}
             class={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm cursor-pointer transition-colors rounded-lg ${
               option.value === props.value
-                ? "bg-blue-600/20 text-blue-400"
+                ? "bg-[var(--color-primary-bg)] text-[var(--color-primary)]"
                 : focusedIndex() === index()
                   ? "bg-gray-700/50 text-gray-200"
                   : "text-gray-200 hover:bg-gray-700/30"
@@ -257,7 +257,7 @@ export function Select(props: SelectProps) {
               </div>
             </div>
             <Show when={option.value === props.value}>
-              <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-blue-400 flex-shrink-0" />
+              <i class="i-hugeicons-checkmark-circle-02 w-4 h-4 text-[var(--color-primary)] flex-shrink-0" />
             </Show>
           </button>
         )}

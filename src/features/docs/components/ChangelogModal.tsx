@@ -57,7 +57,7 @@ const ChangelogModal: Component<Props> = (props) => {
         localStorage.setItem(LAST_VIEWED_VERSION_KEY, latestVersion);
       }
     } catch (error) {
-      console.warn("Failed to save last viewed version:", error);
+      if (import.meta.env.DEV) console.warn("Failed to save last viewed version:", error);
     }
   };
 
