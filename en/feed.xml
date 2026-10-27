@@ -8,6 +8,13 @@
   <updated>2026-10-27T00:00:00Z</updated>
   <icon>https://stuzhik.ru/logo.png</icon>
   <entry>
+    <title>Stuzhik 0.0.22</title>
+    <link href="https://stuzhik.ru/en/changelog.html#v0-0-22" />
+    <id>https://stuzhik.ru/en/changelog.html#v0-0-22</id>
+    <updated>2026-10-27T00:00:00Z</updated>
+    <content type="html">&lt;ul&gt;&lt;li&gt;In Developer Mode, UI Kit, the developer console, Dev Tests and the state playground also open from the command search (Ctrl+K), group “Developer”. On Windows UI Kit could fail to open with Ctrl+Shift+U. Without Developer Mode these entries are not in the search&lt;/li&gt;&lt;li&gt;The “Waves” background drew no lines on some graphics cards under Windows: the screen stayed dark, and its tile in settings showed scattered dots. Line thickness is now computed in a way that does not depend on the graphics card&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>Stuzhik 0.0.21</title>
     <link href="https://stuzhik.ru/en/changelog.html#v0-0-21" />
     <id>https://stuzhik.ru/en/changelog.html#v0-0-21</id>

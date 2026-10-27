@@ -8,6 +8,13 @@
   <updated>2026-10-27T00:00:00Z</updated>
   <icon>https://stuzhik.ru/logo.png</icon>
   <entry>
+    <title>Stuzhik 0.0.22</title>
+    <link href="https://stuzhik.ru/changelog.html#v0-0-22" />
+    <id>https://stuzhik.ru/changelog.html#v0-0-22</id>
+    <updated>2026-10-27T00:00:00Z</updated>
+    <content type="html">&lt;ul&gt;&lt;li&gt;В режиме разработчика UI Kit, консоль разработчика, Dev Tests и «Полигон состояний» открываются и из поиска по командам (Ctrl+K), группа «Разработчику». На Windows UI Kit по Ctrl+Shift+U мог не открываться. Без режима разработчика этих пунктов в поиске нет&lt;/li&gt;&lt;li&gt;Фон «Волны» на части видеокарт с Windows не рисовал линии: вместо них оставался тёмный экран, а на плитке в настройках — редкие точки. Толщина линий теперь считается так, что от видеокарты не зависит&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>Stuzhik 0.0.21</title>
     <link href="https://stuzhik.ru/changelog.html#v0-0-21" />
     <id>https://stuzhik.ru/changelog.html#v0-0-21</id>
