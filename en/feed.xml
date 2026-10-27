@@ -8,6 +8,13 @@
   <updated>2026-10-27T00:00:00Z</updated>
   <icon>https://stuzhik.ru/logo.png</icon>
   <entry>
+    <title>Stuzhik 0.0.21</title>
+    <link href="https://stuzhik.ru/en/changelog.html#v0-0-21" />
+    <id>https://stuzhik.ru/en/changelog.html#v0-0-21</id>
+    <updated>2026-10-27T00:00:00Z</updated>
+    <content type="html">&lt;ul&gt;&lt;li&gt;“Background only” mode: the interface hides, leaving the background and the cursor effect — to look at the background or play with it. Turn it on with Ctrl+Shift+B, from the command search (Ctrl+K) or with the “Background only” button in Settings → Interface → “Application Background”; Esc or Ctrl+Shift+B again brings the interface back&lt;/li&gt;&lt;li&gt;“Pixel Trail”: its squares are 3–4 times smaller (“Grid” defaults to 140 instead of 40), and the trail itself is narrower. If you changed its settings, the values you chose stay&lt;/li&gt;&lt;li&gt;Sliders responded only at the top edge of the bar: below it, clicking and dragging did nothing. Now the whole bar works&lt;/li&gt;&lt;li&gt;A slider&amp;apos;s accent marker vanished as soon as the fill reached the label or the value — that is, during almost any drag. Now it never disappears: over the text its ends show above and below&lt;/li&gt;&lt;li&gt;“Target” framed elements off-centre: when the app stuttered the frame flew apart, at the edge of a wide button one of its sides went inside the button, and on the search field it outlined the text inside rather than the field. Now the frame sits around what you see, and its lean toward the cursor stays within the padding. “Target” and “Crosshair” also recognise switches, checkboxes and settings rows&lt;/li&gt;&lt;li&gt;With “Hide the system cursor” on, “Target” and “Crosshair” hid the cursor over text fields too — you couldn&amp;apos;t see where the caret would go. Now the usual text cursor shows over text fields&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>Stuzhik 0.0.20</title>
     <link href="https://stuzhik.ru/en/changelog.html#v0-0-20" />
     <id>https://stuzhik.ru/en/changelog.html#v0-0-20</id>

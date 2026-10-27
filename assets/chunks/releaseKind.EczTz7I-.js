@@ -1,0 +1,1 @@
+const n=r=>{const e=/^(\d+)\.(\d+)\.(\d+)/.exec(r);return e?[Number(e[1]),Number(e[2]),Number(e[3])]:null};function s(r){const e=n(r);return!!e&&(e[0]>0||e[1]>0)}function u(r,e){const t=n(r);return t&&s(r)?t[2]>0:e==="patch"}export{u as i};
