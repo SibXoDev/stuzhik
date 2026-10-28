@@ -8,6 +8,13 @@
   <updated>2026-10-27T00:00:00Z</updated>
   <icon>https://stuzhik.ru/logo.png</icon>
   <entry>
+    <title>Stuzhik 0.0.23</title>
+    <link href="https://stuzhik.ru/en/changelog.html#v0-0-23" />
+    <id>https://stuzhik.ru/en/changelog.html#v0-0-23</id>
+    <updated>2026-10-27T00:00:00Z</updated>
+    <content type="html">&lt;ul&gt;&lt;li&gt;A new profile avatar is no longer silently cropped to the centre: after choosing a picture, a “Visible area” window opens — move the picture with the mouse or arrow keys and zoom with the wheel or the slider, with previews of how it looks on the card and in the list&lt;/li&gt;&lt;li&gt;Shortcuts in the command search, the window search bar, the docs and the “Background only” hint are shown as separate keys joined by “+”: it is clear they are several keys pressed together&lt;/li&gt;&lt;li&gt;Settings → “Data”: the tiles under “Playtime”, “Storage” and “Java management” no longer run together — label and figure are set apart, tiles have even edges and padding, and the eight sizes line up in even rows of four or two&lt;/li&gt;&lt;li&gt;The cursor effect no longer hides under dropdowns, tooltips and menus: over an open list it used to be invisible altogether&lt;/li&gt;&lt;li&gt;A profile card with a frame no longer shows scrollbars: the frame stuck out past the edge by a pixel&lt;/li&gt;&lt;li&gt;Avatar frame “None” now really means no frame: the dark ring around the avatar stays only under a chosen frame&lt;/li&gt;&lt;li&gt;UI Kit (Developer Mode): WakeSlider, GooeyNav and BranchedMenu no longer get covered by a grey block on hover, the GooeyNav highlight no longer slides across the tabs, and its frame uses the app colours&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
+  <entry>
     <title>Stuzhik 0.0.22</title>
     <link href="https://stuzhik.ru/en/changelog.html#v0-0-22" />
     <id>https://stuzhik.ru/en/changelog.html#v0-0-22</id>
