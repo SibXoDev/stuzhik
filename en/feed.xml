@@ -5,8 +5,15 @@
   <link href="https://stuzhik.ru/en/feed.xml" rel="self" />
   <link href="https://stuzhik.ru/en/changelog.html" />
   <id>https://stuzhik.ru/en/</id>
-  <updated>2026-10-27T00:00:00Z</updated>
+  <updated>2026-11-06T00:00:00Z</updated>
   <icon>https://stuzhik.ru/logo.png</icon>
+  <entry>
+    <title>Stuzhik 0.0.24</title>
+    <link href="https://stuzhik.ru/en/changelog.html#v0-0-24" />
+    <id>https://stuzhik.ru/en/changelog.html#v0-0-24</id>
+    <updated>2026-11-06T00:00:00Z</updated>
+    <content type="html">&lt;ul&gt;&lt;li&gt;Deleting a build and other actions no longer fail with “database is locked” in the first seconds after start or while mods are being analysed: refreshing the Minecraft version list held the database for up to 11 seconds, and mod analysis held it while reading every jar file&lt;/li&gt;&lt;li&gt;Cancelling the install of a Fabric or Quilt build takes effect at once: before, the launcher kept waiting up to two minutes for Fabric&amp;apos;s servers, and the cancelled build could stay in the list with an install error instead of disappearing&lt;/li&gt;&lt;li&gt;A modpack install from the catalog can be cancelled from the first second: while the pack&amp;apos;s archive was downloading, the “Cancel” button did nothing&lt;/li&gt;&lt;li&gt;The modpack install window no longer grows a wall of hundreds of “Asset …” and library cards: the pack&amp;apos;s archive is one bar with its size and speed, and the game and mod files are one counter with the current file&lt;/li&gt;&lt;li&gt;The “Pixel trail” cursor effect no longer stutters on fast mouse moves. A jump across half the window built up to ten thousand points per frame and drew each one on the CPU; now the GPU draws the trail, with a few dozen points per jump at most&lt;/li&gt;&lt;li&gt;A mod published for several loaders no longer demands another loader&amp;apos;s dependencies: LambDynamicLights on NeoForge asked for Fabric API, because Modrinth keeps one dependency list for all loaders and the Fabric manifest of a universal jar was read. Mods already installed are recomputed at the next check&lt;/li&gt;&lt;li&gt;Installing Fabric works even when Fabric&amp;apos;s servers are unreachable: version lists and the loader profile come from a backup mirror. Metadata requests of the server installers no longer hang for a minute without an answer&lt;/li&gt;&lt;/ul&gt;</content>
+  </entry>
   <entry>
     <title>Stuzhik 0.0.23</title>
     <link href="https://stuzhik.ru/en/changelog.html#v0-0-23" />
